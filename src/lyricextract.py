@@ -56,7 +56,11 @@ def genius_get_song_id_jp(artist, song):
         # remove nones
         results = [result for result in results if result is not None]
 
-        return results[0] if results else None
+        # if no matches found, return None
+        if len(results) == 0:
+            return None
+
+        return results[0]
     # error handling
     except requests.exceptions.RequestException as e:
         print(e)
@@ -73,6 +77,8 @@ def genius_get_translated(song_id):
 
         # many many digging through layers
         translated_song_id = data['response']['song']['song_relationships']
+
+        list_of_translations = []
 
         # find translation area
         for item in translated_song_id:
