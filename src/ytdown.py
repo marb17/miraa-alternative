@@ -1,20 +1,45 @@
 import yt_dlp
-import io
-import requests
+import json
+import os
+import re
 
-def download_youtube_video(url):
-    yt_download_options = {"format": "bestaudio/best", "quiet": True}
-    with yt_dlp.YoutubeDL(yt_download_options) as ydl:
+from globalfuncs import base58_to_str, str_to_base58
+
+def extract_video_title(url: str) -> json:
+    ydl_opts = {"quiet": True}
+
+    # get info as json
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
-        video_info = info.get('title', None)
-        stream = info["url"]
 
-    response = requests.get(stream, stream=True)
+        # output the title only
+        return info["title"]
 
-    file_like = io.BytesIO(response.content)
-    file_like.seek(0)
+def get_audio(url: str, output_dir='../database/songs/'):
+    # create new dir for specific song
+    title = extract_video_title(url)
+    # use base58 cuz no special characters
+    title_enc = str_to_base58(title)
 
-    return video_info, file_like
+    print(title_enc, " | ", title)
 
-if __name__ == "__main__":
-    pass
+    os.makedirs(output_dir, exist_ok=True)
+
+    # save as wav
+    ydl_opts = {
+        "format": "bestaudio/best",
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "wav",
+            "preferredquality": "192",
+        }],
+        "outtmpl": f"{output_dir}/{title_enc}/{title_enc}",
+        "quiet": True,
+    }
+
+    # download
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url])
+
+    # return the title
+    return title, title_enc

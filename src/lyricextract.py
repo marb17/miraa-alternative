@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import json
 from concurrent.futures import ThreadPoolExecutor
 from lyricsgenius import Genius
+import re
 
 load_dotenv()
 
@@ -36,8 +37,12 @@ def fetch_search_for_multithreadding(hit_id):
         print(e)
 
 
-def genius_get_song_id_jp(artist, song):
-    url_search = f"{genius_api_base}search?q={song} - {artist}"
+def genius_get_song_id_jp(artist, song, removepar=True):
+    if removepar:
+        song = re.sub(r'\([^)]*\)|\[[^\]]*\]', '', song)
+
+    # url_search = f"{genius_api_base}search?q={song} - {artist}"
+    url_search = f"{genius_api_base}search?q={song}"
 
     # call api
     header = {'Authorization': 'Bearer ' + genius_client_access_token}
