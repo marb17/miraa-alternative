@@ -5,8 +5,13 @@ import re
 
 from globalfuncs import base58_to_str, str_to_base58
 
+with open('globalconfig.json', 'r') as f:
+    config = json.load(f)
+
+quiet_mode = bool(config['ytdown_quiet_mode'])
+
 def extract_video_title(url: str) -> json:
-    ydl_opts = {"quiet": True}
+    ydl_opts = {"quiet": quiet_mode}
 
     # get info as json
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -34,7 +39,7 @@ def get_audio(url: str, output_dir='../database/songs/'):
             "preferredquality": "192",
         }],
         "outtmpl": f"{output_dir}/{title_enc}/{title_enc}",
-        "quiet": True,
+        "quiet": quiet_mode,
     }
 
     # download

@@ -3,10 +3,20 @@ import torchaudio
 from demucs.pretrained import get_model
 from demucs.apply import apply_model
 import os
+import gc
+import json
+
+with open('globalconfig.json', 'r') as f:
+    config = json.load(f)
+
+demucs_shifts = int(config["demucs_shifts"])
+demucs_worker_num = int(config["demucs_worker_num"])
+demucs_quiet_mode = bool(config["demucs_quiet_mode"])
+demucs_model = str(["demucs_model"])
 
 from globalfuncs import base58_to_str, str_to_base58
 
-def seperate_audio(filepath, split=True, device="cuda" if torch.cuda.is_available() else "cpu"):
+def separate_audio(filepath, split=True, device="cuda" if torch.cuda.is_available() else "cpu"):
     # demucs model
     model = get_model("mdx_extra_q")
     model.to(device)
@@ -24,7 +34,7 @@ def seperate_audio(filepath, split=True, device="cuda" if torch.cuda.is_availabl
     wav = wav.unsqueeze(0).to(device)
 
     # split
-    sources = apply_model(model, wav, split=split, device=device, shifts=3, progress=True)
+    sources = apply_model(model, wav, split=split, device=device, shifts=demucs_shifts, progress=demucs_quiet_mode, num_workers=demucs_worker_num)
 
     # only get vocals
     vocals = sources[0, -1, :, :]
@@ -34,5 +44,11 @@ def seperate_audio(filepath, split=True, device="cuda" if torch.cuda.is_availabl
     out_path = f"{base}_vocals.wav"
     torchaudio.save(out_path, vocals.cpu(), sr)
     print(f"Saved vocals -> {out_path}")
+
+    # delete model
+
+    del model
+    torch.cuda.empty_cache()
+    gc.collect()
 
     return vocals

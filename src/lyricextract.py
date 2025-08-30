@@ -6,6 +6,11 @@ from concurrent.futures import ThreadPoolExecutor
 from lyricsgenius import Genius
 import re
 
+with open('globalconfig.json', 'r') as f:
+    config = json.load(f)
+
+rem_brak = bool(config["remove_brackets_genius_lyr_search"])
+
 load_dotenv()
 
 # genius data scraper setup
@@ -37,7 +42,7 @@ def fetch_search_for_multithreadding(hit_id):
         print(e)
 
 
-def genius_get_song_id_jp(artist, song, removepar=True):
+def genius_get_song_id_jp(artist, song, removepar=rem_brak):
     if removepar:
         song = re.sub(r'\([^)]*\)|\[[^\]]*\]', '', song)
 
