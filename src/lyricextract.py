@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from lyricsgenius import Genius
 import re
 
+# global config
 with open('globalconfig.json', 'r') as f:
     config = json.load(f)
 
@@ -23,7 +24,7 @@ genius_client_access_token = os.getenv('GENIUS_CLIENT_ACCESS_TOKEN')
 genius_api_base = 'https://api.genius.com/'
 
 # for the multi-processing thread so it can call faster
-def fetch_search_for_multithreadding(hit_id):
+def fetch_search_for_multithreadding(hit_id: str) -> dict:
     headers = {'Authorization': 'Bearer ' + genius_client_access_token}
 
     try:
@@ -35,18 +36,20 @@ def fetch_search_for_multithreadding(hit_id):
             return data['response']['song']['api_path']
         else:
             # return None if no match
-            return None
+            raise Exception(f"Song not found: {data['response']['song']['api_path']}")
 
     # error handling
     except requests.exceptions.RequestException as e:
         print(e)
 
 
-def genius_get_song_id_jp(artist, song, removepar=rem_brak):
+def genius_get_song_id_jp(song: str, removepar=rem_brak, consoleout=True) -> dict:
     if removepar:
         song = re.sub(r'\([^)]*\)|\[[^\]]*\]', '', song)
 
-    # url_search = f"{genius_api_base}search?q={song} - {artist}"
+    if consoleout:
+        print(song)
+
     url_search = f"{genius_api_base}search?q={song}"
 
     # call api
@@ -68,7 +71,7 @@ def genius_get_song_id_jp(artist, song, removepar=rem_brak):
 
         # if no matches found, return None
         if len(results) == 0:
-            return None
+            raise Exception(f"Song not found: {song}")
 
         return results[0]
     # error handling
@@ -102,13 +105,13 @@ def genius_get_translated(song_id):
                 return item['api_path']
 
         # if nothing is found
-        return None
+        raise Exception(f"Song not found: {song_id}")
 
     # error handling
     except requests.exceptions.RequestException as e:
         print(e)
 
-def find_url_from_api_path(api_path):
+def find_url_from_api_path(api_path: int) -> str:
     header = {'Authorization': 'Bearer ' + genius_client_access_token}
 
     # remove first slash
@@ -124,7 +127,7 @@ def find_url_from_api_path(api_path):
     except requests.exceptions.RequestException as e:
         print(e)
 
-def extract_lyrics(api_path):
+def extract_lyrics(api_path: str) -> str:
     # remove all non numbered characters
     api_path = int("".join([char for char in api_path if char.isdigit()]))
 

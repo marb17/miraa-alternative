@@ -6,6 +6,7 @@ import os
 import gc
 import json
 
+# global config
 with open('globalconfig.json', 'r') as f:
     config = json.load(f)
 
@@ -14,9 +15,7 @@ demucs_worker_num = int(config["demucs_worker_num"])
 demucs_quiet_mode = bool(config["demucs_quiet_mode"])
 demucs_model = str(["demucs_model"])
 
-from globalfuncs import base58_to_str, str_to_base58
-
-def separate_audio(filepath, split=True, device="cuda" if torch.cuda.is_available() else "cpu"):
+def separate_audio(filepath: str, split=True, device="cuda" if torch.cuda.is_available() else "cpu") -> None:
     # demucs model
     model = get_model("mdx_extra_q")
     model.to(device)
@@ -27,7 +26,7 @@ def separate_audio(filepath, split=True, device="cuda" if torch.cuda.is_availabl
     # load audio
     wav, sr = torchaudio.load(filepath)
 
-    # make sure strero
+    # make sure stereo
     if wav.shape[0] == 1:
         wav = wav.repeat(2, 1)
 
@@ -46,9 +45,6 @@ def separate_audio(filepath, split=True, device="cuda" if torch.cuda.is_availabl
     print(f"Saved vocals -> {out_path}")
 
     # delete model
-
     del model
     torch.cuda.empty_cache()
     gc.collect()
-
-    return vocals
