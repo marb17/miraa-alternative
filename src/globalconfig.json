@@ -11,5 +11,8 @@
   "whisper_model": "large-v3",
   "whisper_quiet_mode": "False",
 
-  "console_print_line_separators": "True"
+  "console_print_line_separators": "True",
+
+  "large_model_name": "../model/.llama/checkpoints/Llama3.2-3B-Instruct-conv",
+  "jp_en_model_name": "../model/shisav2"
 }

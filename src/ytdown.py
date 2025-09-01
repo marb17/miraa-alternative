@@ -1,14 +1,14 @@
 import yt_dlp
 import json
 import os
-import re
+from globalfuncs import str_to_base58
 
-from globalfuncs import base58_to_str, str_to_base58
-
+# global config
 with open('globalconfig.json', 'r') as f:
     config = json.load(f)
 
 quiet_mode = bool(config['ytdown_quiet_mode'])
+
 
 def extract_video_title(url: str) -> json:
     ydl_opts = {"quiet": quiet_mode}
@@ -20,7 +20,7 @@ def extract_video_title(url: str) -> json:
         # output the title only
         return info["title"]
 
-def get_audio(url: str, output_dir='../database/songs/'):
+def youtube_download_audio(url: str, output_dir='../database/songs/') -> tuple:
     # create new dir for specific song
     title = extract_video_title(url)
     # use base58 cuz no special characters
