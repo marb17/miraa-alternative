@@ -21,14 +21,15 @@ def extract_video_title(url: str) -> json:
         return info["title"]
 
 def youtube_download_audio(url: str, output_dir='../database/songs/') -> tuple:
-    # create new dir for specific song
     title = extract_video_title(url)
-    # use base58 cuz no special characters
     title_enc = str_to_base58(title)
 
     print(title_enc, " | ", title)
 
-    os.makedirs(output_dir, exist_ok=True)
+    song_dir = os.path.join(output_dir, title_enc)
+    os.makedirs(song_dir, exist_ok=True)
+
+    outtmpl = os.path.join(song_dir, "audio")
 
     # save as wav
     ydl_opts = {
@@ -38,7 +39,7 @@ def youtube_download_audio(url: str, output_dir='../database/songs/') -> tuple:
             "preferredcodec": "wav",
             "preferredquality": "192",
         }],
-        "outtmpl": f"{output_dir}/{title_enc}/{title_enc}",
+        "outtmpl": outtmpl,
         "quiet": quiet_mode,
     }
 

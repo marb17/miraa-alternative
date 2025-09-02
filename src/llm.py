@@ -8,6 +8,7 @@ import tiktoken
 import accelerate
 import gc
 import bitsandbytes
+import re
 
 # global config
 with open('globalconfig.json', 'r') as f:
@@ -20,6 +21,103 @@ bnb_config = BitsAndBytesConfig(load_in_8bit=True)
 
 # device setup
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+META_PATTERNS = [
+    r'(?i)\blyrics\b', r'歌詞', r'(?i)\bofficial\s*(video|audio)\b', r'(?i)\bmv\b',
+    r'(?i)\bcolor\s*coded\b', r'(?i)\bver(\.|sion)?\b', r'(?i)\bfull\s*version\b',
+    r'(?i)\bhd\b', r'(?i)\b4k\b', r'(?i)\blive\b', r'(?i)\bvisualizer\b',
+    r'(?i)\bkan\|rom\|eng\b', r'(?i)\bromaji\b', r'(?i)\benglish\b', r'(?i)\bsubs?\b',
+]
+
+SEP_PATTERN = r'\s*[-–—]\s*'  # common "Artist - Title" separators
+
+def has_non_latin(s: str) -> bool:
+    # returns True if string has chars outside basic Latin
+    return bool(re.search(r'[^\x00-\x7F]', s))
+
+def strip_known_meta(s: str) -> str:
+    # remove common junk tokens anywhere
+    for pat in META_PATTERNS:
+        s = re.sub(pat, '', s)
+    # kill known "(From ...)" or "(Official ...)" etc.
+    s = re.sub(r'[\(\[\{]\s*(?i:from|official|mv|ver|version|lyrics|歌詞).*?[\)\]\}]', '', s)
+    # collapse whitespace
+    s = re.sub(r'\s{2,}', ' ', s).strip(' -–—|')
+    return s.strip()
+
+def clean_brackets_keep_core(s: str) -> str:
+    # remove *all* bracketed content – safer for titles
+    s = re.sub(r'[\(\[\{].*?[\)\]\}]', '', s)
+    s = re.sub(r'\s{2,}', ' ', s).strip(' -–—|')
+    return s.strip()
+
+def pick_artist(chunk: str) -> str:
+    chunk = chunk.strip()
+    # If there's non-Latin text in parentheses, prefer that (e.g., GIVEN (ギヴン) -> ギヴン)
+    m = re.search(r'\(([^)]{1,60})\)', chunk)
+    if m:
+        inner = m.group(1).strip()
+        if has_non_latin(inner):
+            return inner
+    # Else drop parentheses and keep the main text as-is
+    no_paren = clean_brackets_keep_core(chunk)
+    return no_paren or chunk
+
+def pick_title(chunk: str) -> str:
+    # remove metadata junk
+    s = strip_known_meta(chunk)
+
+    # collect bracketed candidates
+    parens = re.findall(r'[\(\[\{](.*?)[\)\]\}]', s)
+
+    # remove all parens for a clean base
+    base = clean_brackets_keep_core(s)
+
+    # 1. Prefer Japanese inside parentheses
+    for p in parens:
+        if re.search(r'[\u3040-\u30FF\u4E00-\u9FFF]', p):  # Hiragana/Katakana/Kanji
+            return p.strip()
+
+    # 2. If base contains Japanese, use it
+    if re.search(r'[\u3040-\u30FF\u4E00-\u9FFF]', base):
+        return base
+
+    # 3. Else, if base has Latin letters (Romaji), use that
+    if re.search(r'[A-Za-z]', base):
+        return base
+
+    # 4. Last fallback: return the first non-metadata parenthesis or the base
+    for p in parens:
+        if p.strip():
+            return p.strip()
+    return base
+
+
+def extract_title_artist(text: str) -> str:
+    t = text.strip()
+    # fast path: split on the first dash-like separator
+    parts = re.split(SEP_PATTERN, t, maxsplit=1)
+    if len(parts) == 2:
+        left, right = parts[0], parts[1]
+        artist = pick_artist(left)
+        title = pick_title(right)
+    else:
+        # fallback heuristics if no dash found: try “Title by Artist” or similar
+        by = re.split(r'(?i)\s+by\s+', t, maxsplit=1)
+        if len(by) == 2:
+            title = pick_title(by[0])
+            artist = pick_artist(by[1])
+        else:
+            # last-ditch: treat leading quoted chunk as title
+            m = re.search(r'“([^”]+)”|"([^"]+)"|『([^』]+)』|『([^』]+)』', t)
+            if m:
+                title = pick_title(next(g for g in m.groups() if g))
+                rest = t.replace(m.group(0), '')
+                artist = pick_artist(rest)
+            else:
+                # give up and return a best-effort single field (title only)
+                return clean_brackets_keep_core(strip_known_meta(t))
+    return f"{title} - {artist}"
 
 def create_model() -> None:
     global tokenizer, model
@@ -60,28 +158,61 @@ def clear_model() -> None:
         torch.cuda.empty_cache()
         gc.collect()
 
-def get_title_from_song(input_text):
-    prompt = f"""
-You are a text parser. Your only job is to extract the song title and artist from the given input.
+def get_title_from_song(input_text, strict: bool, artist: bool):
+    print(input_text)
+
+    input_text = extract_title_artist(input_text)
+
+    print(input_text)
+
+    prompt =f"""You are a strict text parser.
+
+Task:
+- Extract the song title and artist from the input string.
 
 Rules:
-- If both title and artist exist → output exactly in the format: Title - Artist
-- If only a title exists → output only the title
-- Never invent, translate, or guess missing information
-- Do not add explanations, filler words, or extra characters
-- Keep the title exactly as given, except remove extra metadata like (From "..."), (Full Version), etc.
+1. Never translate, romanize, reword, or guess. Keep text exactly as written in the input.
+2. If there is both a title and an artist → output in the exact format: Title - Artist
+3. If there is only a title → output only the title
+4. Do not output anything else besides the final result (no explanations, no extra characters).
+5. Remove only metadata or junk text, including but not limited to:
+   - Lyrics / 歌詞
+   - Official Video / Audio / MV
+   - Color Coded
+   - Kan|Rom|Eng
+   - Full Version / Version
+   - From "..."
+   - HD, 4K, Live, Visualizer
+6. If the artist text contains both a Latin name and a non-Latin name in parentheses (e.g. ABC (ギヴン)):
+   - Always keep the non-Latin text (ギヴン).
+7. For the title:
+   - Remove subtitle translations in parentheses (e.g. (A Winter Story)), but keep the original core title.
+
+Format:
+- Exactly "Title - Artist" or "Title" with no extra characters.
 
 Input:
 {input_text}
 
 Output:
 """
-    return generate_word_by_word_exp(prompt, max_tokens=18)
 
-create_model()
-output = get_title_from_song('Kamado Tanjirou no Uta (From "Demon Slayer: Kimetsu no Yaiba") (Full Version)')
-print(output)
-output = get_title_from_song("GIVEN (ギヴン) - Fuyu no hanashi (冬のはな) (A Winter Story)")
-print(output)
-output = get_title_from_song("Take Me Home, Country Roads - John Denver | Fingerstyle Guitar")
-print(output)
+    response = generate_word_by_word_exp(prompt, max_tokens=18)
+
+    match = re.search(r'Output:\s*(.+)', response)
+    if match:
+        result = match.group(1).strip()
+    else:
+        raise Exception("regex failed")
+
+    if strict:
+        result = re.sub(r'[\(\[\{（【〈《「『](.*?)[\)\]\}）】〉》」』]', r'\1', result).strip()
+
+    if not artist:
+        result = re.sub(r"\s*-\s*.*", "", result).strip()
+
+    return result
+
+if __name__ == "__main__":
+    create_model()
+    print(get_title_from_song('GIVEN (ギヴン) - Fuyu no hanashi (冬のはな) (A Winter Story) (Kan|Rom|Eng) Lyrics/歌詞', False, True))
