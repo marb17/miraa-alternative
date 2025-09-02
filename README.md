@@ -11,11 +11,11 @@ This diagram shows how the program functions:
 
 ---
 
-## System Requirements
+## System Requirements **OUTDATED**
 This project uses multiple heavy ML models, so a decent GPU is recommended.
 
 **Minimum Requirements:**
-- GPU: RTX 3050 or higher (≥ 4GB VRAM)
+- GPU: RTX 3050 or higher (≥ 6GB VRAM)
 - CPU: Intel i5-11400
 - RAM: 8GB
 - Storage: 15GB
@@ -29,7 +29,7 @@ This project uses multiple heavy ML models, so a decent GPU is recommended.
 
 ---
 
-## Prerequisites
+## Prerequisites **OUTDATED**
 Install the required Python packages:
 
 ```bash
