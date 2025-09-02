@@ -3,6 +3,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 import json
 import gc
+import re
 
 # global config
 with open('globalconfig.json', 'r') as f:
