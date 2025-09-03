@@ -130,7 +130,7 @@ def genius_get_song_id_multi(song: str, search_filter: bool, consoleout=True) ->
     if len(results) == 0:
         raise Exception(f"Song not found: {song}")
 
-    if results == None:
+    if results is None:
         raise Exception("Song not found")
 
     print(results)
@@ -161,6 +161,7 @@ def genius_get_translated(song_id):
         # find english translation area and output api_path
         for item in list_of_translations:
             if item['primary_artist_names'] == "Genius English Translations":
+                print(f"Obtained English Translation: {item['title']} | {item['api_path']}")
                 return item['api_path']
 
         # if nothing is found

@@ -29,37 +29,37 @@ META_PATTERNS = [
     r'(?i)\bkan\|rom\|eng\b', r'(?i)\bromaji\b', r'(?i)\benglish\b', r'(?i)\bsubs?\b',
 ]
 
-SEP_PATTERN = r'\s*[-–—]\s*'  # common "Artist - Title" separators
+SEP_PATTERN = r'\s*[-–—\|]\s*'  # common "Artist - Title" separators
 
 def has_non_latin(s: str) -> bool:
-    # returns True if string has chars outside basic Latin
+    # returns True if string has chars that not latin
     return bool(re.search(r'[^\x00-\x7F]', s))
 
 def strip_known_meta(s: str) -> str:
     # remove common junk tokens anywhere
     for pat in META_PATTERNS:
         s = re.sub(pat, '', s)
-    # kill known "(From ...)" or "(Official ...)" etc.
+    # omit unesseary words
     s = re.sub(r'[\(\[\{]\s*(?i:from|official|mv|ver|version|lyrics|歌詞).*?[\)\]\}]', '', s)
     # collapse whitespace
     s = re.sub(r'\s{2,}', ' ', s).strip(' -–—|')
     return s.strip()
 
 def clean_brackets_keep_core(s: str) -> str:
-    # remove *all* bracketed content – safer for titles
+    # remove all bracketed content
     s = re.sub(r'[\(\[\{].*?[\)\]\}]', '', s)
     s = re.sub(r'\s{2,}', ' ', s).strip(' -–—|')
     return s.strip()
 
 def pick_artist(chunk: str) -> str:
     chunk = chunk.strip()
-    # If there's non-Latin text in parentheses, prefer that (e.g., GIVEN (ギヴン) -> ギヴン)
+    # if japanese in brackets, choose that first
     m = re.search(r'\(([^)]{1,60})\)', chunk)
     if m:
         inner = m.group(1).strip()
         if has_non_latin(inner):
             return inner
-    # Else drop parentheses and keep the main text as-is
+    # keep main text if no brackets
     no_paren = clean_brackets_keep_core(chunk)
     return no_paren or chunk
 
@@ -67,26 +67,26 @@ def pick_title(chunk: str) -> str:
     # remove metadata junk
     s = strip_known_meta(chunk)
 
-    # collect bracketed candidates
+    # collect bracketed stuff
     parens = re.findall(r'[\(\[\{](.*?)[\)\]\}]', s)
 
-    # remove all parens for a clean base
+    # remove all parens
     base = clean_brackets_keep_core(s)
 
-    # 1. Prefer Japanese inside parentheses
+    # prefer japanese inside brackets
     for p in parens:
         if re.search(r'[\u3040-\u30FF\u4E00-\u9FFF]', p):  # Hiragana/Katakana/Kanji
             return p.strip()
 
-    # 2. If base contains Japanese, use it
+    # 2. if base has japanese return that
     if re.search(r'[\u3040-\u30FF\u4E00-\u9FFF]', base):
         return base
 
-    # 3. Else, if base has Latin letters (Romaji), use that
+    # 3. if base has romaji use
     if re.search(r'[A-Za-z]', base):
         return base
 
-    # 4. Last fallback: return the first non-metadata parenthesis or the base
+    # 4. final fallback
     for p in parens:
         if p.strip():
             return p.strip()
@@ -95,27 +95,27 @@ def pick_title(chunk: str) -> str:
 
 def extract_title_artist(text: str) -> str:
     t = text.strip()
-    # fast path: split on the first dash-like separator
+    # fast path split on the first dash separator
     parts = re.split(SEP_PATTERN, t, maxsplit=1)
     if len(parts) == 2:
         left, right = parts[0], parts[1]
         artist = pick_artist(left)
         title = pick_title(right)
     else:
-        # fallback heuristics if no dash found: try “Title by Artist” or similar
+        # fallback heuristics if no dash found using by as split
         by = re.split(r'(?i)\s+by\s+', t, maxsplit=1)
         if len(by) == 2:
             title = pick_title(by[0])
             artist = pick_artist(by[1])
         else:
-            # last-ditch: treat leading quoted chunk as title
+            # last-ditch treat leading quote as title
             m = re.search(r'“([^”]+)”|"([^"]+)"|『([^』]+)』|『([^』]+)』', t)
             if m:
                 title = pick_title(next(g for g in m.groups() if g))
                 rest = t.replace(m.group(0), '')
                 artist = pick_artist(rest)
             else:
-                # give up and return a best-effort single field (title only)
+                # give up
                 return clean_brackets_keep_core(strip_known_meta(t))
     return f"{title} - {artist}"
 
