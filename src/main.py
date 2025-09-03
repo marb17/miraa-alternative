@@ -4,7 +4,8 @@ import ytdown
 import lyricstimestamper
 import json
 import shutil
-import llm
+import llmfortitleextract
+import splittag
 from concurrent.futures import ThreadPoolExecutor
 from globalfuncs import base58_to_str, str_to_base58
 
@@ -23,7 +24,7 @@ except OSError:
     console_width = 20
 
 # main loop
-def main(url, skip_vox_sep=False, skip_lyrics=False, skip_transcribe=False):
+def main(url, skip_vox_sep=True, skip_lyrics=False, skip_transcribe=False):
     # download audio
     print("Starting Download of Song")
     filename, base58path = ytdown.youtube_download_audio(url)
@@ -70,17 +71,22 @@ def main(url, skip_vox_sep=False, skip_lyrics=False, skip_transcribe=False):
         ]
 
         # If llm.create_model() is required before some calls
-        llm.create_model()
+        # ! UNCOMMENT AFTER DONE TESTING
+        # llm.create_model()
+        #
+        # for attempt in fallbacks:
+        #     try:
+        #         jp_song_id = attempt()
+        #         if jp_song_id:  # success
+        #             break
+        #     except Exception:
+        #         continue
+        #     raise Exception("Failed to get song id from audio file")
+        #
+        # llm.clear_model()
 
-        for attempt in fallbacks:
-            try:
-                jp_song_id = attempt()
-                if jp_song_id:  # success
-                    break
-            except Exception:
-                continue
-
-        llm.clear_model()
+        # ! REMOVE AFTER TESTING
+        jp_song_id = '/songs/4844746'
 
         print("Genius Link Obtained: ", jp_song_id, " | ", filename)
         en_song_id = lyricextract.genius_get_translated(jp_song_id)
@@ -97,12 +103,42 @@ def main(url, skip_vox_sep=False, skip_lyrics=False, skip_transcribe=False):
     else:
         print("Skipping Lyrics")
 
-    # split the
+    # split the lyrics
     jp_lyrics = jp_lyrics.split('\n')
 
     print("-" * console_width)
 
     print(jp_lyrics)
+
+    tagged_lyrics = []
+    full_tagged_lyrics = []
+
+    # tag and get pos of word
+    for line in jp_lyrics:
+        if '[' in line or line == '':
+            tagged_lyrics.append(None)
+            full_tagged_lyrics.append(None)
+        else:
+            tagged_lyrics.append(splittag.parse_jp_text(line))
+            full_tagged_lyrics.append(splittag.full_parse_jp_text(line))
+
+    # finding all types of particles for debug
+    all_types_of_pos = set()
+
+    # convert jp pos to eng pos
+    for line in full_tagged_lyrics:
+        if line is None:
+            continue
+        for word in line:
+            all_types_of_pos.add(word[1]) # debug line
+            word[1] = splittag.translate_pos(word[1])
+
+    tagged_lyrics = json.dumps(tagged_lyrics)
+    full_tagged_lyrics = json.dumps(full_tagged_lyrics)
+
+    print(tagged_lyrics)
+    print(full_tagged_lyrics)
+    # print(all_types_of_pos)
 
 if __name__ == '__main__':
     # main('https://www.youtube.com/watch?v=QnkqCv0dZTk')
