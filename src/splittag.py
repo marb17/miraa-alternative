@@ -1,5 +1,6 @@
 import MeCab
 import unidic_lite
+import fugashi
 import re
 
 # tag type
@@ -84,31 +85,37 @@ def translate_pos(pos: str) -> str:
         return pos_map[pos]
 
     # fallback if not found in dictionary
-    if pos.startswith("名詞"):
-        return "noun"
-    elif pos.startswith("動詞"):
-        return "verb"
-    elif pos.startswith("形容詞"):
-        return "adjective"
-    elif pos.startswith("形状詞"):
-        return "adjectival noun"
-    elif pos.startswith("副詞"):
-        return "adverb"
-    elif pos.startswith("助詞"):
-        return "particle"
-    elif pos.startswith("助動詞"):
-        return "auxiliary verb"
-    elif pos.startswith("接続詞"):
-        return "conjunction"
-    elif pos.startswith("感動詞"):
-        return "interjection"
-    elif pos.startswith("連体詞"):
-        return "adnominal"
-    elif pos.startswith("補助記号"):
-        return "symbol/punctuation"
+    # if pos.startswith("名詞"):
+    #     return "noun"
+    # elif pos.startswith("動詞"):
+    #     return "verb"
+    # elif pos.startswith("形容詞"):
+    #     return "adjective"
+    # elif pos.startswith("形状詞"):
+    #     return "adjectival noun"
+    # elif pos.startswith("副詞"):
+    #     return "adverb"
+    # elif pos.startswith("助詞"):
+    #     return "particle"
+    # elif pos.startswith("助動詞"):
+    #     return "auxiliary verb"
+    # elif pos.startswith("接続詞"):
+    #     return "conjunction"
+    # elif pos.startswith("感動詞"):
+    #     return "interjection"
+    # elif pos.startswith("連体詞"):
+    #     return "adnominal"
+    # elif pos.startswith("補助記号"):
+    #     return "symbol/punctuation"
 
     # fall back
     return pos
 
+lem_tagger = fugashi.Tagger('-Owakati')
+
+def lemmatize(text: str) -> str:
+    for word in lem_tagger(text):
+        return word.feature.lemma
+
 if __name__ == '__main__':
-    print(full_parse_jp_text('まだ溶けきれずに残った'))
+    print(lemmatize('残った'))

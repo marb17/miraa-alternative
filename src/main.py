@@ -63,16 +63,15 @@ def main(url, skip_vox_sep=True, skip_lyrics=False, skip_transcribe=False):
         # Define your fallback attempts
         fallbacks = [
             lambda: lyricextract.genius_get_song_id_jp(filename),
-            lambda: lyricextract.genius_get_song_id_jp(llm.get_title_from_song(filename, False, True)),
-            lambda: lyricextract.genius_get_song_id_jp(llm.get_title_from_song(filename, True, True)),
-            lambda: lyricextract.genius_get_song_id_jp(llm.get_title_from_song(filename, True, False)),
-            lambda: lyricextract.genius_get_song_id_multi(llm.get_title_from_song(filename, False, False), True),
+            lambda: lyricextract.genius_get_song_id_jp(llmfortitleextract.get_title_from_song(filename, False, True)),
+            lambda: lyricextract.genius_get_song_id_jp(llmfortitleextract.get_title_from_song(filename, True, True)),
+            lambda: lyricextract.genius_get_song_id_jp(llmfortitleextract.get_title_from_song(filename, True, False)),
+            lambda: lyricextract.genius_get_song_id_multi(llmfortitleextract.get_title_from_song(filename, False, False), True),
             lambda: lyricextract.genius_get_song_id_multi(filename, False),
         ]
 
-        # If llm.create_model() is required before some calls
         # ! UNCOMMENT AFTER DONE TESTING
-        # llm.create_model()
+        # llmfortitleextract.create_model()
         #
         # for attempt in fallbacks:
         #     try:
@@ -83,7 +82,7 @@ def main(url, skip_vox_sep=True, skip_lyrics=False, skip_transcribe=False):
         #         continue
         #     raise Exception("Failed to get song id from audio file")
         #
-        # llm.clear_model()
+        # llmfortitleextract.clear_model()
 
         # ! REMOVE AFTER TESTING
         jp_song_id = '/songs/4844746'
@@ -133,8 +132,8 @@ def main(url, skip_vox_sep=True, skip_lyrics=False, skip_transcribe=False):
             all_types_of_pos.add(word[1]) # debug line
             word[1] = splittag.translate_pos(word[1])
 
-    tagged_lyrics = json.dumps(tagged_lyrics)
-    full_tagged_lyrics = json.dumps(full_tagged_lyrics)
+    # tagged_lyrics = json.dumps(tagged_lyrics)
+    # full_tagged_lyrics = json.dumps(full_tagged_lyrics)
 
     print(tagged_lyrics)
     print(full_tagged_lyrics)
