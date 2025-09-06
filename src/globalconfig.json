@@ -2,6 +2,7 @@
   "ytdown_quiet_mode": "False",
 
   "remove_brackets_genius_lyr_search": "True",
+  "console_out_genius_lyr_search": "True",
 
   "demucs_shifts": 2,
   "demucs_worker_num": 8,
@@ -14,5 +15,10 @@
   "console_print_line_separators": "True",
 
   "large_model_name": "../model/.llama/checkpoints/Llama3.2-3B-Instruct-conv",
-  "jp_en_model_name": "../model/shisav2"
+
+  "jp_en_model_name": "../model/shisav2",
+  "jp_model_precision_level": "fp16",
+
+  "dictlookup_retries": 5,
+  "dictlookup_backoff": 0.5
 }

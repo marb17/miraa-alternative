@@ -9,8 +9,12 @@ import accelerate
 import gc
 import bitsandbytes
 import re
+from colorama import Fore, Back, Style, init
 
 # global config
+
+init(autoreset=True) # for console colors
+
 with open('globalconfig.json', 'r') as f:
     config = json.load(f)
 
@@ -22,6 +26,7 @@ bnb_config = BitsAndBytesConfig(load_in_8bit=True)
 # device setup
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+# patterns for regex
 META_PATTERNS = [
     r'(?i)\blyrics\b', r'歌詞', r'(?i)\bofficial\s*(video|audio)\b', r'(?i)\bmv\b',
     r'(?i)\bcolor\s*coded\b', r'(?i)\bver(\.|sion)?\b', r'(?i)\bfull\s*version\b',
@@ -31,6 +36,7 @@ META_PATTERNS = [
 
 SEP_PATTERN = r'\s*[-–—\|]\s*'  # common "Artist - Title" separators
 
+# main functions
 def has_non_latin(s: str) -> bool:
     # returns True if string has chars that not latin
     return bool(re.search(r'[^\x00-\x7F]', s))
@@ -159,11 +165,11 @@ def clear_model() -> None:
         gc.collect()
 
 def get_title_from_song(input_text, strict: bool, artist: bool):
-    print(input_text)
+    print(Fore.MAGENTA + input_text)
 
     input_text = extract_title_artist(input_text)
 
-    print(input_text)
+    print(Fore.MAGENTA + input_text)
 
     prompt =f"""You are a strict text parser.
 

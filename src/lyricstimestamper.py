@@ -14,6 +14,7 @@ whisper_quiet_mode = bool(config["whisper_quiet_mode"])
 # use cuda if avaliable
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# main functions
 def transcribe(filepath: str) -> json:
     model = faster_whisper.WhisperModel(whisper_model, device="cuda", compute_type='float16')
 
