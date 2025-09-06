@@ -83,6 +83,7 @@ def tokenize(lyric: str) -> tuple[list, list]:
 
     # fall back parsing
     if response == 'None':
+        print(Fore.YELLOW + f"Tokenizing fail, falling back for: ", f"{lyric}")
         tagged = splittag.full_parse_jp_text(lyric)
 
         all_words = []
@@ -99,14 +100,18 @@ def tokenize(lyric: str) -> tuple[list, list]:
     return all_words, all_pos
 
 def get_definition(word: str, pos: str):
+    if re.search(r'[\[\]\(\)\{\}\.\,]', word):
+        print(Fore.MAGENTA + f"Word isn't in japanese: {word}")
+        return None
+    # check if english
+    if re.search(r'[a-zA-Z]', word):
+        print(Fore.MAGENTA + f"Word isn't in japanese: {word}")
+        return None
+
     print(Fore.BLUE + f"Finding definition for {word}")
     response = safe_request_word(word)
 
-    # check if english
-    if re.findall(r'[a-zA-Z]', word) is True:
-        return None
-
-    if response == 'None':
+    if response == 'None' or response is None or response == '':
         print(Fore.CYAN + f"[warn] Error while fetching definition of '{word}' using library, trying to use LLM")
         with _llm_lock:
             if word in safe_request_word.llm_cache:
@@ -170,12 +175,6 @@ def get_definition(word: str, pos: str):
     return unique_meanings
 
 def get_line_meaning_tag(lyric: str) -> tuple[list, list, list]:
-    exclusion_list = ['[', ']', '(', ')', ',', '.', '.']
-    for exclusion in exclusion_list:
-        if exclusion in lyric:
-            print(Fore.MAGENTA + f"Word isn't in japanese: {lyric}")
-            return None
-
     words, pos = tokenize(lyric)
 
     if len(words) == 0 and len(pos) == 0:
