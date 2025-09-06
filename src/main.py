@@ -2,14 +2,28 @@ import lyricextract
 import vocalsep
 import ytdown
 import lyricstimestamper
-import json
-import shutil
 import llmfortitleextract
 import splittag
+import dictlookup
+
 from concurrent.futures import ThreadPoolExecutor
 from globalfuncs import base58_to_str, str_to_base58
+import json
+import shutil
+
+'''
+Green: Success
+Yellow: Warn / Fallback
+Cyan: Check Fail
+Red: Error
+Blue: On Process
+Magenta: Info
+'''
 
 # global config
+from colorama import Fore, Back, Style, init
+init(autoreset=True)
+
 with open('globalconfig.json', 'r') as f:
     config = json.load(f)
 
@@ -20,15 +34,15 @@ try:
     terminal_size = shutil.get_terminal_size()
     console_width = terminal_size.columns
 except OSError:
-    print("Could not determine terminal size. Running in a non-terminal environment or terminal does not support size query.")
+    print(Fore.RED + "Could not determine terminal size. Running in a non-terminal environment or terminal does not support size query.")
     console_width = 20
 
 # main loop
-def main(url, skip_vox_sep=True, skip_lyrics=False, skip_transcribe=False):
+def main(url, skip_vox_sep=True, skip_lyrics=False, skip_transcribe=True):
     # download audio
-    print("Starting Download of Song")
+    print(Fore.BLUE + "Starting Download of Song")
     filename, base58path = ytdown.youtube_download_audio(url)
-    print("Finished downloading")
+    print(Fore.GREEN + "Finished downloading")
 
     print("-" * console_width)
 
@@ -38,21 +52,21 @@ def main(url, skip_vox_sep=True, skip_lyrics=False, skip_transcribe=False):
 
     # separate vox
     if not skip_vox_sep:
-        print("Starting Vox Separation")
+        print(Fore.BLUE + "Starting Vox Separation")
         vocalsep.separate_audio(filepath)
-        print("Finished Vox Separation")
+        print(Fore.GREEN + "Finished Vox Separation")
     else:
-        print("Skipping Vox Separation")
+        print(Fore.GREEN + "Skipping Vox Separation")
 
     print("-" * console_width)
 
     # get time stampped transcription for video sync
     if not skip_transcribe:
-        print("Start timestamp words")
+        print(Fore.BLUE + "Start timestamp words")
         timestampped_words = lyricstimestamper.transcribe(filepath_vocal)
-        print("Finished timestamp words")
+        print(Fore.GREEN + "Finished timestamp words")
     else:
-        print("Skipping timestamp words")
+        print(Fore.GREEN + "Skipping timestamp words")
 
     print("-" * console_width)
 
@@ -70,24 +84,20 @@ def main(url, skip_vox_sep=True, skip_lyrics=False, skip_transcribe=False):
             lambda: lyricextract.genius_get_song_id_multi(filename, False),
         ]
 
-        # ! UNCOMMENT AFTER DONE TESTING
-        # llmfortitleextract.create_model()
-        #
-        # for attempt in fallbacks:
-        #     try:
-        #         jp_song_id = attempt()
-        #         if jp_song_id:  # success
-        #             break
-        #     except Exception:
-        #         continue
-        #     raise Exception("Failed to get song id from audio file")
-        #
-        # llmfortitleextract.clear_model()
+        llmfortitleextract.create_model()
 
-        # ! REMOVE AFTER TESTING
-        jp_song_id = '/songs/4844746'
+        for attempt in fallbacks:
+            try:
+                jp_song_id = attempt()
+                if jp_song_id:  # success
+                    break
+            except Exception:
+                continue
+            raise Exception("Failed to get song id from audio file")
 
-        print("Genius Link Obtained: ", jp_song_id, " | ", filename)
+        llmfortitleextract.clear_model()
+
+        print(Fore.GREEN + "Genius Link Obtained: ", jp_song_id, " | ", filename)
         en_song_id = lyricextract.genius_get_translated(jp_song_id)
 
         # multithread for faster load times
@@ -98,16 +108,17 @@ def main(url, skip_vox_sep=True, skip_lyrics=False, skip_transcribe=False):
             jp_lyrics = f_jp_lyrics.result()
             en_lyrics = f_en_lyrics.result()
 
-        print("Finished Lyrics")
+        print(Fore.GREEN + "Finished Lyrics")
     else:
-        print("Skipping Lyrics")
+        print(Fore.GREEN + "Skipping Lyrics")
 
     # split the lyrics
+    unsplit_jp_lyrics = jp_lyrics
     jp_lyrics = jp_lyrics.split('\n')
 
     print("-" * console_width)
 
-    print(jp_lyrics)
+    print(Fore.MAGENTA + str(jp_lyrics))
 
     tagged_lyrics = []
     full_tagged_lyrics = []
@@ -135,11 +146,20 @@ def main(url, skip_vox_sep=True, skip_lyrics=False, skip_transcribe=False):
     # tagged_lyrics = json.dumps(tagged_lyrics)
     # full_tagged_lyrics = json.dumps(full_tagged_lyrics)
 
-    print(tagged_lyrics)
-    print(full_tagged_lyrics)
+    print(Fore.MAGENTA + str(tagged_lyrics))
+    print(Fore.MAGENTA + str(full_tagged_lyrics))
     # print(all_types_of_pos)
+
+    print("-" * console_width)
+
+    print(Fore.BLUE + f"Getting definitions of each phrase")
+    dict_lookup_res = dictlookup.get_meaning_full(jp_lyrics)
+    print(Fore.MAGENTA + str(dict_lookup_res))
+    print(Fore.GREEN + f"Finished getting definitions")
+
+    print("-" * console_width)
 
 if __name__ == '__main__':
     # main('https://www.youtube.com/watch?v=QnkqCv0dZTk')
-    # main('youtube.com/watch?v=ZRtdQ81jPUQ')
-    main('https://www.youtube.com/watch?v=Mhl9FaxiQ_E')
+    main('youtube.com/watch?v=ZRtdQ81jPUQ')
+    # main('https://www.youtube.com/watch?v=Mhl9FaxiQ_E')

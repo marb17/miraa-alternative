@@ -8,12 +8,16 @@ import re
 from urllib.parse import quote
 import itertools
 import difflib
+from colorama import Fore, Back, Style, init
+
+init(autoreset=True) # for console colors
 
 # global config
 with open('globalconfig.json', 'r') as f:
     config = json.load(f)
 
 rem_brak = bool(config["remove_brackets_genius_lyr_search"])
+console_out = bool(config["console_out_genius_lyr_search"])
 
 load_dotenv()
 
@@ -26,6 +30,7 @@ genius_client_access_token = os.getenv('GENIUS_CLIENT_ACCESS_TOKEN')
 # genius api link
 genius_api_base = 'https://api.genius.com/'
 
+# main functions
 # for the multi-processing thread so it can call faster
 def fetch_search_for_multithreadding(hit_id: str, check_for_artist_title, filename: str) -> dict:
     headers = {'Authorization': 'Bearer ' + genius_client_access_token}
@@ -43,13 +48,13 @@ def fetch_search_for_multithreadding(hit_id: str, check_for_artist_title, filena
                 raise Exception("Regex failure")
 
             if difflib.SequenceMatcher(None, str(data['response']['song']['primary_artist_names']), str(artist)).ratio() < 0.3:
-                print(f"Artist fail -> {data['response']['song']['primary_artist_names']} | {artist}")
+                print(Fore.YELLOW + f"Artist fail -> {data['response']['song']['primary_artist_names']} | {artist}")
                 return None
             elif difflib.SequenceMatcher(None, str(data['response']['song']['full_title']), str(song)).ratio() < 0.1:
-                print(f"Title 1 fail -> {data['response']['song']['full_title']} | {song}")
+                print(Fore.YELLOW + f"Title 1 fail -> {data['response']['song']['full_title']} | {song}")
                 return None
             elif difflib.SequenceMatcher(None, str(data['response']['song']['title']), str(song)).ratio() < 0.1:
-                print(f"Title 2 fail -> {data['response']['song']['title']} | {song}")
+                print(Fore.YELLOW + f"Title 2 fail -> {data['response']['song']['title']} | {song}")
                 return None
 
         if data['response']['song']['language'] == 'ja':
@@ -63,12 +68,12 @@ def fetch_search_for_multithreadding(hit_id: str, check_for_artist_title, filena
         print(e)
 
 
-def genius_get_song_id_jp(song: str, removepar=rem_brak, consoleout=True) -> dict:
+def genius_get_song_id_jp(song: str, removepar=rem_brak, consoleout=console_out) -> dict:
     if removepar:
         song = re.sub(r'\([^)]*\)|\[[^\]]*\]', '', song)
 
     if consoleout:
-        print(song, " | ", quote(song, safe=''))
+        print(Fore.MAGENTA + song, " | ", Fore.MAGENTA + quote(song, safe=''))
 
     url_search = f"{genius_api_base}search?q={song}"
 
@@ -83,7 +88,7 @@ def genius_get_song_id_jp(song: str, removepar=rem_brak, consoleout=True) -> dic
         hit_list = [hit['result']['id'] for hit in hits]
 
         # multi-threading setup
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=20) as executor:
             results = list(executor.map(fetch_search_for_multithreadding, hit_list, itertools.repeat(True), itertools.repeat(song)))
 
         # remove nones
@@ -98,9 +103,9 @@ def genius_get_song_id_jp(song: str, removepar=rem_brak, consoleout=True) -> dic
     except requests.exceptions.RequestException as e:
         print(e)
 
-def genius_get_song_id_multi(song: str, search_filter: bool, consoleout=True) -> dict:
+def genius_get_song_id_multi(song: str, search_filter: bool, consoleout=console_out) -> dict:
     if consoleout:
-        print(song, " | ", quote(song, safe=''))
+        print(Fore.MAGENTA + song, " | ", Fore.MAGENTA + quote(song, safe=''))
 
     url = "https://genius.com/api/search/multi"
     params = {'q': song}
@@ -120,7 +125,7 @@ def genius_get_song_id_multi(song: str, search_filter: bool, consoleout=True) ->
         for sub_hit in hit['hits']:
             hit_list.append(sub_hit['result']['id'])
 
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor(max_workers=20) as executor:
         results = list(executor.map(fetch_search_for_multithreadding, hit_list, itertools.repeat(search_filter), itertools.repeat(song)))
 
     # remove nones
@@ -133,7 +138,7 @@ def genius_get_song_id_multi(song: str, search_filter: bool, consoleout=True) ->
     if results is None:
         raise Exception("Song not found")
 
-    print(results)
+    print(Fore.GREEN + results)
 
     return results[0]
 
@@ -161,7 +166,7 @@ def genius_get_translated(song_id):
         # find english translation area and output api_path
         for item in list_of_translations:
             if item['primary_artist_names'] == "Genius English Translations":
-                print(f"Obtained English Translation: {item['title']} | {item['api_path']}")
+                print(Fore.GREEN + f"Obtained English Translation: ", f"{item['title']} | {item['api_path']}")
                 return item['api_path']
 
         # if nothing is found
@@ -178,6 +183,3 @@ def extract_lyrics(api_path: str) -> str:
     # use web scraper to get lyrics
     song = genius.search_song(None, None, api_path)
     return song.lyrics
-
-if __name__ == '__main__':
-    genius_get_song_id_multi("「アイドル」 - YOASOBI", True, consoleout=True)

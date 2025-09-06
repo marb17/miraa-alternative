@@ -3,6 +3,7 @@ import unidic_lite
 import fugashi
 import re
 
+# main functions
 # tag type
 wakati = MeCab.Tagger("-Owakati")
 
