@@ -74,7 +74,6 @@ def main(url, skip_vox_sep=True, skip_lyrics=False, skip_transcribe=True):
     if not skip_lyrics:
         jp_song_id = None
 
-        # Define your fallback attempts
         fallbacks = [
             lambda: lyricextract.genius_get_song_id_jp(filename),
             lambda: lyricextract.genius_get_song_id_jp(llmfortitleextract.get_title_from_song(filename, False, True)),
@@ -84,18 +83,22 @@ def main(url, skip_vox_sep=True, skip_lyrics=False, skip_transcribe=True):
             lambda: lyricextract.genius_get_song_id_multi(filename, False),
         ]
 
-        llmfortitleextract.create_model()
+        # ! UNCOMMENT AFTER DEBUGGING
+        # llmfortitleextract.create_model()
+        #
+        # for attempt in fallbacks:
+        #     try:
+        #         jp_song_id = attempt()
+        #         if jp_song_id:  # success
+        #             break
+        #     except Exception:
+        #         continue
+        #     raise Exception("Failed to get song id from audio file")
+        #
+        # llmfortitleextract.clear_model()
 
-        for attempt in fallbacks:
-            try:
-                jp_song_id = attempt()
-                if jp_song_id:  # success
-                    break
-            except Exception:
-                continue
-            raise Exception("Failed to get song id from audio file")
-
-        llmfortitleextract.clear_model()
+        # ! REMOVE AFTER DEBUGGING
+        jp_song_id = '/songs/8842895'
 
         print(Fore.GREEN + "Genius Link Obtained: ", jp_song_id, " | ", filename)
         en_song_id = lyricextract.genius_get_translated(jp_song_id)

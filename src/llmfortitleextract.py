@@ -46,7 +46,7 @@ def strip_known_meta(s: str) -> str:
     for pat in META_PATTERNS:
         s = re.sub(pat, '', s)
     # omit unesseary words
-    s = re.sub(r'[\(\[\{]\s*(?i:from|official|mv|ver|version|lyrics|歌詞).*?[\)\]\}]', '', s)
+    s = re.sub(r'[\(\[\{]\s*(?i:from|official|mv|ver|version|music|lyrics|歌詞).*?[\)\]\}]', '', s)
     # collapse whitespace
     s = re.sub(r'\s{2,}', ' ', s).strip(' -–—|')
     return s.strip()
