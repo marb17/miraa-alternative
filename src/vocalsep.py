@@ -5,11 +5,9 @@ from demucs.apply import apply_model
 import os
 import gc
 import json
-from colorama import Fore, Back, Style, init
+import globalfuncs
 
 # global config
-init(autoreset=True) # for console colors
-
 with open('globalconfig.json', 'r') as f:
     config = json.load(f)
 
@@ -45,7 +43,7 @@ def separate_audio(filepath: str, split=True, device="cuda" if torch.cuda.is_ava
     base = os.path.splitext(filepath)[0]
     out_path = f"{base}_vocals.wav"
     torchaudio.save(out_path, vocals.cpu(), sr)
-    print(Fore.GREEN + f"Saved vocals -> {out_path}")
+    globalfuncs.logger.success(f"Saved vocals -> {out_path}")
 
     # delete model
     del model

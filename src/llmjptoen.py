@@ -7,11 +7,9 @@ import re
 from transformers import GenerationConfig
 from tqdm import tqdm
 import accelerate
-from colorama import Fore, Back, Style, init
+import globalfuncs
 
 # global config
-init(autoreset=True) # for console colors
-
 with open('globalconfig.json', 'r') as f:
     config = json.load(f)
 
@@ -29,7 +27,7 @@ def create_model(precision='fp16') -> None:
     # tokenizer
     tokenizer = AutoTokenizer.from_pretrained(local_dir)
 
-    print(Fore.MAGENTA + str(tokenizer.eos_token), " | ", Fore.MAGENTA + str(tokenizer.eos_token_id))
+    globalfuncs.logger.verbose(f"{tokenizer.eos_token} | {tokenizer.eos_token_id}")
 
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
@@ -128,13 +126,13 @@ Word: {phrase}
 [END]
     """
 
-    print(Fore.BLUE + f"Finding definition of {phrase} using", Fore.YELLOW + "LLM")
+    globalfuncs.logger.info(f"Finding definition of {phrase} using LLM")
     output = generate_response(prompt, 20, 0.35, 0.95, 1.15, True)
     # output = str(output).split("[END]")[1]
 
-    output = (re.findall(r'Meaning:(?:[\*\s]*?)([\w\s\S]+?)\n', output)[1]).strip()
+    output = (re.findall(r'Meaning:(?:[\*\s]*?)([\w\s\S]+?)(?:\n|\[|E|\])', output)[1]).strip()
     output = re.sub(r'\*', '', output)
-    print(Fore.GREEN + f"Found definition of {phrase}: {output}")
+    globalfuncs.logger.success(f"Found definition of {phrase} using LLM: {output}")
 
     return output
 
