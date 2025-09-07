@@ -2,7 +2,7 @@ import yt_dlp
 import json
 import os
 from globalfuncs import str_to_base58
-from colorama import Fore, Back, Style, init
+import globalfuncs
 
 
 # global config
@@ -10,9 +10,6 @@ with open('globalconfig.json', 'r') as f:
     config = json.load(f)
 
 quiet_mode = bool(config['ytdown_quiet_mode'])
-
-
-init(autoreset=True) # for console colors
 
 # main functions
 def extract_video_title(url: str) -> json:
@@ -29,7 +26,7 @@ def youtube_download_audio(url: str, output_dir='../database/songs/') -> tuple:
     title = extract_video_title(url)
     title_enc = str_to_base58(title)
 
-    print(Fore.GREEN + title_enc, " | ", Fore.GREEN + title)
+    globalfuncs.logger.verbose(f"{title_enc} | {title}")
 
     song_dir = os.path.join(output_dir, title_enc)
     os.makedirs(song_dir, exist_ok=True)

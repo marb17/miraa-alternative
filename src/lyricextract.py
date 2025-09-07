@@ -8,9 +8,7 @@ import re
 from urllib.parse import quote
 import itertools
 import difflib
-from colorama import Fore, Back, Style, init
-
-init(autoreset=True) # for console colors
+import globalfuncs
 
 # global config
 with open('globalconfig.json', 'r') as f:
@@ -48,13 +46,13 @@ def fetch_search_for_multithreadding(hit_id: str, check_for_artist_title, filena
                 raise Exception("Regex failure")
 
             if difflib.SequenceMatcher(None, str(data['response']['song']['primary_artist_names']), str(artist)).ratio() < 0.3:
-                print(Fore.YELLOW + f"Artist fail -> {data['response']['song']['primary_artist_names']} | {artist}")
+                globalfuncs.logger.verbose(f"Artist fail -> {data['response']['song']['primary_artist_names']} | {artist}")
                 return None
             elif difflib.SequenceMatcher(None, str(data['response']['song']['full_title']), str(song)).ratio() < 0.1:
-                print(Fore.YELLOW + f"Title 1 fail -> {data['response']['song']['full_title']} | {song}")
+                globalfuncs.logger.verbose(f"Title 1 fail -> {data['response']['song']['full_title']} | {song}")
                 return None
             elif difflib.SequenceMatcher(None, str(data['response']['song']['title']), str(song)).ratio() < 0.1:
-                print(Fore.YELLOW + f"Title 2 fail -> {data['response']['song']['title']} | {song}")
+                globalfuncs.logger.verbose(f"Title 2 fail -> {data['response']['song']['title']} | {song}")
                 return None
 
         if data['response']['song']['language'] == 'ja':
@@ -65,7 +63,7 @@ def fetch_search_for_multithreadding(hit_id: str, check_for_artist_title, filena
 
     # error handling
     except requests.exceptions.RequestException as e:
-        print(e)
+        globalfuncs.logger.error(e)
 
 
 def genius_get_song_id_jp(song: str, removepar=rem_brak, consoleout=console_out) -> dict:
@@ -73,7 +71,7 @@ def genius_get_song_id_jp(song: str, removepar=rem_brak, consoleout=console_out)
         song = re.sub(r'\([^)]*\)|\[[^\]]*\]', '', song)
 
     if consoleout:
-        print(Fore.MAGENTA + song, " | ", Fore.MAGENTA + quote(song, safe=''))
+        globalfuncs.logger.verbose(f"{song} | {quote(song, safe='')}")
 
     url_search = f"{genius_api_base}search?q={song}"
 
@@ -101,11 +99,11 @@ def genius_get_song_id_jp(song: str, removepar=rem_brak, consoleout=console_out)
         return results[0]
     # error handling
     except requests.exceptions.RequestException as e:
-        print(e)
+        globalfuncs.logger.error(e)
 
 def genius_get_song_id_multi(song: str, search_filter: bool, consoleout=console_out) -> dict:
     if consoleout:
-        print(Fore.MAGENTA + song, " | ", Fore.MAGENTA + quote(song, safe=''))
+        globalfuncs.logger.verbose(f"{song} | {quote(song, safe='')}")
 
     url = "https://genius.com/api/search/multi"
     params = {'q': song}
@@ -113,7 +111,7 @@ def genius_get_song_id_multi(song: str, search_filter: bool, consoleout=console_
     try:
         response = requests.get(url, params=params).json()
     except requests.exceptions.RequestException as e:
-        print(e)
+        globalfuncs.logger.error(e)
         raise Exception
 
     hits = response["response"]["sections"]
@@ -138,7 +136,7 @@ def genius_get_song_id_multi(song: str, search_filter: bool, consoleout=console_
     if results is None:
         raise Exception("Song not found")
 
-    print(Fore.GREEN + results)
+    globalfuncs.logger.success(f"{results}")
 
     return results[0]
 
@@ -166,7 +164,7 @@ def genius_get_translated(song_id):
         # find english translation area and output api_path
         for item in list_of_translations:
             if item['primary_artist_names'] == "Genius English Translations":
-                print(Fore.GREEN + f"Obtained English Translation: ", f"{item['title']} | {item['api_path']}")
+                globalfuncs.logger.success(f"Obtained English Translation: {str(item['title'])} | {str(item['api_path'])}")
                 return item['api_path']
 
         # if nothing is found
@@ -174,7 +172,7 @@ def genius_get_translated(song_id):
 
     # error handling
     except requests.exceptions.RequestException as e:
-        print(e)
+        globalfuncs.logger.error(e)
 
 def extract_lyrics(api_path: str) -> str:
     # remove all non numbered characters

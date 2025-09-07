@@ -9,12 +9,9 @@ import accelerate
 import gc
 import bitsandbytes
 import re
-from colorama import Fore, Back, Style, init
+import globalfuncs
 
 # global config
-
-init(autoreset=True) # for console colors
-
 with open('globalconfig.json', 'r') as f:
     config = json.load(f)
 
@@ -165,11 +162,11 @@ def clear_model() -> None:
         gc.collect()
 
 def get_title_from_song(input_text, strict: bool, artist: bool):
-    print(Fore.MAGENTA + input_text)
+    globalfuncs.logger.verbose(f"{input_text}")
 
     input_text = extract_title_artist(input_text)
 
-    print(Fore.MAGENTA + input_text)
+    globalfuncs.logger.verbose(f"{input_text}")
 
     prompt =f"""You are a strict text parser.
 

@@ -13,7 +13,7 @@ import random
 import llmjptoen
 import functools
 import threading
-from colorama import Fore, Back, Style, init
+import globalfuncs
 
 # global config
 with open('globalconfig.json', 'r') as f:
@@ -21,8 +21,6 @@ with open('globalconfig.json', 'r') as f:
 
 dict_retries = config['dictlookup_retries']
 dict_backoff = config['dictlookup_backoff']
-
-init(autoreset=True) # for console colors
 
 _llm_lock = threading.Lock()
 
@@ -34,7 +32,7 @@ def call_llm():
     if call_llm.counter == 0:
         llmjptoen.create_model()
     else:
-        print(Fore.MAGENTA + "Skipping LLM initialization")
+        globalfuncs.logger.debug("Skipping LLM initialization")
 
     call_llm.counter += 1
 
@@ -47,13 +45,13 @@ def safe_request_word(word: str, retries: int = dict_retries, backoff: float = d
             if response and getattr(response, "data", None):
                 return response
             else:
-                print(Fore.CYAN + f"[warn] Empty response for '{word}', attempt {attempt}/{retries}")
+                globalfuncs.logger.notice(f"[warn] Empty response for '{word}', attempt {attempt}/{retries}")
                 if empty_ins_break:
                     break
         except requests.exceptions.JSONDecodeError:
-            print(Fore.YELLOW + f"[warn]", f"  Invalid JSON for '{word}', attempt {attempt}/{retries}")
+            globalfuncs.logger.notice(f"[warn] Invalid JSON for '{word}', attempt {attempt}/{retries}")
         except Exception as e:
-            print(Fore.CYAN + f"[warn] Error for '{word}': {e}, attempt {attempt}/{retries}")
+            globalfuncs.logger.warning(f"[warn] Error for '{word}': {e}, attempt {attempt}/{retries}")
 
         # exponential backoff + jitter
         sleep_time = backoff * (2 ** (attempt - 1)) + random.random()
@@ -61,10 +59,10 @@ def safe_request_word(word: str, retries: int = dict_retries, backoff: float = d
 
     # use llm to find def for fallback
     if try_llm:
-        print(Fore.CYAN + f"[warn] No response found for '{word}', trying to use LLM")
+        globalfuncs.logger.notice(f"[warn] No response found for '{word}', trying to use LLM")
         with _llm_lock:
             if word in safe_request_word.llm_cache:
-                print(Fore.MAGENTA + f"Using cached word '{word}'")
+                globalfuncs.logger.debug(f"Using cached word '{word}'")
                 return safe_request_word.llm_cache[word]
 
             call_llm()
@@ -73,7 +71,7 @@ def safe_request_word(word: str, retries: int = dict_retries, backoff: float = d
                 safe_request_word.llm_cache.update({word: llm_output})
             return llm_output
     else:
-        print(Fore.RED + f"[warn] No response found for '{word}', returning None")
+        globalfuncs.logger.warning(f"[warn] No response found for '{word}', returning None")
         return 'No definition found'
 
 
@@ -83,7 +81,7 @@ def tokenize(lyric: str) -> tuple[list, list]:
 
     # fall back parsing
     if response == 'None':
-        print(Fore.YELLOW + f"Tokenizing fail, falling back for: ", f"{lyric}")
+        globalfuncs.logger.notice(f"Tokenizing fail, falling back for: {str(lyric)}")
         tagged = splittag.full_parse_jp_text(lyric)
 
         all_words = []
@@ -101,21 +99,21 @@ def tokenize(lyric: str) -> tuple[list, list]:
 
 def get_definition(word: str, pos: str):
     if re.search(r'[\[\]\(\)\{\}\.\,]', word):
-        print(Fore.MAGENTA + f"Word isn't in japanese: {word}")
+        globalfuncs.logger.verbose(f"Word isn't in japanese: {word}")
         return None
     # check if english
     if re.search(r'[a-zA-Z]', word):
-        print(Fore.MAGENTA + f"Word isn't in japanese: {word}")
+        globalfuncs.logger.verbose(f"Word isn't in japanese: {word}")
         return None
 
-    print(Fore.BLUE + f"Finding definition for {word}")
+    globalfuncs.logger.spam(f"Finding definition for {word}")
     response = safe_request_word(word)
 
     if response == 'None' or response is None or response == '':
-        print(Fore.CYAN + f"[warn] Error while fetching definition of '{word}' using library, trying to use LLM")
+        globalfuncs.logger.notice(f"[warn] Error while fetching definition of '{word}' using library, trying to use LLM")
         with _llm_lock:
             if word in safe_request_word.llm_cache:
-                print(Fore.MAGENTA + f"Using cached word '{word}'")
+                globalfuncs.logger.debug(f"Using cached word '{word}'")
                 return safe_request_word.llm_cache[word]
 
             call_llm()
@@ -171,7 +169,7 @@ def get_definition(word: str, pos: str):
         if item not in unique_meanings:
             unique_meanings.append(item)
 
-    print(Fore.GREEN + f"Got definition for {word}: {unique_meanings}")
+    globalfuncs.logger.success(f"Got definition for {word}: {unique_meanings}")
     return unique_meanings
 
 def get_line_meaning_tag(lyric: str) -> tuple[list, list, list]:
