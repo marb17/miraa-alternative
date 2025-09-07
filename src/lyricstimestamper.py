@@ -19,23 +19,33 @@ def transcribe(filepath: str) -> json:
     model = faster_whisper.WhisperModel(whisper_model, device="cuda", compute_type='float16')
 
     #! do NOT change temperature out of 0 or omit, will crash
-    result, info = model.transcribe(filepath, language="ja", word_timestamps=True, log_progress=whisper_quiet_mode, beam_size=5, temperature=0, vad_filter=True)
+    result, info = model.transcribe(filepath, language="ja", word_timestamps=True, log_progress=whisper_quiet_mode, beam_size=10, temperature=0.1, vad_filter=True, best_of=4)
 
     segments = list(result)  # consume generator immediately
 
     # collect words
     words_result = []
+    lyrics_result = []
     for segment in segments:
+        lyrics_result.append(
+            [
+                segment.start,
+                segment.end,
+                segment.text,
+            ]
+        )
         for word in segment.words:
-            words_result.append({
-                "start": word.start,
-                "end": word.end,
-                "word": word.word
-            })
+            words_result.append(
+                [
+                    word.start,
+                    word.end,
+                    word.word
+                ]
+            )
 
     # clear vram and cache for other models
     del model
     torch.cuda.empty_cache()
     gc.collect()
 
-    return json.dumps(words_result, ensure_ascii=False, indent=2)
+    return words_result, lyrics_result

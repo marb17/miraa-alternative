@@ -4,10 +4,10 @@
   "remove_brackets_genius_lyr_search": "True",
   "console_out_genius_lyr_search": "True",
 
-  "demucs_shifts": 2,
-  "demucs_worker_num": 8,
+  "demucs_shifts": 3,
+  "demucs_worker_num": 10,
   "demucs_quiet_mode": "False",
-  "demucs_model": "mdx_extra_q",
+  "demucs_model": "htdemucs_ft",
 
   "whisper_model": "large-v3",
   "whisper_quiet_mode": "False",

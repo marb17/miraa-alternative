@@ -35,11 +35,15 @@ except OSError:
     console_width = 20
 
 # main loop
-def main(url, skip_vox_sep=False, skip_lyrics=False, skip_transcribe=False):
+def main(url, use_genius, skip_download=True, skip_vox_sep=False, skip_lyrics=False, skip_transcribe=False, skip_dict_lookup=True):
     # download audio
-    globalfuncs.logger.info("Starting Download of Song")
-    filename, base58path = ytdown.youtube_download_audio(url)
-    globalfuncs.logger.success("Finished downloading")
+    if not skip_download:
+        globalfuncs.logger.info("Starting Download of Song")
+        filename, base58path = ytdown.youtube_download_audio(url)
+        globalfuncs.logger.success("Finished downloading")
+    else:
+        globalfuncs.logger.success("Skipping Youtube Download")
+        filename, base58path = 'Kamado Tanjirou no Uta (From "Demon Slayer: Kimetsu no Yaiba") (Full Version)','z8rvj6Zu1aQd1jFgJsiYv6182HkSV8JAy19Gbfurh3Z4HLzCk45mj5HyaKxQemUBu8XwtYUeNiAaCJpp3Jkyscz5nmV2jdU8fh1E39qXW'
 
     globalfuncs.logger.plain(f"{"-" * console_width}")
 
@@ -60,7 +64,9 @@ def main(url, skip_vox_sep=False, skip_lyrics=False, skip_transcribe=False):
     # get time stampped transcription for video sync
     if not skip_transcribe:
         globalfuncs.logger.info("Start timestamp words")
-        timestampped_words = lyricstimestamper.transcribe(filepath_vocal)
+        timestampped_words, lyrics = lyricstimestamper.transcribe(filepath_vocal)
+        globalfuncs.logger.verbose(str(timestampped_words))
+        globalfuncs.logger.verbose(str(lyrics))
         globalfuncs.logger.success("Finished timestamp words")
     else:
         globalfuncs.logger.success("Skipping timestamp words")
@@ -69,56 +75,70 @@ def main(url, skip_vox_sep=False, skip_lyrics=False, skip_transcribe=False):
 
     # retrieve lyrics (jp and en)
     if not skip_lyrics:
-        jp_song_id = None
+        if use_genius == 'genius':
+            globalfuncs.logger.verbose('Using Genius Lyrics')
 
-        fallbacks = [
-            lambda: lyricextract.genius_get_song_id_jp(filename),
-            lambda: lyricextract.genius_get_song_id_jp(llmfortitleextract.get_title_from_song(filename, False, True)),
-            lambda: lyricextract.genius_get_song_id_jp(llmfortitleextract.get_title_from_song(filename, True, True)),
-            lambda: lyricextract.genius_get_song_id_jp(llmfortitleextract.get_title_from_song(filename, True, False)),
-            lambda: lyricextract.genius_get_song_id_multi(llmfortitleextract.get_title_from_song(filename, False, False), True),
-            lambda: lyricextract.genius_get_song_id_multi(filename, False),
-        ]
+            jp_song_id = None
 
-        # ! UNCOMMENT AFTER DEBUGGING
-        # llmfortitleextract.create_model()
-        #
-        # for attempt in fallbacks:
-        #     try:
-        #         jp_song_id = attempt()
-        #         if jp_song_id:  # success
-        #             break
-        #     except Exception:
-        #         continue
-        #     raise Exception("Failed to get song id from audio file")
-        #
-        # llmfortitleextract.clear_model()
+            fallbacks = [
+                lambda: lyricextract.genius_get_song_id_jp(filename),
+                lambda: lyricextract.genius_get_song_id_jp(llmfortitleextract.get_title_from_song(filename, False, True)),
+                lambda: lyricextract.genius_get_song_id_jp(llmfortitleextract.get_title_from_song(filename, True, True)),
+                lambda: lyricextract.genius_get_song_id_jp(llmfortitleextract.get_title_from_song(filename, True, False)),
+                lambda: lyricextract.genius_get_song_id_multi(llmfortitleextract.get_title_from_song(filename, False, False), True),
+                lambda: lyricextract.genius_get_song_id_multi(filename, False),
+            ]
 
-        # ! REMOVE AFTER DEBUGGING
-        jp_song_id = '/songs/8842895'
+            # ! UNCOMMENT AFTER DEBUGGING
+            # llmfortitleextract.create_model()
+            #
+            # for attempt in fallbacks:
+            #     try:
+            #         jp_song_id = attempt()
+            #         if jp_song_id:  # success
+            #             break
+            #     except Exception:
+            #         continue
+            #     raise Exception("Failed to get song id from audio file")
+            #
+            # llmfortitleextract.clear_model()
 
-        globalfuncs.logger.success(f"Genius Link Obtained: {jp_song_id} | {filename}")
-        en_song_id = lyricextract.genius_get_translated(jp_song_id)
+            # ! REMOVE AFTER DEBUGGING
+            jp_song_id = '/songs/8842895'
 
-        # multithread for faster load times
-        with ThreadPoolExecutor() as executor:
-            f_jp_lyrics = executor.submit(lyricextract.extract_lyrics, jp_song_id)
-            f_en_lyrics = executor.submit(lyricextract.extract_lyrics, en_song_id)
+            globalfuncs.logger.success(f"Genius Link Obtained: {jp_song_id} | {filename}")
+            en_song_id = lyricextract.genius_get_translated(jp_song_id)
 
-            jp_lyrics = f_jp_lyrics.result()
-            en_lyrics = f_en_lyrics.result()
+            # multithread for faster load times
+            with ThreadPoolExecutor() as executor:
+                f_jp_lyrics = executor.submit(lyricextract.extract_lyrics, jp_song_id)
+                f_en_lyrics = executor.submit(lyricextract.extract_lyrics, en_song_id)
 
-        globalfuncs.logger.success("Finished Lyrics")
+                jp_lyrics = f_jp_lyrics.result()
+                en_lyrics = f_en_lyrics.result()
+
+                # split the lyrics
+                unsplit_jp_lyrics = jp_lyrics
+                jp_lyrics = jp_lyrics.split('\n')
+
+            globalfuncs.logger.success("Finished Lyrics")
+        elif use_genius == 'ai':
+            globalfuncs.logger.verbose('Using AI Transcription')
+
+            jp_lyrics = []
+            unsplit_jp_lyrics = ''
+            for lyric in lyrics:
+                jp_lyrics.append(lyric[2])
+                unsplit_jp_lyrics = unsplit_jp_lyrics + lyric[2] + '\n'
+
+            # TODO make llm
     else:
         globalfuncs.logger.success("Skipping Lyrics")
-
-    # split the lyrics
-    unsplit_jp_lyrics = jp_lyrics
-    jp_lyrics = jp_lyrics.split('\n')
 
     globalfuncs.logger.plain(f"{"-" * console_width}")
 
     globalfuncs.logger.verbose(str(jp_lyrics))
+    globalfuncs.logger.verbose(str(unsplit_jp_lyrics))
 
     tagged_lyrics = []
     full_tagged_lyrics = []
@@ -152,14 +172,17 @@ def main(url, skip_vox_sep=False, skip_lyrics=False, skip_transcribe=False):
 
     globalfuncs.logger.plain(f"{"-" * console_width}")
 
-    globalfuncs.logger.info(f"Getting definitions of each phrase")
-    dict_lookup_res = dictlookup.get_meaning_full(jp_lyrics)
-    globalfuncs.logger.verbose(str(dict_lookup_res))
-    globalfuncs.logger.success(f"Finished getting definitions")
+    if not skip_dict_lookup:
+        globalfuncs.logger.info(f"Getting definitions of each phrase")
+        dict_lookup_res = dictlookup.get_meaning_full(jp_lyrics)
+        globalfuncs.logger.verbose(str(dict_lookup_res))
+        globalfuncs.logger.success(f"Finished getting definitions")
+    else:
+        globalfuncs.logger.success("Skipping dictionary look up for words")
 
     globalfuncs.logger.plain(f"{"-" * console_width}")
 
 if __name__ == '__main__':
-    main('https://www.youtube.com/watch?v=QnkqCv0dZTk')
+    main('https://www.youtube.com/watch?v=QnkqCv0dZTk', 'ai')
     # main('youtube.com/watch?v=ZRtdQ81jPUQ')
     # main('https://www.youtube.com/watch?v=Mhl9FaxiQ_E')
