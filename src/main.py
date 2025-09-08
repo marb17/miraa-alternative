@@ -35,7 +35,19 @@ except OSError:
     console_width = 20
 
 # main loop
-def main(url, use_genius, skip_download=True, skip_vox_sep=False, skip_lyrics=False, skip_transcribe=False, skip_dict_lookup=True):
+def main(url: str, use_genius: bool, skip_download=True, skip_vox_sep=False, skip_lyrics=True, skip_transcribe=True, skip_dict_lookup=True):
+    """
+    Returns JSON file, includes: lyrics, timestamps, translations, meanings, POS
+    :param url: Input the URL of the song (YouTube Only)
+    :param use_genius: if True, uses Genius API to get lyrics, otherwise uses AI transcription (unreliable)
+    :param skip_download:
+    :param skip_vox_sep:
+    :param skip_lyrics:
+    :param skip_transcribe:
+    :param skip_dict_lookup:
+    :return:
+    """
+
     # download audio
     if not skip_download:
         globalfuncs.logger.info("Starting Download of Song")
@@ -43,7 +55,7 @@ def main(url, use_genius, skip_download=True, skip_vox_sep=False, skip_lyrics=Fa
         globalfuncs.logger.success("Finished downloading")
     else:
         globalfuncs.logger.success("Skipping Youtube Download")
-        filename, base58path = 'Kamado Tanjirou no Uta (From "Demon Slayer: Kimetsu no Yaiba") (Full Version)','z8rvj6Zu1aQd1jFgJsiYv6182HkSV8JAy19Gbfurh3Z4HLzCk45mj5HyaKxQemUBu8XwtYUeNiAaCJpp3Jkyscz5nmV2jdU8fh1E39qXW'
+        base58path, filename = '6Zgp7o1Mfz3R6ANKskxuimK1j1XwVGA6N7kuaPDb3GrdT2EK8HzFbcdorugKBBU89YP9nL1EHjouDo2XrSBSZKkSS9cnV5eH2nne5p34o1YqXr6Fi3C5AfirERVz5R1d2M', 'GIVEN (ギヴン) - Fuyu no hanashi (冬のはな) (A Winter Story) (Kan|Rom|Eng) Lyrics/歌詞'
 
     globalfuncs.logger.plain(f"{"-" * console_width}")
 
@@ -64,9 +76,11 @@ def main(url, use_genius, skip_download=True, skip_vox_sep=False, skip_lyrics=Fa
     # get time stampped transcription for video sync
     if not skip_transcribe:
         globalfuncs.logger.info("Start timestamp words")
-        timestampped_words, lyrics = lyricstimestamper.transcribe(filepath_vocal)
-        globalfuncs.logger.verbose(str(timestampped_words))
-        globalfuncs.logger.verbose(str(lyrics))
+        vox_timestampped_words, vox_lyrics = lyricstimestamper.transcribe(filepath_vocal)
+
+        globalfuncs.logger.verbose(str(vox_timestampped_words))
+        globalfuncs.logger.verbose(str(vox_lyrics))
+
         globalfuncs.logger.success("Finished timestamp words")
     else:
         globalfuncs.logger.success("Skipping timestamp words")
@@ -127,7 +141,7 @@ def main(url, use_genius, skip_download=True, skip_vox_sep=False, skip_lyrics=Fa
 
             jp_lyrics = []
             unsplit_jp_lyrics = ''
-            for lyric in lyrics:
+            for lyric in vox_lyrics:
                 jp_lyrics.append(lyric[2])
                 unsplit_jp_lyrics = unsplit_jp_lyrics + lyric[2] + '\n'
 
@@ -183,6 +197,6 @@ def main(url, use_genius, skip_download=True, skip_vox_sep=False, skip_lyrics=Fa
     globalfuncs.logger.plain(f"{"-" * console_width}")
 
 if __name__ == '__main__':
-    main('https://www.youtube.com/watch?v=QnkqCv0dZTk', 'ai')
+    # main('https://www.youtube.com/watch?v=QnkqCv0dZTk', 'ai')
     # main('youtube.com/watch?v=ZRtdQ81jPUQ')
-    # main('https://www.youtube.com/watch?v=Mhl9FaxiQ_E')
+    main('https://www.youtube.com/watch?v=Mhl9FaxiQ_E', 'ai', 'vox')

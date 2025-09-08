@@ -11,6 +11,8 @@ with open('globalconfig.json', 'r') as f:
 whisper_model = str(config["whisper_model"])
 whisper_quiet_mode = bool(config["whisper_quiet_mode"])
 
+whisper_quiet_mode = not whisper_quiet_mode
+
 # use cuda if avaliable
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -19,7 +21,7 @@ def transcribe(filepath: str) -> json:
     model = faster_whisper.WhisperModel(whisper_model, device="cuda", compute_type='float16')
 
     #! do NOT change temperature out of 0 or omit, will crash
-    result, info = model.transcribe(filepath, language="ja", word_timestamps=True, log_progress=whisper_quiet_mode, beam_size=10, temperature=0.1, vad_filter=True, best_of=4)
+    result, info = model.transcribe(filepath, language="ja", word_timestamps=True, log_progress=whisper_quiet_mode, beam_size=10, temperature=0, vad_filter=True, best_of=4)
 
     segments = list(result)  # consume generator immediately
 
