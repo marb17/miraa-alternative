@@ -6,6 +6,10 @@ import os
 import gc
 import json
 import globalfuncs
+import numpy
+from pedalboard import Pedalboard, Reverb
+from pedalboard.io import AudioFile
+import soundfile
 
 # global config
 with open('globalconfig.json', 'r') as f:
@@ -14,11 +18,19 @@ with open('globalconfig.json', 'r') as f:
 demucs_shifts = int(config["demucs_shifts"])
 demucs_worker_num = int(config["demucs_worker_num"])
 demucs_quiet_mode = bool(config["demucs_quiet_mode"])
-demucs_model = str(["demucs_model"])
+demucs_model = str(config["demucs_model"])
+demucs_model_2 = str(config["demucs_model_2"])
+demucs_post_processing = bool(config["demucs_post_processing"])
+demucs_ensemble = bool(config["demucs_ensemble"])
+demucs_weight = float(config["demucs_weight"])
+demucs_2_weight = float(config["demucs_2_weight"])
+demucs_quiet_mode = not demucs_quiet_mode
 
 def separate_audio(filepath: str, split=True, device="cuda" if torch.cuda.is_available() else "cpu") -> None:
+    globalfuncs.logger.verbose(f"Post Processing: {demucs_post_processing}, Ensemble: {demucs_ensemble}, Models: '{demucs_model}' and '{demucs_model_2}'")
+
     # demucs model
-    model = get_model("mdx_extra_q")
+    model = get_model(demucs_model)
     model.to(device)
 
     # get abs path
@@ -39,13 +51,44 @@ def separate_audio(filepath: str, split=True, device="cuda" if torch.cuda.is_ava
     # only get vocals
     vocals = sources[0, -1, :, :]
 
-    # save
-    base = os.path.splitext(filepath)[0]
-    out_path = f"{base}_vocals.wav"
-    torchaudio.save(out_path, vocals.cpu(), sr)
-    globalfuncs.logger.success(f"Saved vocals -> {out_path}")
-
-    # delete model
     del model
     torch.cuda.empty_cache()
     gc.collect()
+
+    # post processing
+    if demucs_post_processing:
+        vocals_np = vocals.cpu().numpy()
+        board = Pedalboard([Reverb(room_size=0.4, damping=0.2, wet_level=0.05)])
+        vocals_np = board(vocals_np, sr)
+    else:
+        vocals_np = vocals.cpu().numpy()
+
+    # ensemble mode to mix two models into one
+    if demucs_ensemble:
+        model_2 = get_model(demucs_model_2)
+        model_2.to(device)
+
+        sources_2 = apply_model(model_2, wav, split=split, device=device, shifts=demucs_shifts, progress=demucs_quiet_mode,
+                              num_workers=demucs_worker_num)
+
+        vocals_2 = sources_2[0, -1, :, :]
+        vocals_2_np = vocals_2.cpu().numpy()
+
+        if demucs_post_processing:
+            vocals_2 = board(vocals_2_np, sr)
+
+        final_vocals = demucs_weight * vocals_np + demucs_2_weight * vocals_2_np
+        final_vocals = board(final_vocals, sr)
+
+        del model_2
+        torch.cuda.empty_cache()
+        gc.collect()
+    else:
+        final_vocals = vocals_np
+
+    # save path
+    base = os.path.splitext(filepath)[0]
+    out_path = f"{base}_vocals.wav"
+
+    soundfile.write(out_path, final_vocals.T, sr)
+    globalfuncs.logger.success(f"Saved vocals -> {out_path}")

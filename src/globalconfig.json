@@ -1,18 +1,23 @@
 {
-  "ytdown_quiet_mode": "False",
+  "ytdown_quiet_mode": false,
 
-  "remove_brackets_genius_lyr_search": "True",
-  "console_out_genius_lyr_search": "True",
+  "remove_brackets_genius_lyr_search": true,
+  "console_out_genius_lyr_search": true,
 
-  "demucs_shifts": 3,
+  "demucs_shifts": 2,
   "demucs_worker_num": 10,
-  "demucs_quiet_mode": "False",
-  "demucs_model": "htdemucs_ft",
+  "demucs_quiet_mode": false,
+  "demucs_model": "mdx_extra",
+  "demucs_model_2": "htdemucs_ft",
+  "demucs_weight": 0.4,
+  "demucs_2_weight": 0.6,
+  "demucs_post_processing": true,
+  "demucs_ensemble": true,
 
   "whisper_model": "large-v3",
-  "whisper_quiet_mode": "False",
+  "whisper_quiet_mode": false,
 
-  "console_print_line_separators": "True",
+  "console_print_line_separators": true,
 
   "large_model_name": "../model/.llama/checkpoints/Llama3.2-3B-Instruct-conv",
 
