@@ -55,6 +55,8 @@ def separate_audio(filepath: str, split=True, device="cuda" if torch.cuda.is_ava
     torch.cuda.empty_cache()
     gc.collect()
 
+    vocals_trans = vocals.cpu().numpy()
+
     # post processing
     if demucs_post_processing:
         vocals_np = vocals.cpu().numpy()
@@ -89,6 +91,11 @@ def separate_audio(filepath: str, split=True, device="cuda" if torch.cuda.is_ava
     # save path
     base = os.path.splitext(filepath)[0]
     out_path = f"{base}_vocals.wav"
+    out_path_for_trans = f"{base}_vocals_trans.wav"
 
     soundfile.write(out_path, final_vocals.T, sr)
+    soundfile.write(out_path_for_trans, vocals_trans.T, sr)
     globalfuncs.logger.success(f"Saved vocals -> {out_path}")
+
+    torch.cuda.empty_cache()
+    gc.collect()
