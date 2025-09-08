@@ -141,11 +141,14 @@ def translate_lyric_to_en(full_lyrics: str, lyric: str) -> str:
 
     prompt = f"""
     You are a professional translator and lyric analyst.  
-    Translate the following Japanese lyrics line by line into natural, poetic English.  
+    Translate the selected Japanese lyric into natural, poetic English using the full lyrics as context.  
     Preserve tone, mood, and implied emotion.
 
     Lyrics:
     {full_lyrics}
+    
+    Lyric to be translated:
+    {lyric}
 
     ### OUTPUT FORMAT (strict JSON) ###
     "en": "<English translation>"
@@ -159,7 +162,7 @@ def translate_lyric_to_en(full_lyrics: str, lyric: str) -> str:
 
     output = generate_response(prompt, 30, 0.65, 0.95, 1.15, True)
 
-    print(output)
+    return re.findall(r'"en":\s?"(.*?)"', output)[1]
 
 def pull_info_from_llm(text: str):
     text = re.findall(r'\[END\]([\s\S]*?)(?:\[END]|---|Lyric line:)', text)[0]
@@ -171,24 +174,3 @@ def pull_info_from_llm(text: str):
     summary = (re.findall(r'Summary:\w?(.+?)\n', text)[0]).strip()
 
     return meaning, grammar, nuance, impact, summary
-
-f_l = """ローフォー戻れ帰れ
-戻れ帰れ
-飽きたくなるような優しい
-どう苦しくても絶望たち
-失っても失っても
-生きていくしかない
-どんなに打ちのめ守る
-失う失う
-生きていくしかない
-どんなに打ちのめさ守るも
-痛はがい
-優しい
-どんなし
-立ちや"""
-
-l = '飽きたくなるような優しい'
-
-if __name__ == '__main__':
-    create_model()
-    print(translate_lyric_to_en(f_l, l))
