@@ -90,26 +90,28 @@ def explain_word_in_line(lyric: str, word: str, pos: str, full_song: str) -> tup
     global tokenizer, model
 
     prompt = f"""You are analyzing Japanese lyrics.  
-Given a lyric line, a target word, and its part of speech, output a concise explanation with exactly this structure:
+    Given a lyric line, a target word, and its part of speech, output a concise explanation with exactly this structure:
 
-**Meaning:** <short literal meaning without any explanations. only output the meaning of the word in the current tense>  
-**Grammatical Role:** <part of speech in context>  
-**Nuance:** <emotional / implicit connotation, in less than 2 sentences>  
-**Impact on Meaning:** <how it changes the lyric’s emotional tone or imagery, ≤2 sentences>  
+    **Meaning:** <short literal meaning without any explanations. only output the meaning of the word in the current tense>  
+    **Grammatical Role:** <part of speech in context>  
+    **Nuance:** <emotional / implicit connotation, in less than 2 sentences>  
+    **Impact on Meaning:** <how it changes the lyric’s emotional tone or imagery, ≤2 sentences>  
 
-**Summary:** <one-sentence summary around 50 words, weaving the above into a cohesive interpretation>  
+    **Summary:** <one-sentence summary around 50 words, weaving the above into a cohesive interpretation>  
 
-Do not include any other commentary or headers. Keep it concise and poetic, but analytical.
+    Do not include any other commentary, headers, or revisions.  
+    Output this structure once only.  
+    Always end with <END_EXPLANATION>  
 
-Full lyrics (for context): {full_song}
-Lyric line: {lyric}  
-Target word: {word}  
-Part of speech: {pos}
-
-[END]
-"""
+    Full lyrics (for context): {full_song}  
+    Lyric line: {lyric}  
+    Target word: {word}  
+    Part of speech: {pos}  
+    """
 
     output = generate_response(prompt, 200, 0.9, 0.9, 1.15, True)
+
+    print(output)
 
     return pull_info_from_llm(output)
 
@@ -165,12 +167,14 @@ def translate_lyric_to_en(full_lyrics: str, lyric: str) -> str:
     return re.findall(r'"en":\s?"(.*?)"', output)[1]
 
 def pull_info_from_llm(text: str):
-    text = re.findall(r'\[END\]([\s\S]*?)(?:\[END]|---|Lyric line:)', text)[0]
+    # ? text = re.findall(r'\[END\]([\s\S]*?)(?:\[END]|---|Lyric line:)', text)[0]
 
-    meaning = (re.findall(r'Meaning:\w?(.+?)\n', text)[0]).strip()
-    grammar = (re.findall(r'Grammatical Role:\w?(.+?)\n', text)[0]).strip()
-    nuance = (re.findall(r'Nuance:\w?(.+?)\n', text)[0]).strip()
-    impact = (re.findall(r'Impact on Meaning:\w?(.+?)\n', text)[0]).strip()
-    summary = (re.findall(r'Summary:\w?(.+?)\n', text)[0]).strip()
+    text = re.sub(r'\*', '', text)
+
+    meaning = (re.findall(r'Meaning:(?:[\*\s]*?)(.+?)\n', text)[2]).strip()
+    grammar = (re.findall(r'Grammatical Role:(?:[\*\s]*?)(.+?)\n', text)[1]).strip()
+    nuance = (re.findall(r'Nuance:(?:[\*\s]*?)(.+?)\n', text)[1]).strip()
+    impact = (re.findall(r'Impact on Meaning:(?:[\*\s]*?)(.+?)\n', text)[1]).strip()
+    summary = (re.findall(r'Summary:(?:[\*\s]*?)(.+?)(?:\n|[<]?END[\\\_]+?EXPLANATION[>]?)', text)[1]).strip()
 
     return meaning, grammar, nuance, impact, summary
