@@ -20,7 +20,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def transcribe(filepath: str) -> json:
     model = faster_whisper.WhisperModel(whisper_model, device="cuda", compute_type='float16')
 
-    #! do NOT change temperature out of 0 or omit, will crash
+    # // do NOT change temperature out of 0 or omit, will crash
+    # // (problem fixed, no longer crashes, idk why tbh)
     result, info = model.transcribe(filepath, language="ja", word_timestamps=True, log_progress=whisper_quiet_mode, beam_size=10, temperature=0, vad_filter=True, best_of=4)
 
     segments = list(result)  # consume generator immediately
