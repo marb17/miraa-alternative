@@ -46,8 +46,11 @@ def youtube_download_audio(url: str, output_dir='../database/songs/') -> tuple:
     }
 
     # download
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+    if os.path.exists(f"{outtmpl}.wav"):
+        globalfuncs.logger.verbose(f"Audio file already exists, skipping download")
+    else:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
 
     # return the title
     return title, title_enc

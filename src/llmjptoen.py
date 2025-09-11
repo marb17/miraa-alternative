@@ -109,11 +109,11 @@ def explain_word_in_line(lyric: str, word: str, pos: str, full_song: str) -> tup
     Part of speech: {pos}  
     """
 
-    output = generate_response(prompt, 200, 0.9, 0.9, 1.15, True)
+    output = generate_response(prompt, 170, 0.9, 0.9, 1.15, True)
 
     print(output)
 
-    return pull_info_from_llm(output)
+    return list(pull_info_from_llm(output))
 
 def get_definition_of_phrase(phrase: str) -> str:
     global tokenizer, model
@@ -175,6 +175,9 @@ def pull_info_from_llm(text: str):
     grammar = (re.findall(r'Grammatical Role:(?:[\*\s]*?)(.+?)\n', text)[1]).strip()
     nuance = (re.findall(r'Nuance:(?:[\*\s]*?)(.+?)\n', text)[1]).strip()
     impact = (re.findall(r'Impact on Meaning:(?:[\*\s]*?)(.+?)\n', text)[1]).strip()
-    summary = (re.findall(r'Summary:(?:[\*\s]*?)(.+?)(?:\n|[<]?END[\\\_]+?EXPLANATION[>]?)', text)[1]).strip()
+    try:
+        summary = (re.findall(r'Summary:(?:[\*\s]*?)(.+?)(?:\n|[<]?END[\\\_]+?EXPLANATION[>]?)', text)[1]).strip()
+    except IndexError:
+        summary = (re.findall(r'Summary:(?:[\*\s]*?)(.*)', text)[1]).strip()
 
     return meaning, grammar, nuance, impact, summary

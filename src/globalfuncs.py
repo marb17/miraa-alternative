@@ -98,3 +98,49 @@ logger.propagate = False
 # logger.success("Message with level success (35)")
 # logger.error("Message with level error (40)")
 # logger.critical("Message with level critical (50)")
+
+# write to json system
+
+import json
+
+import json
+import os
+
+import json, os
+
+def write_json(new_data, filename, path, as_list=True, extend=False):
+    # If file doesn’t exist or is empty, start with {}
+    if not os.path.exists(filename) or os.stat(filename).st_size == 0:
+        file_data = {}
+    else:
+        with open(filename, 'r', encoding='utf-8') as file:
+            try:
+                file_data = json.load(file)
+            except json.decoder.JSONDecodeError:
+                file_data = {}
+
+    # Navigate up to the parent of the final key
+    current = file_data
+    for key in path[:-1]:
+        current = current.setdefault(key, {})  # create dicts if missing
+
+    final_key = path[-1]
+
+    if as_list:
+        # Ensure it's a list
+        current.setdefault(final_key, [])
+        # Wrap single items in list before extending
+        if not isinstance(new_data, list):
+            new_data = [new_data]
+        if not extend:
+            current[final_key].append(new_data)
+        else:
+            current[final_key].extend(new_data)
+    else:
+        # Dict mode: final_key itself is used as the dict key
+        current[final_key] = new_data
+
+    # Write back to file
+    with open(filename, 'w', encoding='utf-8') as file:
+        json.dump(file_data, file, indent=4, ensure_ascii=False)
+
