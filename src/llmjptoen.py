@@ -77,6 +77,25 @@ def generate_response(text: str, tokens: int, temp: float, nucleus: float, reppe
 
     return response
 
+def batch_generate_response(prompts: list, tokens: int, temp: float, nucleus: float, reppen: float, dosample: bool) -> list:
+    global tokenizer, model
+
+    inputs = tokenizer(prompts, return_tensors="pt", padding=True, truncation=True).to(model.device)
+
+    outputs = model.generate(
+        **inputs,
+        max_new_tokens=tokens,
+        temperature=temp,
+        top_p=nucleus,
+        repetition_penalty=reppen,
+        do_sample=dosample,
+        eos_token_id=tokenizer.eos_token_id,
+        pad_token_id=tokenizer.eos_token_id,
+    )
+
+    responses = [tokenizer.decode(o, skip_special_tokens=True) for o in outputs]
+
+    return responses
 
 def clear_model() -> None:
     global model
@@ -86,10 +105,13 @@ def clear_model() -> None:
         torch.cuda.empty_cache()
         gc.collect()
 
-def explain_word_in_line(lyric: str, word: str, pos: str, full_song: str) -> tuple[str, str, str, str, str]:
+def explain_word_in_line(input_data) -> list:
     global tokenizer, model
 
-    prompt = f"""You are analyzing Japanese lyrics.  
+    prompt_list = []
+
+    for prompt in input_data:
+        prompt_list.append(f"""You are analyzing Japanese lyrics.  
     Given a lyric line, a target word, and its part of speech, output a concise explanation with exactly this structure:
 
     **Meaning:** <short literal meaning without any explanations. only output the meaning of the word in the current tense>  
@@ -103,17 +125,20 @@ def explain_word_in_line(lyric: str, word: str, pos: str, full_song: str) -> tup
     Output this structure once only.  
     Always end with <END_EXPLANATION>  
 
-    Full lyrics (for context): {full_song}  
-    Lyric line: {lyric}  
-    Target word: {word}  
-    Part of speech: {pos}  
-    """
+    Full lyrics (for context): {prompt[3]}  
+    Lyric line: {prompt[0]}  
+    Target word: {prompt[1]}  
+    Part of speech: {prompt[2]}  
+    """)
 
-    output = generate_response(prompt, 170, 0.9, 0.9, 1.15, True)
+    output = batch_generate_response(prompt_list, 170, 0.8, 0.9, 1.15, True)
 
-    print(output)
+    results = []
 
-    return list(pull_info_from_llm(output))
+    for result in output:
+        results.append(list(pull_info_from_llm(result)))
+
+    return results
 
 def get_definition_of_phrase(phrase: str) -> str:
     global tokenizer, model
@@ -137,6 +162,37 @@ Word: {phrase}
     globalfuncs.logger.success(f"Found definition of {phrase} using LLM: {output}")
 
     return output
+
+def batch_translate_lyric_to_en(input_data: list) -> list:
+    global tokenizer, model
+
+    prompt_list = []
+    for full_lyrics, lyric in input_data:
+        prompt_list.append(f"""
+    You are a professional translator and lyric analyst.  
+    Translate the selected Japanese lyric into natural, poetic English using the full lyrics as context.  
+    Preserve tone, mood, and implied emotion.
+
+    Lyrics:
+    {full_lyrics}
+    
+    Lyric to be translated:
+    {lyric}
+
+    ### OUTPUT FORMAT (strict JSON) ###
+    "en": "<English translation>"
+
+    Rules:
+    - Translate every line individually.
+    - Do not merge, omit, or add lines.
+    - No commentary or romanization.
+    - Output valid JSON only.
+    """)
+
+    output = batch_generate_response(prompt_list, 40, 0.65, 0.95, 1.15, True)
+
+    return output
+
 
 def translate_lyric_to_en(full_lyrics: str, lyric: str) -> str:
     global tokenizer, model

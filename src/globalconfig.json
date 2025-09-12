@@ -23,5 +23,9 @@
   "jp_model_precision_level": "fp16",
 
   "dictlookup_retries": 5,
-  "dictlookup_backoff": 0.5
+  "dictlookup_backoff": 0.5,
+
+  "llm_batch_size_explanation": 6,
+  "llm_batch_size_translation": 12
+
 }
