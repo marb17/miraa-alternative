@@ -117,21 +117,21 @@ def explain_word_in_line(input_data) -> list:
     **Meaning:** <short literal meaning without any explanations. only output the meaning of the word in the current tense>  
     **Grammatical Role:** <part of speech in context>  
     **Nuance:** <emotional / implicit connotation, in less than 2 sentences>  
-    **Impact on Meaning:** <how it changes the lyric’s emotional tone or imagery, ≤2 sentences>  
+    **Impact on Meaning:** <how it changes the lyric’s emotional tone or imagery, less than 3 sentences>  
 
     **Summary:** <one-sentence summary around 50 words, weaving the above into a cohesive interpretation>  
 
     Do not include any other commentary, headers, or revisions.  
-    Output this structure once only.  
     Always end with <END_EXPLANATION>  
-
+    Output this structure once only.  
+    
     Full lyrics (for context): {prompt[3]}  
     Lyric line: {prompt[0]}  
     Target word: {prompt[1]}  
     Part of speech: {prompt[2]}  
     """)
 
-    output = batch_generate_response(prompt_list, 170, 0.8, 0.9, 1.15, True)
+    output = batch_generate_response(prompt_list, 200, 0.8, 0.9, 1.15, True)
 
     results = []
 
@@ -139,6 +139,9 @@ def explain_word_in_line(input_data) -> list:
         results.append(list(pull_info_from_llm(result)))
 
     return results
+
+    # return output
+
 
 def get_definition_of_phrase(phrase: str) -> str:
     global tokenizer, model
@@ -225,10 +228,12 @@ def translate_lyric_to_en(full_lyrics: str, lyric: str) -> str:
 def pull_info_from_llm(text: str):
     # ? text = re.findall(r'\[END\]([\s\S]*?)(?:\[END]|---|Lyric line:)', text)[0]
 
+    print(text)
+
     text = re.sub(r'\*', '', text)
 
     meaning = (re.findall(r'Meaning:(?:[\*\s]*?)(.+?)\n', text)[2]).strip()
-    grammar = (re.findall(r'Grammatical Role:(?:[\*\s]*?)(.+?)\n', text)[1]).strip()
+    grammar = (re.findall(r'Gramm?atica?l? Role:(?:[\*\s]*?)(.+?)\n', text)[1]).strip()
     nuance = (re.findall(r'Nuance:(?:[\*\s]*?)(.+?)\n', text)[1]).strip()
     impact = (re.findall(r'Impact on Meaning:(?:[\*\s]*?)(.+?)\n', text)[1]).strip()
     try:
