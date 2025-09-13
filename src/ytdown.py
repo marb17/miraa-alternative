@@ -13,6 +13,11 @@ quiet_mode = bool(config['ytdown_quiet_mode'])
 
 # main functions
 def extract_video_title(url: str) -> json:
+    """
+    Extracts the video title using the URL
+    :param url: URL of a YouTube video as a string
+    :return: a string with the video title
+    """
     ydl_opts = {"quiet": quiet_mode}
 
     # get info as json
@@ -23,6 +28,12 @@ def extract_video_title(url: str) -> json:
         return info["title"]
 
 def youtube_download_audio(url: str, output_dir='../database/songs/') -> tuple:
+    """
+    Downloads the audio from a YouTube video
+    :param url: URL of a YouTube video as a string
+    :param output_dir: output directory to save audio file to encoded in base58
+    :return: A tuple containing the title and title encoded in base58
+    """
     title = extract_video_title(url)
     title_enc = str_to_base58(title)
 

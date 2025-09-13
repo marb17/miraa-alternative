@@ -12,6 +12,7 @@ import globalfuncs
 import json
 import shutil
 import os
+import re
 
 '''
 Green: Success
@@ -38,7 +39,7 @@ except OSError:
     console_width = 20
 
 # main loop
-def main(url: str, use_genius: str, skip_download=False, skip_vox_sep=False, skip_lyrics=False, skip_transcribe=False, skip_dict_lookup=False, skip_llm_exp=False, skip_llm_trans=False):
+def main(url: str, use_genius: str, skip_download=False, skip_vox_sep=False, skip_lyrics=False, skip_transcribe=False, skip_dict_lookup=False, skip_llm_exp=True, skip_llm_trans=False):
     """
     Returns JSON file, includes: lyrics, timestamps, translations, meanings, POS
     :param url: Input the URL of the song (YouTube Only)
@@ -275,6 +276,7 @@ def main(url: str, use_genius: str, skip_download=False, skip_vox_sep=False, ski
     # explanations for each token
 
     if not skip_llm_exp:
+        globalfuncs.logger.info(f"Getting explanations of tokens")
         llmjptoen.create_model()
 
         llm_result = []
@@ -290,13 +292,38 @@ def main(url: str, use_genius: str, skip_download=False, skip_vox_sep=False, ski
             llm_data = []
 
         counter = 0
+        attempt_try = 0
 
         prompt_batch = []
 
+        def call_llm_and_save():
+            nonlocal prompt_batch, counter, attempt_try, llm_result
+
+            attempt_try = 1
+
+            while True:
+                try:
+                    response = llmjptoen.explain_word_in_line(prompt_batch)
+                    break
+                except:
+                    attempt_try += 1
+                    globalfuncs.logger.notice(f"LLM Failure, trying again. Attempt: {attempt_try}")
+
+            for item, input_data in zip(response, prompt_batch):
+                globalfuncs.logger.spam(f"{input_data} | {item}")
+                if input_data[0] != '' or input_data[1] is not None:
+                    globalfuncs.write_json(item, filepath_json, ['llm', 'explanation', 'tokens'], as_list=True,
+                                           extend=False)
+                    llm_result.append(item)
+                    counter += 1
+                else:
+                    llm_result.append(None)
+                    globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
+                    counter += 1
+
         for lyric, lyric_line in zip(dict_lookup_res, jp_lyrics):
-            globalfuncs.logger.verbose(f"{lyric_line} | {lyric}")
+            globalfuncs.logger.spam(f"{lyric_line} | {lyric}")
             if lyric is None or lyric == '':
-                globalfuncs.logger.error('firsdt check')
                 llm_result.append(None)
                 globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
                 counter += 1
@@ -313,28 +340,6 @@ def main(url: str, use_genius: str, skip_download=False, skip_vox_sep=False, ski
                 counter += 1
                 continue
 
-            def call_llm_and_save():
-                nonlocal prompt_batch, counter, attempt_try, llm_result
-
-                while True:
-                    try:
-                        response = llmjptoen.explain_word_in_line(prompt_batch)
-                        break
-                    except:
-                        attempt_try += 1
-                        globalfuncs.logger.notice(f"LLM Failure, trying again. Attempt: {attempt_try}")
-
-                for item, input_data in zip(response, prompt_batch):
-                    globalfuncs.logger.verbose(f"{input_data} | {item}")
-                    if input_data[0] != '' or input_data[1] is not None:
-                        globalfuncs.write_json(item, filepath_json, ['llm', 'explanation', 'tokens'], as_list=True, extend=False)
-                        llm_result.append(item)
-                        counter += 1
-                    else:
-                        llm_result.append(None)
-                        globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
-                        counter += 1
-
             for word, s_pos, meaning in zip(token, pos, meaning):
                 if counter < cur_length_of_json_llm:
                     llm_result.append(llm_data[counter])
@@ -343,35 +348,69 @@ def main(url: str, use_genius: str, skip_download=False, skip_vox_sep=False, ski
 
                     continue
 
-                attempt_try = 1
-                prompt_batch.append([lyric_line, word, s_pos, unsplit_jp_lyrics])
-
                 if len(prompt_batch) == llm_batch_size_explanation:
                     call_llm_and_save()
                     prompt_batch = []
 
-            if prompt_batch:
-                call_llm_and_save()
-                prompt_batch = []
+                prompt_batch.append([lyric_line, word, s_pos, unsplit_jp_lyrics])
+
+        if prompt_batch:
+            call_llm_and_save()
+            prompt_batch = []
+
+        llmjptoen.clear_model()
+        globalfuncs.logger.info(f"Finished getting explanations of tokens")
+    else:
+        globalfuncs.logger.verbose(f"Skipping getting explanations of tokens")
+
+    globalfuncs.logger.plain(f"{"-" * console_width}")
 
     # TODO add llm for translating jp lyrics to en lyrics, again....
     # ! NOT TESTED YET
+    llm_trans_result = []
+
+    globalfuncs.logger.info(f"Translating each lyric")
+
+    llmjptoen.create_model()
+
     prompt_batch = []
+    attempt_try = 1
 
     for jp_lyric in jp_lyrics:
         prompt_batch.append([unsplit_jp_lyrics, jp_lyric])
 
         if len(prompt_batch) == llm_batch_size_translation:
-            responses = llmjptoen.batch_translate_lyric_to_en(prompt_batch)
-            prompt_batch = []
+            globalfuncs.logger.spam(f"{prompt_batch}")
+            while True:
+                try:
+                    responses = llmjptoen.batch_translate_lyric_to_en(prompt_batch)
+                    break
+                except:
+                    attempt_try += 1
+                    globalfuncs.logger.notice(f"Translation failure, attempt: {attempt_try}")
 
-            for item in responses: globalfuncs.write_json(item, filepath_json, ['lyrics', 'genius_jp', 'en_lyrics_ai_translate'], as_list=True, extend=True)
+            for item, lyric in zip(responses, prompt_batch):
+                if lyric[1] is not '':
+                    globalfuncs.logger.spam(f"{item}")
+                    globalfuncs.write_json(item, filepath_json, ['lyrics', 'genius_jp', 'en_lyrics_ai_translate'], as_list=True, extend=True)
+                else:
+                    globalfuncs.write_json('', filepath_json, ['lyrics', 'genius_jp', 'en_lyrics_ai_translate'], as_list=True, extend=True)
+
+            prompt_batch = []
 
     if prompt_batch:
         responses = llmjptoen.batch_translate_lyric_to_en(prompt_batch)
         prompt_batch = []
 
-        for item in responses: globalfuncs.write_json(item, filepath_json,['lyrics', 'genius_jp', 'en_lyrics_ai_translate'], as_list=True, extend=True)
+        for item in responses:
+            try:
+                item = re.findall(r'"en":\s?"(.*?)"', item)[1]
+                globalfuncs.logger.spam(f"{item}")
+                globalfuncs.write_json(item, filepath_json,['lyrics', 'genius_jp', 'en_lyrics_ai_translate'], as_list=True, extend=True)
+            except:
+                print(item)
+                raise Exception
+
     llmjptoen.clear_model()
 
     # TODO add timestamp thing so u can display it later

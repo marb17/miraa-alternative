@@ -30,7 +30,14 @@ genius_api_base = 'https://api.genius.com/'
 
 # main functions
 # for the multi-processing thread so it can call faster
-def fetch_search_for_multithreadding(hit_id: str, check_for_artist_title, filename: str) -> dict:
+def fetch_search_for_multithreadding(hit_id: str, check_for_artist_title: bool, filename: str) -> dict:
+    """
+    Checks if song id of song matches song title given using title and artist checks
+    :param hit_id: Song ID to check
+    :param check_for_artist_title: A more accurate system to check if the song is right, recommended to check artist title
+    :param filename: The title and artist for the algorithm to check, in this format. "Title - Artist"
+    :return:
+    """
     headers = {'Authorization': 'Bearer ' + genius_client_access_token}
 
     try:
@@ -67,6 +74,13 @@ def fetch_search_for_multithreadding(hit_id: str, check_for_artist_title, filena
 
 
 def genius_get_song_id_jp(song: str, removepar=rem_brak, consoleout=console_out) -> dict:
+    """
+    Finds the song ID of a song using the title and artist
+    :param song: Title and artist name in this format, "Title - Artist"
+    :param removepar: Removes parentheses from the input
+    :param consoleout: Outputs console information
+    :return: The song ID
+    """
     if removepar:
         song = re.sub(r'\([^)]*\)|\[[^\]]*\]', '', song)
 

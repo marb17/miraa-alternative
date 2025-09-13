@@ -112,7 +112,7 @@ def explain_word_in_line(input_data) -> list:
 
     for prompt in input_data:
         prompt_list.append(f"""You are analyzing Japanese lyrics.  
-    Given a lyric line, a target word, and its part of speech, output a concise explanation with exactly this structure:
+    Given a lyric line, a target word, and its part of speech, output a concise explanation with exactly this structure without adding extra information that isn't part of the structure given below:
 
     **Meaning:** <short literal meaning without any explanations. only output the meaning of the word in the current tense>  
     **Grammatical Role:** <part of speech in context>  
@@ -121,7 +121,7 @@ def explain_word_in_line(input_data) -> list:
 
     **Summary:** <one-sentence summary around 50 words, weaving the above into a cohesive interpretation>  
 
-    Do not include any other commentary, headers, or revisions.  
+    Do not include any other commentary, headers, or revisions.
     Always end with <END_EXPLANATION>  
     Output this structure once only.  
     
@@ -173,28 +173,31 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
     for full_lyrics, lyric in input_data:
         prompt_list.append(f"""
     You are a professional translator and lyric analyst.  
-    Translate the selected Japanese lyric into natural, poetic English using the full lyrics as context.  
-    Preserve tone, mood, and implied emotion.
-
-    Lyrics:
-    {full_lyrics}
+    Translate the given Japanese lyric line into natural, poetic English using the full lyrics as context.  
+    Preserve tone, mood, and implied emotion.  
     
-    Lyric to be translated:
-    {lyric}
-
-    ### OUTPUT FORMAT (strict JSON) ###
-    "en": "<English translation>"
-
-    Rules:
-    - Translate every line individually.
-    - Do not merge, omit, or add lines.
-    - No commentary or romanization.
-    - Output valid JSON only.
+    Output with exactly this structure, and do not include any other commentary, headers, or revisions:  
+    
+    "en": "<English translation of the lyric line>"  
+    
+    If the lyric line is blank, output:
+    "en": ""
+    
+    Always output this structure once only.  
+    Output must be valid JSON.  
+    
+    Full lyrics (for context): {full_lyrics}  
+    Lyric line: {lyric}  
     """)
 
-    output = batch_generate_response(prompt_list, 40, 0.65, 0.95, 1.15, True)
+    output = batch_generate_response(prompt_list, 25, 0.65, 0.95, 1.15, True)
 
-    return output
+    results = []
+
+    for item in output:
+        results.append(re.findall(r'"en":\s?"(.*?)"', item)[2])
+
+    return results
 
 
 def translate_lyric_to_en(full_lyrics: str, lyric: str) -> str:
