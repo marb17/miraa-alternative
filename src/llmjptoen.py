@@ -258,7 +258,7 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
             if 'Lyric line to translate' in line:
                 globalfuncs.logger.verbose(line)
         try:
-            results.append((re.sub(r'\*', '', (re.findall(r'Translation:(?:[\*\s]*?)(.+?)\n', item)[2]))).strip())
+            results.append((re.sub(r'\*|\:', '', (re.findall(r'Translation(?:[\:\*\s]*?)(.+?\n)', item)[4]))).strip())
         except:
             globalfuncs.logger.verbose(item)
             raise Exception
