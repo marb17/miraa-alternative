@@ -15,6 +15,7 @@ with open('globalconfig.json', 'r') as f:
 
 local_dir = config['jp_en_model_name']
 precision_level = config['jp_model_precision_level']
+llm_translate_use_context = config['llm_translate_use_context']
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -171,31 +172,96 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
 
     prompt_list = []
     for full_lyrics, lyric in input_data:
-        prompt_list.append(f"""
-    You are a professional translator and lyric analyst.  
-    Translate the given Japanese lyric line into natural, poetic English using the full lyrics as context.  
-    Preserve tone, mood, and implied emotion.  
-    
-    Output with exactly this structure, and do not include any other commentary, headers, or revisions:  
-    
-    "en": "<English translation of the lyric line>"  
-    
-    If the lyric line is blank, output:
-    "en": ""
-    
-    Always output this structure once only.  
-    Output must be valid JSON.  
-    
-    Full lyrics (for context): {full_lyrics}  
-    Lyric line: {lyric}  
-    """)
+        if llm_translate_use_context:
+            # prompt_list.append(f"""
+            # You are a professional Japanese-to-English lyric translator.
+            # Translate exactly one lyric line into natural English.
+            # Use the full lyrics only as **context** to capture nuance, tone, and emotion.
+            # Never translate or copy the full lyrics — only the single target line.
+            #
+            # ### RULES ###
+            # - Strictly output in this format:
+            # **Translation:** <English translation of the lyric line>
+            # <END_EXPLANATION>
+            #
+            # - Translate **only** the lyric line.
+            # - If the lyric line is empty or metadata (e.g. [Intro], [Verse], [Chorus], song title, tags), output:
+            # **Translation:**
+            # <END_EXPLANATION>
+            #
+            # - Do not provide multiple translations.
+            # - Do not explain, comment, or add extra text outside the strict format.
+            #
+            # ### CONTEXT (do not translate) ###
+            # Full lyrics: {full_lyrics}
+            #
+            # Lyric line to translate: {lyric}
+            # """)
+            prompt_list.append(f"""
+            You are a professional translator of Japanese lyrics.
+            Translate the given lyric line into natural English, using full_lyrics as context to preserve emotional nuance and implicit meaning.
 
-    output = batch_generate_response(prompt_list, 25, 0.65, 0.95, 1.15, True)
+            Ignore any metadata such as:
+            - [verse], [chorus], [bridge]
+            - [intro], [outro]
+            - [YOASOBI「アイドル」歌詞]
+            - Empty lines or blank markers
+
+            full_lyrics:
+            {full_lyrics}
+
+            lyric:
+            {lyric}
+
+            Output only in this exact format (no explanations, no additional text):
+            **Translation:** <English translation of the lyric line>
+
+            ## Example ONLY: ##
+            Input, lyric: ちゃんと愛したいから
+            Output, **Translation:** Because I want to truly love you
+            
+            Input, lyric: 
+            Output, **Translation:** 
+            
+            Input, lyric: [verse]
+            Output, **Translation:** 
+            """)
+        else:
+            prompt_list.append(f"""
+                        You are a professional Japanese-to-English lyric translator.  
+                        Translate exactly one lyric line into natural English.  
+                        Do not use any external context — translate only the provided lyric line.  
+
+                        ### RULES ###
+                        - Strictly output in this format:  
+                        **Translation:** <English translation of the lyric line>  
+                        <END_EXPLANATION>  
+
+                        - Translate **only** the lyric line.  
+                        - If the lyric line is empty or metadata (e.g. [Intro], [Verse], [Chorus], song title, tags), output:  
+                        **Translation:**  
+                        <END_EXPLANATION>  
+
+                        - Do not provide multiple translations.  
+                        - Do not explain, comment, or add extra text outside the strict format.  
+
+                        Lyric line to translate: {lyric}  
+                        """)
+    output = batch_generate_response(prompt_list, 50, 0.65, 0.95, 1.15, True)
 
     results = []
 
     for item in output:
-        results.append(re.findall(r'"en":\s?"(.*?)"', item)[2])
+        for line in item.split('\n'):
+            if 'Translation' in line:
+                globalfuncs.logger.verbose(line)
+            if 'Lyric line to translate' in line:
+                globalfuncs.logger.verbose(line)
+        try:
+            results.append((re.sub(r'\*', '', (re.findall(r'Translation:(?:[\*\s]*?)(.+?)\n', item)[2]))).strip())
+        except:
+            globalfuncs.logger.verbose(item)
+            raise Exception
 
     return results
 

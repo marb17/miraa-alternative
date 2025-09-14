@@ -390,7 +390,7 @@ def main(url: str, use_genius: str, skip_download=False, skip_vox_sep=False, ski
                     globalfuncs.logger.notice(f"Translation failure, attempt: {attempt_try}")
 
             for item, lyric in zip(responses, prompt_batch):
-                if lyric[1] is not '':
+                if lyric[1] != '':
                     globalfuncs.logger.spam(f"{item}")
                     globalfuncs.write_json(item, filepath_json, ['lyrics', 'genius_jp', 'en_lyrics_ai_translate'], as_list=True, extend=True)
                 else:
