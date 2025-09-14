@@ -22,6 +22,8 @@
   "jp_en_model_name": "../model/shisav2",
   "jp_model_precision_level": "fp16",
 
+  "llm_translate_use_context": true,
+
   "dictlookup_retries": 5,
   "dictlookup_backoff": 0.5,
 
