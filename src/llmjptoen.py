@@ -207,15 +207,6 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
             - [YOASOBI「アイドル」歌詞]
             - Empty lines or blank markers
 
-            full_lyrics:
-            {full_lyrics}
-
-            lyric:
-            {lyric}
-
-            Output only in this exact format (no explanations, no additional text):
-            **Translation:** <English translation of the lyric line>
-
             ## Example ONLY: ##
             Input, lyric: ちゃんと愛したいから
             Output, **Translation:** Because I want to truly love you
@@ -223,8 +214,27 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
             Input, lyric: 
             Output, **Translation:** 
             
-            Input, lyric: [verse]
+            Input, lyric: [Verse 1]
             Output, **Translation:** 
+            
+            Input, lyric: (Chorus)
+            Output, **Translation:** 
+            
+            Input, lyric: [Bridge]
+            Output, **Translation:** 
+            ## END of Example ##
+            
+            full_lyrics (for context):
+            {full_lyrics}
+
+            If the input is empty, output this only:
+            **Translation:**
+            
+            Output only in this exact format with no explanations, no additional text and no other context:
+            **Translation:** <English translation of the lyric line>
+            
+            lyric:
+            {lyric}
             """)
         else:
             prompt_list.append(f"""
@@ -247,7 +257,7 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
 
                         Lyric line to translate: {lyric}  
                         """)
-    output = batch_generate_response(prompt_list, 50, 0.65, 0.95, 1.15, True)
+    output = batch_generate_response(prompt_list, 30, 0.35, 0.95, 1.15, True)
 
     results = []
 
@@ -258,7 +268,7 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
             if 'Lyric line to translate' in line:
                 globalfuncs.logger.verbose(line)
         try:
-            results.append((re.sub(r'\*|\:', '', (re.findall(r'Translation(?:[\:\*\s]*?)(.+?\n)', item)[4]))).strip())
+            results.append((re.sub(r'\*|\:', '', (re.findall(r'Translation(?:[\:\*\s]*?)(.+?)(?:\n|$)', item)[7]))).strip())
         except:
             globalfuncs.logger.verbose(item)
             raise Exception
