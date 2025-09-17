@@ -171,39 +171,14 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
     global tokenizer, model
 
     prompt_list = []
-    for full_lyrics, lyric in input_data:
+    for full_lyrics, lyric, full_en_lyrics in input_data:
         if llm_translate_use_context:
-            # prompt_list.append(f"""
-            # You are a professional Japanese-to-English lyric translator.
-            # Translate exactly one lyric line into natural English.
-            # Use the full lyrics only as **context** to capture nuance, tone, and emotion.
-            # Never translate or copy the full lyrics — only the single target line.
-            #
-            # ### RULES ###
-            # - Strictly output in this format:
-            # **Translation:** <English translation of the lyric line>
-            # <END_EXPLANATION>
-            #
-            # - Translate **only** the lyric line.
-            # - If the lyric line is empty or metadata (e.g. [Intro], [Verse], [Chorus], song title, tags), output:
-            # **Translation:**
-            # <END_EXPLANATION>
-            #
-            # - Do not provide multiple translations.
-            # - Do not explain, comment, or add extra text outside the strict format.
-            #
-            # ### CONTEXT (do not translate) ###
-            # Full lyrics: {full_lyrics}
-            #
-            # Lyric line to translate: {lyric}
-            # """)
             prompt_list.append(f"""
             You are a professional translator of Japanese lyrics.
-            Translate the given lyric line into natural English, using full_lyrics as context to preserve emotional nuance and implicit meaning.
+            Translate the given lyric line into natural English, using the full lyrics provided as context only to preserve emotional nuance and implicit meaning.
 
             Ignore any metadata such as:
-            - [verse], [chorus], [bridge]
-            - [intro], [outro]
+            - [verse], [chorus], [bridge], [intro], [outro]
             - [YOASOBI「アイドル」歌詞]
             - Empty lines or blank markers
 
@@ -216,20 +191,15 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
             
             Input, lyric: [Verse 1]
             Output, **Translation:** 
-            
-            Input, lyric: (Chorus)
-            Output, **Translation:** 
-            
-            Input, lyric: [Bridge]
-            Output, **Translation:** 
             ## END of Example ##
             
-            full_lyrics (for context):
+            Full lyrics (for context):
             {full_lyrics}
 
-            If the input is empty, output this only:
+            If the input is empty or is invalid, output this only:
             **Translation:**
             
+            Translate the lyric provided and NO OTHER lyric.
             Output only in this exact format with no explanations, no additional text and no other context:
             **Translation:** <English translation of the lyric line>
             
@@ -243,17 +213,14 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
                         Do not use any external context — translate only the provided lyric line.  
 
                         ### RULES ###
+                        - Translate **only** the lyric line.  
+                        - Do not provide multiple translations.  
+                        - Do not comment or add extra text outside the strict format.  
+                        - Do NOT add any other explanations outside the strict format.  
                         - Strictly output in this format:  
                         **Translation:** <English translation of the lyric line>  
                         <END_EXPLANATION>  
-
-                        - Translate **only** the lyric line.  
-                        - If the lyric line is empty or metadata (e.g. [Intro], [Verse], [Chorus], song title, tags), output:  
-                        **Translation:**  
-                        <END_EXPLANATION>  
-
-                        - Do not provide multiple translations.  
-                        - Do not explain, comment, or add extra text outside the strict format.  
+                        ### END OF RULES ###
 
                         Lyric line to translate: {lyric}  
                         """)
@@ -268,7 +235,10 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
             if 'Lyric line to translate' in line:
                 globalfuncs.logger.verbose(line)
         try:
-            results.append((re.sub(r'\*|\:', '', (re.findall(r'Translation(?:[\:\*\s]*?)(.+?)(?:\n|$)', item)[7]))).strip())
+            if llm_translate_use_context:
+                results.append((re.sub(r'\*|\:', '', (re.findall(r'Translation(?:[\:\*\s]*?)(.+?)(?:\n|$)', item)[5]))).strip())
+            else:
+                results.append((re.sub(r'\*|\:', '', (re.findall(r'Translation(?:[\:\*\s]*?)(.+?)(?:\n|$)', item)[1]))).strip())
         except:
             globalfuncs.logger.verbose(item)
             raise Exception
