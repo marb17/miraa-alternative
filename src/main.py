@@ -133,6 +133,7 @@ def main(url: str, use_genius: str, skip_download=False, skip_vox_sep=False, ski
                 jp_lyrics = file_data['lyrics']['genius_jp']['jp_lyrics']
                 en_lyrics = file_data['lyrics']['genius_en']['en_lyrics']
                 unsplit_jp_lyrics = file_data['lyrics']['genius_jp']['unsplit_jp_lyrics']
+                unsplit_en_lyrics = file_data['lyrics']['genius_en']['unsplit_en_lyrics']
                 globalfuncs.logger.verbose("Skipping lyrics, data already exists")
             else:
                 globalfuncs.logger.verbose('Using Genius Lyrics')
@@ -176,6 +177,7 @@ def main(url: str, use_genius: str, skip_download=False, skip_vox_sep=False, ski
                     unsplit_jp_lyrics = jp_lyrics
                     jp_lyrics = jp_lyrics.split('\n')
 
+                    unsplit_en_lyrics = en_lyrics
                     en_lyrics = en_lyrics.split('\n')
 
                 globalfuncs.write_json(jp_song_id, filepath_json, ['lyrics', 'genius_jp', 'jp_song_id'], as_list=False)
@@ -183,6 +185,7 @@ def main(url: str, use_genius: str, skip_download=False, skip_vox_sep=False, ski
                 globalfuncs.write_json(unsplit_jp_lyrics, filepath_json, ['lyrics', 'genius_jp', 'unsplit_jp_lyrics'], as_list=False)
                 globalfuncs.write_json(en_song_id, filepath_json, ['lyrics', 'genius_en', 'en_song_id'], as_list=False)
                 for item in en_lyrics: globalfuncs.write_json(item, filepath_json, ['lyrics', 'genius_en', 'en_lyrics'], as_list=True, extend=True)
+                globalfuncs.write_json(unsplit_en_lyrics, filepath_json, ['lyrics', 'genius_en', 'unsplit_en_lyrics'], as_list=False)
 
                 globalfuncs.logger.success("Finished Lyrics")
         elif use_genius == 'ai':
@@ -190,6 +193,7 @@ def main(url: str, use_genius: str, skip_download=False, skip_vox_sep=False, ski
                 jp_lyrics = file_data['lyrics']['ai_trans']['jp_lyrics']
                 en_lyrics = file_data['lyrics']['ai_trans']['en_lyrics']
                 unsplit_jp_lyrics = file_data['lyrics']['ai_trans']['unsplit_jp_lyrics']
+                unsplit_en_lyrics = file_data['lyrics']['ai_trans']['unsplit_en_lyrics']
                 globalfuncs.logger.verbose("Skipping ai lyrics words, data already exists")
             else:
                 globalfuncs.logger.verbose('Using AI Transcription')
@@ -205,11 +209,13 @@ def main(url: str, use_genius: str, skip_download=False, skip_vox_sep=False, ski
                 for lyric in vox_lyrics:
                     en_lyrics = en_lyrics + llmjptoen.translate_lyric_to_en(unsplit_jp_lyrics, lyric) + '\n'
 
+                unsplit_en_lyrics = en_lyrics
                 en_lyrics = en_lyrics.split('\n')
 
                 for item in jp_lyrics: globalfuncs.write_json(item, filepath_json, ['lyrics', 'ai_trans', 'jp_lyrics'], as_list=True, extend=True)
                 globalfuncs.write_json(unsplit_jp_lyrics, filepath_json, ['lyrics', 'ai_trans', 'unsplit_jp_lyrics'], as_list=False)
                 for item in en_lyrics: globalfuncs.write_json(item, filepath_json, ['lyrics', 'ai_trans', 'en_lyrics'], as_list=True, extend=True)
+                globalfuncs.write_json(unsplit_en_lyrics, filepath_json, ['lyrics', 'ai_trans', 'unsplit_en_lyrics'], as_list=False)
     else:
         globalfuncs.logger.success("Skipping Lyrics")
 
@@ -377,7 +383,7 @@ def main(url: str, use_genius: str, skip_download=False, skip_vox_sep=False, ski
     attempt_try = 1
 
     for jp_lyric in jp_lyrics:
-        prompt_batch.append([unsplit_jp_lyrics, jp_lyric])
+        prompt_batch.append([unsplit_jp_lyrics, jp_lyric, unsplit_en_lyrics])
 
         if len(prompt_batch) == llm_batch_size_translation:
             globalfuncs.logger.spam(f"{prompt_batch}")
@@ -399,17 +405,8 @@ def main(url: str, use_genius: str, skip_download=False, skip_vox_sep=False, ski
             prompt_batch = []
 
     if prompt_batch:
-        responses = llmjptoen.batch_translate_lyric_to_en(prompt_batch)
-        prompt_batch = []
-
-        for item in responses:
-            try:
-                item = re.findall(r'"en":\s?"(.*?)"', item)[1]
-                globalfuncs.logger.spam(f"{item}")
-                globalfuncs.write_json(item, filepath_json,['lyrics', 'genius_jp', 'en_lyrics_ai_translate'], as_list=True, extend=True)
-            except:
-                print(item)
-                raise Exception
+        pass
+        # TODO add the thing for fallback
 
     llmjptoen.clear_model()
 
