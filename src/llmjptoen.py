@@ -178,29 +178,18 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
             Translate the given lyric line into natural English, using the full lyrics provided as context only to preserve emotional nuance and implicit meaning.
 
             Ignore any metadata such as:
-            - [verse], [chorus], [bridge], [intro], [outro]
-            - [YOASOBI「アイドル」歌詞]
+            - [verse], [chorus], [bridge]
             - Empty lines or blank markers
 
-            ## Example ONLY: ##
-            Input, lyric: ちゃんと愛したいから
-            Output, **Translation:** Because I want to truly love you
-            
-            Input, lyric: 
-            Output, **Translation:** 
-            
-            Input, lyric: [Verse 1]
-            Output, **Translation:** 
-            ## END of Example ##
-            
             Full lyrics (for context):
             {full_lyrics}
 
-            If the input is empty or is invalid, output this only:
+            If the input is empty or is invalid, output this only and do not output any other message:
             **Translation:**
             
             Translate the lyric provided and NO OTHER lyric.
-            Output only in this exact format with no explanations, no additional text and no other context:
+            Do not try and continue the lyrics.
+            Output the translation in this exact format with no explanations, no additional text and no other context:
             **Translation:** <English translation of the lyric line>
             
             lyric:
@@ -236,7 +225,7 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
                 globalfuncs.logger.verbose(line)
         try:
             if llm_translate_use_context:
-                results.append((re.sub(r'\*|\:', '', (re.findall(r'Translation(?:[\:\*\s]*?)(.+?)(?:\n|$)', item)[5]))).strip())
+                results.append((re.sub(r'\*|\:', '', (re.findall(r'Translation(?:[\:\*\s]*?)(.+?)(?:\n|$)', item)[2]))).strip())
             else:
                 results.append((re.sub(r'\*|\:', '', (re.findall(r'Translation(?:[\:\*\s]*?)(.+?)(?:\n|$)', item)[1]))).strip())
         except:
