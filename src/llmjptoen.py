@@ -171,30 +171,27 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
     global tokenizer, model
 
     prompt_list = []
+    lyric_list = []
     for full_lyrics, lyric, full_en_lyrics in input_data:
+        lyric_list.append(lyric)
         if llm_translate_use_context:
             prompt_list.append(f"""
-            You are a professional translator of Japanese lyrics.
-            Translate the given lyric line into natural English, using the full lyrics provided as context only to preserve emotional nuance and implicit meaning.
+You are a professional translator of Japanese song lyrics. 
+You must strictly follow the output format. 
+Do not provide explanations, extra commentary, or anything outside the required format. 
 
-            Ignore any metadata such as:
-            - [verse], [chorus], [bridge]
-            - Empty lines or blank markers
+If the lyric line contains [Verse] or [Bridge] or anything similar, output this only strictly:
+**Translation:**
 
-            Full lyrics (for context):
-            {full_lyrics}
+Use the full lyrics for context:
+{full_lyrics}
 
-            If the input is empty or is invalid, output this only and do not output any other message:
-            **Translation:**
-            
-            Translate the lyric provided and NO OTHER lyric.
-            Do not try and continue the lyrics.
-            Output the translation in this exact format with no explanations, no additional text and no other context:
-            **Translation:** <English translation of the lyric line>
-            
-            lyric:
-            {lyric}
-            """)
+### STRICT OUTPUT FORMAT ###
+**Translation:** <English translation of the lyric line>
+
+Translate only the following lyric line into natural, fluent English, including implicit meanings and emotional nuances:
+Lyric: {lyric}
+""")
         else:
             prompt_list.append(f"""
                         You are a professional Japanese-to-English lyric translator.  
@@ -213,11 +210,12 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
 
                         Lyric line to translate: {lyric}  
                         """)
-    output = batch_generate_response(prompt_list, 30, 0.35, 0.95, 1.15, True)
+    output = batch_generate_response(prompt_list, 30, 0.4, 0.95, 1.15, True)
 
     results = []
 
-    for item in output:
+    for item, lyric in zip(output, lyric_list):
+        globalfuncs.logger.spam(f"{item}")
         for line in item.split('\n'):
             if 'Translation' in line:
                 globalfuncs.logger.verbose(line)
@@ -225,7 +223,10 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
                 globalfuncs.logger.verbose(line)
         try:
             if llm_translate_use_context:
-                results.append((re.sub(r'\*|\:', '', (re.findall(r'Translation(?:[\:\*\s]*?)(.+?)(?:\n|$)', item)[2]))).strip())
+                if lyric == '':
+                    results.append('')
+                else:
+                    results.append((re.sub(r'\*|\:', '', (re.findall(r'Translation(?:[\:\*\s]*?)(.+?)(?:\n|$)', item)[2]))).strip())
             else:
                 results.append((re.sub(r'\*|\:', '', (re.findall(r'Translation(?:[\:\*\s]*?)(.+?)(?:\n|$)', item)[1]))).strip())
         except:

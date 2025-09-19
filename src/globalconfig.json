@@ -28,6 +28,6 @@
   "dictlookup_backoff": 0.5,
 
   "llm_batch_size_explanation": 10,
-  "llm_batch_size_translation": 24
+  "llm_batch_size_translation": 30
 
 }
