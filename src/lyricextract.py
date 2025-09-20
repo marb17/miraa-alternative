@@ -21,6 +21,7 @@ load_dotenv()
 
 # genius data scraper setup
 genius = Genius(os.getenv("LGENIUS_CLIENT_ACCESS_TOKEN"))
+genius_no_headers = Genius(os.getenv("LGENIUS_CLIENT_ACCESS_TOKEN"), remove_section_headers=True)
 
 # tokens
 genius_client_access_token = os.getenv('GENIUS_CLIENT_ACCESS_TOKEN')
@@ -188,10 +189,11 @@ def genius_get_translated(song_id):
     except requests.exceptions.RequestException as e:
         globalfuncs.logger.error(e)
 
-def extract_lyrics(api_path: str) -> str:
+def extract_lyrics(api_path: str) -> tuple[str, str]:
     # remove all non numbered characters
     api_path = int("".join([char for char in api_path if char.isdigit()]))
 
     # use web scraper to get lyrics
     song = genius.search_song(None, None, api_path)
-    return song.lyrics
+    song_no_headers = genius_no_headers.search_song(None, None, api_path)
+    return song.lyrics, song_no_headers.lyrics

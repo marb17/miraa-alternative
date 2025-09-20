@@ -15,7 +15,6 @@ with open('globalconfig.json', 'r') as f:
 
 local_dir = config['jp_en_model_name']
 precision_level = config['jp_model_precision_level']
-llm_translate_use_context = config['llm_translate_use_context']
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -174,42 +173,56 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
     lyric_list = []
     for full_lyrics, lyric, full_en_lyrics in input_data:
         lyric_list.append(lyric)
-        if llm_translate_use_context:
-            prompt_list.append(f"""
-You are a professional translator of Japanese song lyrics. 
-You must strictly follow the output format. 
-Do not provide explanations, extra commentary, or anything outside the required format. 
 
-If the lyric line contains [Verse] or [Bridge] or anything similar, output this only strictly:
+        prompt_list.append(f"""
+You are a professional translator of Japanese song lyrics specializing in capturing emotional depth and cultural nuance.
+You must strictly follow the output format with NO exceptions.
+
+TRANSLATION PHILOSOPHY:
+- Capture the FEELING and emotional resonance, not just literal words
+- Consider cultural context and implicit meanings in Japanese
+- Use natural, flowing English that sounds like it was written by a native speaker
+- Preserve poetic elements, metaphors, and imagery
+- Consider how the line would feel when sung, not just read
+
+CRITICAL RULES:
+1. Translate ONLY the single line specified in "Lyric:" below
+2. Output exactly ONE translation - do not repeat "**Translation:**" multiple times
+3. Do not provide alternatives, parenthetical explanations, or multiple interpretations
+4. If the line contains [Verse], [Chorus], [Bridge], [Outro], [Intro], or any bracket notation, output exactly: **Translation:**
+5. If the line is empty, contains only punctuation, or is metadata/credits, output exactly: **Translation:**
+6. Do not add any text after your translation (no explanations, no commentary, nothing)
+7. Your response must be exactly one line: "**Translation:** <your translation>"
+
+EXAMPLES OF EMOTIONAL NUANCE:
+Lyric: 君がいない夜は長すぎる
+**Translation:** The nights without you stretch on forever
+
+Lyric: 心の奥で泣いている
+**Translation:** I'm crying deep inside my soul
+
+Lyric: 桜が散る時のように
+**Translation:** Like cherry blossoms falling away
+
+Lyric: もう一度だけ
+**Translation:** Just one more time
+
+Lyric: [Chorus]
 **Translation:**
 
 Use the full lyrics for context:
 {full_lyrics}
 
 ### STRICT OUTPUT FORMAT ###
-**Translation:** <English translation of the lyric line>
+**Translation:** <English translation with emotional depth>
 
-Translate only the following lyric line into natural, fluent English, including implicit meanings and emotional nuances:
+Translate the following lyric line into natural, emotionally resonant English that captures both the literal meaning and the deeper feeling:
 Lyric: {lyric}
+
+OUTPUT EXACTLY: **Translation:** <translation>
+STOP IMMEDIATELY after the translation.
 """)
-        else:
-            prompt_list.append(f"""
-                        You are a professional Japanese-to-English lyric translator.  
-                        Translate exactly one lyric line into natural English.  
-                        Do not use any external context — translate only the provided lyric line.  
 
-                        ### RULES ###
-                        - Translate **only** the lyric line.  
-                        - Do not provide multiple translations.  
-                        - Do not comment or add extra text outside the strict format.  
-                        - Do NOT add any other explanations outside the strict format.  
-                        - Strictly output in this format:  
-                        **Translation:** <English translation of the lyric line>  
-                        <END_EXPLANATION>  
-                        ### END OF RULES ###
-
-                        Lyric line to translate: {lyric}  
-                        """)
     output = batch_generate_response(prompt_list, 30, 0.4, 0.95, 1.15, True)
 
     results = []
@@ -222,13 +235,12 @@ Lyric: {lyric}
             if 'Lyric line to translate' in line:
                 globalfuncs.logger.verbose(line)
         try:
-            if llm_translate_use_context:
-                if lyric == '':
-                    results.append('')
-                else:
-                    results.append((re.sub(r'\*|\:', '', (re.findall(r'Translation(?:[\:\*\s]*?)(.+?)(?:\n|$)', item)[2]))).strip())
+            if lyric == '':
+                results.append('')
+            elif re.match(r'^(?:\[|-)(.+?)(?:\]|-)$', lyric):
+                results.append('')
             else:
-                results.append((re.sub(r'\*|\:', '', (re.findall(r'Translation(?:[\:\*\s]*?)(.+?)(?:\n|$)', item)[1]))).strip())
+                results.append((re.sub(r'\*|\:', '', (re.findall(r'Translation(?:[\:\*\s]*?)(.+?)(?:\n|$)', item)[5]))).strip())
         except:
             globalfuncs.logger.verbose(item)
             raise Exception
@@ -263,6 +275,40 @@ def translate_lyric_to_en(full_lyrics: str, lyric: str) -> str:
     output = generate_response(prompt, 30, 0.65, 0.95, 1.15, True)
 
     return re.findall(r'"en":\s?"(.*?)"', output)[1]
+
+def batch_explain_tokens(input_list: list) -> list:
+    global tokenizer, model
+
+    prompt_list = []
+
+    for item in input_list:
+        prompt_list.append(f"""
+You are a Japanese language expert and linguist. I will give you a sentence that has been tokenized, with part-of-speech (POS) and dependency (DEP) annotations for each token. I want you to explain **what each token means in English**, including:
+
+1. The literal meaning of the token.
+2. Its part of speech in English.
+3. Its dependency function in the sentence.
+4. Any grammatical notes (e.g., tense, auxiliary function, particle usage).
+
+Output the result in **JSON format**, using the following structure:
+
+[
+  {{
+    "token": "<token text>",
+    "meaning": "<literal English meaning>",
+    "pos": "<POS in English>",
+  }},
+  ...
+]
+
+Here is the tokenized sentence:
+{item}
+""")
+
+    output = batch_generate_response(prompt_list, 30, 0.4, 0.95, 1.15, True)
+
+    return output
+
 
 def pull_info_from_llm(text: str):
     # ? text = re.findall(r'\[END\]([\s\S]*?)(?:\[END]|---|Lyric line:)', text)[0]
