@@ -1,3 +1,4 @@
+from jamdict import Jamdict
 from jisho_api.kanji import Kanji
 from jisho_api.word import Word
 from jisho_api import scrape, word
@@ -6,7 +7,7 @@ from jisho_api.sentence import Sentence
 import json
 import splittag
 import re
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import requests
 import time
 import random
@@ -14,6 +15,7 @@ import llmjptoen
 import functools
 import threading
 import globalfuncs
+import jamdict, jamdict_data
 
 # global config
 with open('globalconfig.json', 'r') as f:
@@ -24,7 +26,9 @@ dict_backoff = config['dictlookup_backoff']
 
 _llm_lock = threading.Lock()
 
-#main functions
+cache_responses = {}
+
+# region jisho website functions
 def call_llm():
     if not hasattr(call_llm, "counter"):
         call_llm.counter = 0
@@ -36,13 +40,27 @@ def call_llm():
 
     call_llm.counter += 1
 
-@functools.lru_cache(maxsize=None)
+def timeout_word_request(word_input, timeout=15):
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(Word.request, word_input)
+        try:
+            return future.result(timeout=timeout)
+        except TimeoutError:
+            globalfuncs.logger.notice(f"[warn] Word.request('{word}') timed out after {timeout}s")
+            raise TimeoutError
+
 def safe_request_word(word: str, retries: int = dict_retries, backoff: float = dict_backoff, try_llm=True, empty_ins_break=True):
+    if word in cache_responses:
+        globalfuncs.logger.debug(f"Using main cached word '{word}'")
+        return cache_responses
+
     for attempt in range(1, retries + 1):
         try:
-            response = Word.request(word)
+            # response = Word.request(word)
+            response = timeout_word_request(word)
             # Make sure we got usable data
             if response and getattr(response, "data", None):
+                cache_responses[word] = response
                 return response
             else:
                 globalfuncs.logger.notice(f"[warn] Empty response for '{word}', attempt {attempt}/{retries}")
@@ -50,6 +68,8 @@ def safe_request_word(word: str, retries: int = dict_retries, backoff: float = d
                     break
         except requests.exceptions.JSONDecodeError:
             globalfuncs.logger.notice(f"[warn] Invalid JSON for '{word}', attempt {attempt}/{retries}")
+        except TimeoutError:
+            globalfuncs.logger.notice(f"[warn] Timeout for '{word}', attempt {attempt}/{retries}")
         except Exception as e:
             globalfuncs.logger.warning(f"[warn] Error for '{word}': {e}, attempt {attempt}/{retries}")
 
@@ -62,13 +82,14 @@ def safe_request_word(word: str, retries: int = dict_retries, backoff: float = d
         globalfuncs.logger.notice(f"[warn] No response found for '{word}', trying to use LLM")
         with _llm_lock:
             if word in safe_request_word.llm_cache:
-                globalfuncs.logger.debug(f"Using cached word '{word}'")
+                globalfuncs.logger.debug(f"Using LLM cached word '{word}'")
                 return safe_request_word.llm_cache[word]
 
             call_llm()
             llm_output = str(llmjptoen.get_definition_of_phrase(word))
             if word not in safe_request_word.llm_cache:
                 safe_request_word.llm_cache.update({word: llm_output})
+                cache_responses[word] = llm_output
             return llm_output
     else:
         globalfuncs.logger.warning(f"[warn] No response found for '{word}', returning None")
@@ -95,6 +116,8 @@ def tokenize(lyric: str) -> tuple[list, list]:
         all_words = re.findall(r"\'([\u3040-\u30FF\u4E00-\u9FFF]+?)\'", response)
         all_pos = re.findall(r"(?:\<PosTag\.\w+?\:\s)\'([a-zA-Z]+?)\'", response)
 
+    globalfuncs.logger.spam(f'{all_words} | {all_pos}')
+
     return all_words, all_pos
 
 def get_definition(word: str, pos: str):
@@ -113,13 +136,14 @@ def get_definition(word: str, pos: str):
         globalfuncs.logger.notice(f"[warn] Error while fetching definition of '{word}' using library, trying to use LLM")
         with _llm_lock:
             if word in safe_request_word.llm_cache:
-                globalfuncs.logger.debug(f"Using cached word '{word}'")
+                globalfuncs.logger.debug(f"Using LLM cached word '{word}'")
                 return safe_request_word.llm_cache[word]
 
             call_llm()
             llm_output = str(llmjptoen.get_definition_of_phrase(word))
             if word not in safe_request_word.llm_cache:
                 safe_request_word.llm_cache.update({word: llm_output})
+                cache_responses[word] = response
 
     if response == 'No definition found':
         return 'No definition found'
@@ -153,7 +177,7 @@ def get_definition(word: str, pos: str):
                     if sub_sense.lower() != 'wikipedia definition':
                         meanings.append(sense.english_definitions)
 
-    # find all definitons for fallback
+    # find all definitions for fallback
     if len(meanings) == 0:
         response = safe_request_word(word)
 
@@ -172,13 +196,13 @@ def get_definition(word: str, pos: str):
     globalfuncs.logger.success(f"Got definition for {word}: {unique_meanings}")
     return unique_meanings
 
-def get_line_meaning_tag(lyric: str) -> tuple[list, list, list]:
+def get_line_meaning_tag(lyric: str, timeout=15) -> tuple[list, list, list]:
     words, pos = tokenize(lyric)
 
     if len(words) == 0 and len(pos) == 0:
         words, pos = [lyric], []
 
-    with ThreadPoolExecutor(max_workers=30) as executor:
+    with ThreadPoolExecutor(max_workers=10) as executor:
         results = list(executor.map(get_definition, words, pos))
 
     return words, pos, results
@@ -187,9 +211,77 @@ def get_meaning_full(lyrics: list[str]):
     call_llm.counter = 0
     safe_request_word.llm_cache = {}
 
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:
         results = list(executor.map(get_line_meaning_tag, lyrics))
 
     safe_request_word.cache_clear()
     llmjptoen.clear_model()
     return results
+# endregion
+
+# region local pull
+def get_meaning_full_jamdict(input_lyrics: list[str], use_jisho_tokenization=False):
+    results = []
+
+    if not use_jisho_tokenization:
+        @functools.lru_cache(maxsize=None)
+        def get_definition_local(word: str) -> str:
+            jmd = Jamdict()
+
+            if word == '':
+                return None
+
+            if re.match(r'\[|\]|\(|\)|\.|\,|\?|\"|\'|\}|\{|\「|\」|\『|\』|\【|\】|\？|\-|\_|\+|\=|\&|\!|\、', word):
+                return None
+
+            if re.match(r'[a-zA-Z0-9]', word):
+                return None
+
+            meaning = jmd.lookup(word)
+            globalfuncs.logger.spam(f"'{word}' | {meaning}")
+
+            if re.match(r'No entries', str(meaning)):
+                with _llm_lock:
+                    if word in get_definition_local.llm_cache:
+                        globalfuncs.logger.debug(f"Using LLM cached word '{word}'")
+                        return get_definition_local.llm_cache[word]
+
+                    call_llm()
+                    while True:
+                        try:
+                            meaning = str(llmjptoen.get_definition_of_phrase(word))
+                            break
+                        except Exception as e:
+                            globalfuncs.logger.notice(f"Error while fetching definition of '{word}' using LLM, retrying")
+                    if word not in get_definition_local.llm_cache:
+                        get_definition_local.llm_cache.update({word: meaning})
+                        cache_responses[word] = meaning
+            else:
+                return meaning
+
+        get_definition_local.llm_cache = {}
+
+        def get_definition_line_local(lyric: str) -> str:
+            tagged_lyrics = splittag.full_parse_jp_text(lyric)
+
+            globalfuncs.logger.verbose(f"'{lyric}' | {tagged_lyrics}")
+
+            tagged_lyrics = [x[0] for x in tagged_lyrics]
+
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                results = list(executor.map(get_definition_local, tagged_lyrics))
+
+            return results
+
+        print(input_lyrics)
+
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            results = list(executor.map(get_definition_line_local, input_lyrics))
+
+            print(results)
+
+    if use_jisho_tokenization: #! NOT RECOMMENDED
+        with ThreadPoolExecutor(max_workers=200) as executor:
+            results = list(executor.map(tokenize, input_lyrics))
+            print(results)
+# endregion

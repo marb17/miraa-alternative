@@ -1,14 +1,18 @@
 import MeCab
 import unidic_lite
+import unidic
 import fugashi
 import re
+from sudachipy import tokenizer, dictionary
+import spacy
+import ginza
 
 # main functions
 # tag type
 wakati = MeCab.Tagger("-Owakati")
 
 # half tagger, only splits
-def parse_jp_text(text):
+def morphemes_tag(text):
     return wakati.parse(text).split()
 
 # full tag
@@ -113,10 +117,11 @@ def translate_pos(pos: str) -> str:
     return pos
 
 lem_tagger = fugashi.Tagger('-Owakati')
-
 def lemmatize(text: str) -> str:
     for word in lem_tagger(text):
         return word.feature.lemma
 
+nlp = spacy.load("ja_core_news_sm")
+
 if __name__ == '__main__':
-    print(lemmatize('残った'))
+    pass
