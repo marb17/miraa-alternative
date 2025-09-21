@@ -75,10 +75,19 @@ def main(url: str, use_genius: str, use_jisho: str, skip_dict_lookup=False, skip
             file_data = json.load(f)
     except FileExistsError:
         with open(filepath_json, 'r', encoding='utf-8') as f:
+            globalfuncs.logger.verbose(f"{f}")
             try:
-                file_data = json.load(f)
+                f.seek(0)
+                content = f.read()
+                if content.strip():
+                    file_data = json.loads(content)
+                else:
+                    globalfuncs.logger.error("Existing file is empty!")
+                    file_data = {}
+                globalfuncs.logger.verbose("Data file loaded successfully.")
             except json.decoder.JSONDecodeError:
                 file_data = {}  # fallback if file is invalid
+                globalfuncs.logger.verbose("Data file failed to load. Defaulting to empty json")
         globalfuncs.logger.verbose("Data file already exists.")
     # endregion
 
@@ -102,7 +111,7 @@ def main(url: str, use_genius: str, use_jisho: str, skip_dict_lookup=False, skip
     globalfuncs.logger.plain(f"{"-" * console_width}")
 
     # region get time stamped transcription for video sync
-    if 'vox_lyrics' in file_data.get('transcribe', {}) and 'vox_timestamped_words' in file_data.get('transcribe', {}):
+    if 'vox_lyrics' in file_data.get('transcribe', {}):
         vox_timestamped_words = file_data['transcribe']['vox_timestamped_words']
         vox_lyrics = file_data['transcribe']['vox_lyrics']
         globalfuncs.logger.verbose("Skipping timestamp words, data already exists")
@@ -259,7 +268,7 @@ def main(url: str, use_genius: str, use_jisho: str, skip_dict_lookup=False, skip
     globalfuncs.logger.verbose(str(jp_lyrics))
     globalfuncs.logger.verbose(str(unsplit_jp_lyrics))
 
-    # region tag and get pos of word
+    # region tag and get pos of word and natural split
     tagged_lyrics = []
     full_tagged_lyrics = []
 
@@ -268,8 +277,10 @@ def main(url: str, use_genius: str, use_jisho: str, skip_dict_lookup=False, skip
             tagged_lyrics.append(None)
             full_tagged_lyrics.append(None)
         else:
-            tagged_lyrics.append(splittag.morphemes_tag(str(line)))
+            tagged_lyrics.append(splittag.full_output_split(str(line))[0])
             full_tagged_lyrics.append(splittag.full_parse_jp_text(str(line)))
+
+    natural_lyrics_split = [splittag.natural_split(lyric) for lyric in jp_lyrics]
     # endregion
 
     # * finding all types of particles for debug
@@ -283,10 +294,14 @@ def main(url: str, use_genius: str, use_jisho: str, skip_dict_lookup=False, skip
             all_types_of_pos.add(word[1])  # debug line
             word[1] = splittag.translate_pos(word[1])
 
+    natural_lyrics_split = [splittag.natural_split(lyric) for lyric in jp_lyrics]
+
     if 'tagged' not in file_data.get('lyrics', {}):
         for item in tagged_lyrics: globalfuncs.write_json(item, filepath_json, ['lyrics', 'tagged', 'token'],
                                                           as_list=True)
         for item in full_tagged_lyrics: globalfuncs.write_json(item, filepath_json, ['lyrics', 'tagged', 'full_parse'],
+                                                               as_list=True)
+        for item in natural_lyrics_split: globalfuncs.write_json(item, filepath_json, ['lyrics', 'tagged', 'natural'],
                                                                as_list=True)
     # endregion
 
@@ -297,28 +312,20 @@ def main(url: str, use_genius: str, use_jisho: str, skip_dict_lookup=False, skip
 
     # region dictionary lookup
     if not skip_dict_lookup:
-        if use_jisho:
-            if 'jisho' in file_data.get('lyrics', {}).get('definition', {}):
-                dict_lookup_res = file_data['lyrics']['definition']['jisho']
-                globalfuncs.logger.verbose("Skipping dictionary lookup, data already exists")
-            else:
-                globalfuncs.logger.info(f"Getting definitions of each phrase using jisho-api")
-                dict_lookup_res = dictlookup.get_meaning_full(jp_lyrics)
-                globalfuncs.logger.verbose(str(dict_lookup_res))
-                for item in dict_lookup_res: globalfuncs.write_json(item, filepath_json, ['lyrics', 'definition', 'jisho'],
-                                                                    as_list=True, extend=True)
-                globalfuncs.logger.success(f"Finished getting definitions")
-        elif not use_jisho:
-            if 'jamdict' in file_data.get('lyrics', {}).get('definition', {}):
-                dict_lookup_res = file_data['lyrics']['definition']['jamdict']
-                globalfuncs.logger.verbose("Skipping dictionary lookup, data already exists")
-            else:
-                globalfuncs.logger.info(f"Getting definitions of each phrase using jamdict")
-                dict_lookup_res = dictlookup.get_meaning_full_jamdict(jp_lyrics)
-                globalfuncs.logger.verbose(str(dict_lookup_res))
-                for item in dict_lookup_res: globalfuncs.write_json(item, filepath_json, ['lyrics', 'definition', 'jamdict'],
-                                                                    as_list=True, extend=True)
-                globalfuncs.logger.success(f"Finished getting definitions")
+        if 'jamdict' in file_data.get('lyrics', {}).get('definition', {}):
+            dict_lookup_res = file_data['lyrics']['definition']['jamdict']
+            globalfuncs.logger.verbose("Skipping dictionary lookup, data already exists")
+        else:
+            globalfuncs.logger.info(f"Getting definitions of each phrase using jamdict")
+            dict_lookup_res = dictlookup.get_meaning_full_jamdict(jp_lyrics)
+
+            # TODO add for natural lyrics as well
+
+            globalfuncs.logger.verbose(str(dict_lookup_res))
+            for item in dict_lookup_res: globalfuncs.write_json(item, filepath_json,
+                                                                ['lyrics', 'definition', 'jamdict'],
+                                                                as_list=True, extend=True)
+            globalfuncs.logger.success(f"Finished getting definitions")
     else:
         globalfuncs.logger.success("Skipping dictionary look up for words")
 
@@ -417,8 +424,6 @@ def main(url: str, use_genius: str, use_jisho: str, skip_dict_lookup=False, skip
 
     globalfuncs.logger.plain(f"{"-" * console_width}")
 
-    # TODO add llm for translating jp lyrics to en lyrics, again....
-    # ! NOT TESTED YET
     # region translating jp lyrics to en
     if not skip_llm_trans:
         llm_trans_result = []
