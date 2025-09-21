@@ -26,6 +26,7 @@ def create_model(precision='fp16') -> None:
     global tokenizer, model
     # tokenizer
     tokenizer = AutoTokenizer.from_pretrained(local_dir)
+    tokenizer.save_pretrained(local_dir)
 
     globalfuncs.logger.verbose(f"{tokenizer.eos_token} | {tokenizer.eos_token_id}")
 
@@ -286,29 +287,39 @@ def batch_explain_tokens(input_list: list) -> list:
 You are a Japanese language expert and linguist. I will give you a sentence that has been tokenized, with part-of-speech (POS) and dependency (DEP) annotations for each token. I want you to explain **what each token means in English**, including:
 
 1. The literal meaning of the token.
-2. Its part of speech in English.
-3. Its dependency function in the sentence.
-4. Any grammatical notes (e.g., tense, auxiliary function, particle usage).
+
+## RULES ##
+1. Do not add comments or extra commentary outside of the strict format
 
 Output the result in **JSON format**, using the following structure:
 
 [
   {{
     "token": "<token text>",
-    "meaning": "<literal English meaning>",
-    "pos": "<POS in English>",
+    "meaning": "<literal English definition>",
+    "pos": "<part of speech of token>",
   }},
   ...
 ]
 
 Here is the tokenized sentence:
-{item}
+{str(item)}
 """)
 
-    output = batch_generate_response(prompt_list, 30, 0.4, 0.95, 1.15, True)
+    output = batch_generate_response(prompt_list, 250, 0.4, 0.95, 1.15, True)
 
-    return output
+    results = []
 
+    for item in output:
+        globalfuncs.logger.verbose(str(item))
+
+        json_output = re.findall(r'(\[[^`]*\])', item)[1]
+
+        list_output = json.loads(json_output)
+
+        results.append(list_output)
+
+    return results
 
 def pull_info_from_llm(text: str):
     # ? text = re.findall(r'\[END\]([\s\S]*?)(?:\[END]|---|Lyric line:)', text)[0]

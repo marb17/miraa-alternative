@@ -24,9 +24,6 @@
 
   "jp_tag_model_name": "../model/electra-ginza",
 
-  "dictlookup_retries": 5,
-  "dictlookup_backoff": 0.7,
-
   "llm_batch_size_explanation": 10,
   "llm_batch_size_translation": 30
 
