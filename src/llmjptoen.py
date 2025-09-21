@@ -26,7 +26,6 @@ def create_model(precision='fp16') -> None:
     global tokenizer, model
     # tokenizer
     tokenizer = AutoTokenizer.from_pretrained(local_dir)
-    tokenizer.save_pretrained(local_dir)
 
     globalfuncs.logger.verbose(f"{tokenizer.eos_token} | {tokenizer.eos_token_id}")
 
@@ -336,5 +335,6 @@ def pull_info_from_llm(text: str):
         summary = (re.findall(r'Summary:(?:[\*\s]*?)(.+?)(?:\n|[<]?END[\\\_]+?EXPLANATION[>]?)', text)[1]).strip()
     except IndexError:
         summary = (re.findall(r'Summary:(?:[\*\s]*?)(.*)', text)[1]).strip()
+
 
     return meaning, grammar, nuance, impact, summary
