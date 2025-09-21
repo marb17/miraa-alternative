@@ -1,37 +1,25 @@
 import MeCab
-import unidic_lite
 import unidic
-import fugashi
+from fugashi import Tagger
 import re
-from sudachipy import tokenizer, dictionary
-import spacy
-import ginza
 
 # main functions
-# tag type
-wakati = MeCab.Tagger("-Owakati")
-
-# half tagger, only splits
-def morphemes_tag(text):
-    return wakati.parse(text).split()
+def full_output_split(text: str) -> tuple:
+    lem_tagger = Tagger('-Owakati')
+    return [word.surface for word in lem_tagger(text)], [word.feature.pos1 for word in lem_tagger(text)], [
+        word.feature.lemma for word in lem_tagger(text)]
 
 # full tag
-tagger = MeCab.Tagger()
 def full_parse_jp_text(text):
+    tagger = MeCab.Tagger()
     if text is None:
         return None
-    parsed = tagger.parse(text)
-    parsed = re.sub(r'\t', ' ', parsed)
-    parsed = re.sub(r'EOS', ' ', parsed)
-    parsed = parsed.split('\n')
+
+    word, pos, _ = full_output_split(text)
+
     result = []
-    for item in parsed:
-        if len(item) < 5:
-            continue
-        else:
-            item = item.split(' ')
-            word, _, _, _, type_of_word, *_ = item
-            result.append([word, type_of_word])
+    for word, pos in zip(word, pos):
+        result.append([word, pos])
     return result
 
 def translate_pos(pos: str) -> str:
@@ -116,12 +104,166 @@ def translate_pos(pos: str) -> str:
     # fall back
     return pos
 
-lem_tagger = fugashi.Tagger('-Owakati')
-def lemmatize(text: str) -> str:
-    for word in lem_tagger(text):
+def lemmatize(text: str) -> tuple:
+    lem_tagger = Tagger('-Owakati')
+    for word in lem_tagger.parse(text):
         return word.feature.lemma
 
-nlp = spacy.load("ja_core_news_sm")
+def natural_split(text: str) -> list:
+    surface, pos, lemma = full_output_split(text)
+
+    for _ in range(len(surface)):
+        surface.append('')
+        pos.append('')
+        lemma.append('')
+
+    final_output = []
+    combined = 0
+
+    pos_to_combine = [
+        '助動詞',
+        '接尾辞',
+        '接頭辞'
+    ]
+
+    def is_in_pos_to_combine(pos: str) -> bool:
+        if pos == 'None':
+            return False
+        for item in pos_to_combine:
+            if re.match(item, pos):
+                return True
+        return False
+
+    def is_prefix(pos: str) -> bool:
+        if re.match(pos_to_combine[2], pos):
+            return True
+        return False
+
+    for counter in range(len(surface) * 2):
+        try:
+            if is_in_pos_to_combine(pos[counter + combined + 1]):
+                final_output.append(f"{surface[counter + combined]}{surface[counter + combined + 1]}")
+                combined += 1
+            elif is_prefix(pos[counter + combined]):
+                final_output.append(f"{surface[counter + combined]}{surface[counter + combined + 1]}")
+            else:
+                final_output.append(surface[counter + combined])
+        except IndexError:
+            if is_in_pos_to_combine(pos[counter + combined]):
+                final_output.append(surface[counter + combined])
+            else:
+                pass
+            break
+
+    return [str(token) for token in final_output if token != '']
+
+lyrics = [
+                "[YOASOBI「アイドル」歌詞]",
+                "",
+                "[Intro]",
+                "無敵の笑顔で荒らすメディア",
+                "知りたいその秘密ミステリアス",
+                "抜けてるとこさえ彼女のエリア",
+                "完璧で嘘つきな君は",
+                "天才的なアイドル様",
+                "(You're my savior, you're my saving grace)",
+                "",
+                "[Verse 1]",
+                "今日何食べた？好きな本は？",
+                "遊びに行くならどこに行くの？",
+                "何も食べてない それは内緒",
+                "何を聞かれてものらりくらり",
+                "そう淡々と だけど燦々と",
+                "見えそうで見えない秘密は蜜の味",
+                "あれもないないない これもないないない",
+                "好きなタイプは？相手は？さあ答えて",
+                "",
+                "[Pre-Chorus]",
+                "「誰かを好きになること",
+                "なんて私分からなくてさ」",
+                "嘘か本当か知り得ない",
+                "そんな言葉にまた一人堕ちる",
+                "また好きにさせる",
+                "",
+                "[Chorus]",
+                "誰もが目を奪われていく",
+                "君は完璧で究極のアイドル",
+                "金輪際現れない",
+                "一番星の生まれ変わり",
+                "Ah, その笑顔で愛してるで",
+                "誰も彼も虜にしていく",
+                "その瞳がその言葉が",
+                "嘘でもそれは完全なアイ",
+                "",
+                "[Verse 2]",
+                "はいはいあの子は特別です",
+                "我々はハナからおまけです",
+                "お星様の引き立て役 B です",
+                "全てがあの子のお陰なわけない",
+                "洒落臭い",
+                "妬み嫉妬なんてないわけがない",
+                "これはネタじゃない",
+                "からこそ許せない",
+                "完璧じゃない君じゃ許せない",
+                "自分を許せない",
+                "誰よりも強い君以外は認めない",
+                "",
+                "[Chorus]",
+                "誰もが信じ崇めてる",
+                "まさに最強で無敵のアイドル",
+                "弱点なんて見当たらない",
+                "一番星を宿している",
+                "弱いとこなんて見せちゃダメダメ",
+                "知りたくないとこは見せずに",
+                "唯一無二じゃなくちゃイヤイヤ",
+                "それこそ本物のアイ",
+                "",
+                "[Bridge]",
+                "得意の笑顔で沸かすメディア",
+                "隠しきるこの秘密だけは",
+                "愛してるって嘘で積むキャリア",
+                "これこそ私なりの愛だ",
+                "流れる汗も綺麗なアクア",
+                "ルビーを隠したこの瞼",
+                "歌い踊り舞う私はマリア",
+                "そう嘘はとびきりの愛だ",
+                "",
+                "[Pre-Chorus]",
+                "誰かに愛されたことも",
+                "誰かのこと愛したこともない",
+                "そんな私の嘘がいつか本当になること",
+                "信じてる",
+                "",
+                "[Chorus]",
+                "いつかきっと全部手に入れる",
+                "私はそう欲張りなアイドル",
+                "等身大でみんなのこと",
+                "ちゃんと愛したいから",
+                "今日も嘘をつくの",
+                "この言葉がいつか本当になる日を願って",
+                "それでもまだ",
+                "君と君にだけは言えずにいたけど",
+                "",
+                "[Outro]",
+                "あぁ、やっと言えた",
+                "これは絶対嘘じゃない",
+                "愛してる",
+                "(You're my savior, my true savior, my saving grace)"
+            ]
 
 if __name__ == '__main__':
-    pass
+    print(full_output_split('君と君にだけは言えずにいたけど')[0])
+    # pos = set()
+    #
+    # for lyric in lyrics:
+    #     for item in full_output_split(lyric)[1]:
+    #         pos.add(item)
+    #     print(full_output_split(lyric)[1])
+    #
+    # print()
+    #
+    # print(pos)
+    #
+    # print()
+    #
+    # print(natural_split('お星様の引き立て役 B です'))
