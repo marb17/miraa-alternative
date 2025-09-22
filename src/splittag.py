@@ -71,35 +71,89 @@ def translate_pos(pos: str) -> str:
         "感動詞-一般": "interjection",
 
         # Symbols
-        "補助記号-読点": "punctuation (comma)",
+        "補助記号-読点": "punctuation",
     }
 
     if pos in pos_map:
         return pos_map[pos]
 
-    # fallback if not found in dictionary
-    # if pos.startswith("名詞"):
-    #     return "noun"
-    # elif pos.startswith("動詞"):
-    #     return "verb"
-    # elif pos.startswith("形容詞"):
-    #     return "adjective"
-    # elif pos.startswith("形状詞"):
-    #     return "adjectival noun"
-    # elif pos.startswith("副詞"):
-    #     return "adverb"
-    # elif pos.startswith("助詞"):
-    #     return "particle"
-    # elif pos.startswith("助動詞"):
-    #     return "auxiliary verb"
-    # elif pos.startswith("接続詞"):
-    #     return "conjunction"
-    # elif pos.startswith("感動詞"):
-    #     return "interjection"
-    # elif pos.startswith("連体詞"):
-    #     return "adnominal"
-    # elif pos.startswith("補助記号"):
-    #     return "symbol/punctuation"
+    # fall back
+    return pos
+
+def jamdict_translate_pos(pos: str) -> str:
+
+    pos_map = {
+        # ===== NOUNS =====
+        "名詞-普通名詞-一般": "noun (common) (futsuumeishi)",
+        "名詞-普通名詞-副詞可能": "noun (common) (futsuumeishi)",  # Still a common noun
+        "名詞-普通名詞-助数詞可能": "counter",  # Counter-like nouns
+        "名詞-普通名詞-サ変可能": "noun or participle which takes the aux. verb suru",
+        "名詞-固有名詞": "noun (common) (futsuumeishi)",  # No specific proper noun category in target
+
+        # ===== PRONOUNS =====
+        "代名詞": "pronoun",
+
+        # ===== VERBS =====
+        # Map to general verb categories since we don't know the specific conjugation class
+        "動詞-一般": "verb unspecified",
+        "動詞-非自立可能": "auxiliary verb",  # Non-independent verbs are usually auxiliary
+
+        # ===== ADJECTIVES =====
+        "形容詞-一般": "adjective (keiyoushi)",
+        "形容詞-非自立可能": "auxiliary adjective",  # Non-independent adjectives
+        "形状詞-助動詞語幹": "adjectival nouns or quasi-adjectives (keiyodoshi)",
+
+        # ===== ADVERBIALS =====
+        "連体詞": "pre-noun adjectival (rentaishi)",  # This is the exact match
+        "副詞": "adverb (fukushi)",
+
+        # ===== PARTICLES =====
+        "助詞-格助詞": "particle",
+        "助詞-副助詞": "particle",
+        "助詞-接続助詞": "particle",
+        "助詞-終助詞": "particle",
+        "助詞-係助詞": "particle",
+        "助詞": "particle",  # General fallback
+
+        # ===== AUXILIARY =====
+        "助動詞": "auxiliary verb",
+
+        # ===== CONJUNCTION =====
+        "接続詞": "conjunction",
+
+        # ===== INTERJECTION =====
+        "感動詞-一般": "interjection (kandoushi)",
+
+        # ===== SYMBOLS/PUNCTUATION =====
+        "補助記号-読点": "unclassified",  # No punctuation category in target, so unclassified
+
+        # ===== ADDITIONAL MAPPINGS (in case you encounter them) =====
+        # Numbers
+        "名詞-数詞": "numeric",
+
+        # Prefixes and suffixes
+        "接頭詞": "prefix",
+        "接尾詞": "suffix",
+
+        # Other possible verb forms you might encounter
+        "動詞-サ変": "suru verb - included",
+        "動詞-カ変": "Kuru verb - special class",
+
+        # Other adjective forms
+        "形容動詞": "adjectival nouns or quasi-adjectives (keiyodoshi)",
+
+        # Expressions
+        "フィラー": "expressions (phrases, clauses, etc.)",
+        "言いよどみ": "expressions (phrases, clauses, etc.)",
+
+        # Symbols and punctuation
+        "記号": "unclassified",
+        "補助記号": "unclassified",
+        "空白": "unclassified",
+    }
+
+    if pos in pos_map:
+        return pos_map[pos]
 
     # fall back
     return pos
