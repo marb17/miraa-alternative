@@ -81,79 +81,24 @@ def translate_pos(pos: str) -> str:
     return pos
 
 def jamdict_translate_pos(pos: str) -> str:
-
-    pos_map = {
-        # ===== NOUNS =====
-        "名詞-普通名詞-一般": "noun (common) (futsuumeishi)",
-        "名詞-普通名詞-副詞可能": "noun (common) (futsuumeishi)",  # Still a common noun
-        "名詞-普通名詞-助数詞可能": "counter",  # Counter-like nouns
-        "名詞-普通名詞-サ変可能": "noun or participle which takes the aux. verb suru",
-        "名詞-固有名詞": "noun (common) (futsuumeishi)",  # No specific proper noun category in target
-
-        # ===== PRONOUNS =====
+    pos_translation = {
+        "助詞": "particle",
+        "名詞": "noun",
+        "動詞": "verb",
+        "感動詞": "interjection",
+        "連体詞": "pre-noun adjectival", #pre-nominal word (attributive)
+        "形容詞": "adjective (keiyoushi)",
+        "助動詞": "auxiliary", #auxiliary verb
+        "接尾辞": "suffix",
         "代名詞": "pronoun",
-
-        # ===== VERBS =====
-        # Map to general verb categories since we don't know the specific conjugation class
-        "動詞-一般": "verb unspecified",
-        "動詞-非自立可能": "auxiliary verb",  # Non-independent verbs are usually auxiliary
-
-        # ===== ADJECTIVES =====
-        "形容詞-一般": "adjective (keiyoushi)",
-        "形容詞-非自立可能": "auxiliary adjective",  # Non-independent adjectives
-        "形状詞-助動詞語幹": "adjectival nouns or quasi-adjectives (keiyodoshi)",
-
-        # ===== ADVERBIALS =====
-        "連体詞": "pre-noun adjectival (rentaishi)",  # This is the exact match
-        "副詞": "adverb (fukushi)",
-
-        # ===== PARTICLES =====
-        "助詞-格助詞": "particle",
-        "助詞-副助詞": "particle",
-        "助詞-接続助詞": "particle",
-        "助詞-終助詞": "particle",
-        "助詞-係助詞": "particle",
-        "助詞": "particle",  # General fallback
-
-        # ===== AUXILIARY =====
-        "助動詞": "auxiliary verb",
-
-        # ===== CONJUNCTION =====
+        "副詞": "adverb",
+        "形状詞": "adjectival nouns",
         "接続詞": "conjunction",
-
-        # ===== INTERJECTION =====
-        "感動詞-一般": "interjection (kandoushi)",
-
-        # ===== SYMBOLS/PUNCTUATION =====
-        "補助記号-読点": "unclassified",  # No punctuation category in target, so unclassified
-
-        # ===== ADDITIONAL MAPPINGS (in case you encounter them) =====
-        # Numbers
-        "名詞-数詞": "numeric",
-
-        # Prefixes and suffixes
-        "接頭詞": "prefix",
-        "接尾詞": "suffix",
-
-        # Other possible verb forms you might encounter
-        "動詞-サ変": "suru verb - included",
-        "動詞-カ変": "Kuru verb - special class",
-
-        # Other adjective forms
-        "形容動詞": "adjectival nouns or quasi-adjectives (keiyodoshi)",
-
-        # Expressions
-        "フィラー": "expressions (phrases, clauses, etc.)",
-        "言いよどみ": "expressions (phrases, clauses, etc.)",
-
-        # Symbols and punctuation
-        "記号": "unclassified",
-        "補助記号": "unclassified",
-        "空白": "unclassified",
+        "接頭辞": "prefix"
     }
 
-    if pos in pos_map:
-        return pos_map[pos]
+    if pos in pos_translation:
+        return pos_translation[pos]
 
     # fall back
     return pos
@@ -211,113 +156,130 @@ def natural_split(text: str) -> list:
 
     return [str(token) for token in final_output if token != '']
 
-lyrics = [
-                "[YOASOBI「アイドル」歌詞]",
-                "",
-                "[Intro]",
-                "無敵の笑顔で荒らすメディア",
-                "知りたいその秘密ミステリアス",
-                "抜けてるとこさえ彼女のエリア",
-                "完璧で嘘つきな君は",
-                "天才的なアイドル様",
-                "(You're my savior, you're my saving grace)",
-                "",
-                "[Verse 1]",
-                "今日何食べた？好きな本は？",
-                "遊びに行くならどこに行くの？",
-                "何も食べてない それは内緒",
-                "何を聞かれてものらりくらり",
-                "そう淡々と だけど燦々と",
-                "見えそうで見えない秘密は蜜の味",
-                "あれもないないない これもないないない",
-                "好きなタイプは？相手は？さあ答えて",
-                "",
-                "[Pre-Chorus]",
-                "「誰かを好きになること",
-                "なんて私分からなくてさ」",
-                "嘘か本当か知り得ない",
-                "そんな言葉にまた一人堕ちる",
-                "また好きにさせる",
-                "",
-                "[Chorus]",
-                "誰もが目を奪われていく",
-                "君は完璧で究極のアイドル",
-                "金輪際現れない",
-                "一番星の生まれ変わり",
-                "Ah, その笑顔で愛してるで",
-                "誰も彼も虜にしていく",
-                "その瞳がその言葉が",
-                "嘘でもそれは完全なアイ",
-                "",
-                "[Verse 2]",
-                "はいはいあの子は特別です",
-                "我々はハナからおまけです",
-                "お星様の引き立て役 B です",
-                "全てがあの子のお陰なわけない",
-                "洒落臭い",
-                "妬み嫉妬なんてないわけがない",
-                "これはネタじゃない",
-                "からこそ許せない",
-                "完璧じゃない君じゃ許せない",
-                "自分を許せない",
-                "誰よりも強い君以外は認めない",
-                "",
-                "[Chorus]",
-                "誰もが信じ崇めてる",
-                "まさに最強で無敵のアイドル",
-                "弱点なんて見当たらない",
-                "一番星を宿している",
-                "弱いとこなんて見せちゃダメダメ",
-                "知りたくないとこは見せずに",
-                "唯一無二じゃなくちゃイヤイヤ",
-                "それこそ本物のアイ",
-                "",
-                "[Bridge]",
-                "得意の笑顔で沸かすメディア",
-                "隠しきるこの秘密だけは",
-                "愛してるって嘘で積むキャリア",
-                "これこそ私なりの愛だ",
-                "流れる汗も綺麗なアクア",
-                "ルビーを隠したこの瞼",
-                "歌い踊り舞う私はマリア",
-                "そう嘘はとびきりの愛だ",
-                "",
-                "[Pre-Chorus]",
-                "誰かに愛されたことも",
-                "誰かのこと愛したこともない",
-                "そんな私の嘘がいつか本当になること",
-                "信じてる",
-                "",
-                "[Chorus]",
-                "いつかきっと全部手に入れる",
-                "私はそう欲張りなアイドル",
-                "等身大でみんなのこと",
-                "ちゃんと愛したいから",
-                "今日も嘘をつくの",
-                "この言葉がいつか本当になる日を願って",
-                "それでもまだ",
-                "君と君にだけは言えずにいたけど",
-                "",
-                "[Outro]",
-                "あぁ、やっと言えた",
-                "これは絶対嘘じゃない",
-                "愛してる",
-                "(You're my savior, my true savior, my saving grace)"
-            ]
-
 if __name__ == '__main__':
-    print(full_output_split('君と君にだけは言えずにいたけど')[0])
-    # pos = set()
-    #
-    # for lyric in lyrics:
-    #     for item in full_output_split(lyric)[1]:
-    #         pos.add(item)
-    #     print(full_output_split(lyric)[1])
-    #
-    # print()
-    #
-    # print(pos)
-    #
-    # print()
-    #
-    # print(natural_split('お星様の引き立て役 B です'))
+    japanese_words_by_pos = [
+        # 1 Nouns (名詞)
+        ["犬", "学校", "本", "時間", "友達"],
+
+        # 2 Proper nouns (固有名詞)
+        ["東京", "太郎", "日本", "富士山", "マイクロソフト"],
+
+        # 3 Pronouns (代名詞)
+        ["私", "僕", "彼", "彼女", "あなた"],
+
+        # 4 Numerals (数詞)
+        ["一", "二", "三", "十", "百"],
+
+        # 5 Counters (助数詞)
+        ["人", "本", "匹", "枚", "回"],
+
+        # 6 Ichidan verbs (一段動詞)
+        ["食べる", "見る", "起きる", "信じる", "教える"],
+
+        # 7 Godan verbs (五段動詞)
+        ["書く", "遊ぶ", "話す", "待つ", "死ぬ"],
+
+        # 8 Irregular verbs (不規則動詞)
+        ["する", "来る", "行く", "ある", "おる"],
+
+        # 9 Transitive verbs (他動詞)
+        ["読む", "閉める", "始める", "止める", "作る"],
+
+        # 10 Intransitive verbs (自動詞)
+        ["開く", "始まる", "止まる", "眠る", "落ちる"],
+
+        # 11 Auxiliary verbs (助動詞)
+        ["ます", "たい", "ない", "られる", "た"],
+
+        # 12 Copula / 判定詞
+        ["だ", "です", "である", "だろう", "ではない"],
+
+        # 13 I-adjectives (い形容詞)
+        ["高い", "新しい", "暑い", "面白い", "大きい"],
+
+        # 14 Na-adjectives (な形容詞 / 形容動詞)
+        ["静か", "有名", "便利", "安全", "元気"],
+
+        # 15 Taru-adjectives (古語・タル形)
+        ["堂々たる", "断固たる", "確固たる", "勇敢たる", "崇高たる"],
+
+        # 16 Adverbs (副詞)
+        ["すぐに", "よく", "ときどき", "はっきり", "たまに"],
+
+        # 17 Degree adverbs (程度副詞)
+        ["とても", "かなり", "少し", "まったく", "ほとんど"],
+
+        # 18 Conjunctions (接続詞)
+        ["そして", "しかし", "だから", "また", "それに"],
+
+        # 19 Case particles (格助詞)
+        ["は", "が", "を", "に", "で"],
+
+        # 20 Listing / coordination particles (並立助詞)
+        ["と", "や", "か", "とか", "やら"],
+
+        # 21 Auxiliary particles (副助詞)
+        ["しか", "だけ", "こそ", "さえ", "まで"],
+
+        # 22 Sentence-final particles (終助詞)
+        ["ね", "よ", "ぞ", "か", "な"],
+
+        # 23 Conjunctive particles (接続助詞)
+        ["から", "ので", "けれど", "ながら", "つつ"],
+
+        # 24 Pre-nominal words (連体詞)
+        ["この", "その", "あの", "ある", "どの"],
+
+        # 25 Prefixes (接頭辞)
+        ["お", "ご", "不", "非", "超"],
+
+        # 26 Suffixes (接尾辞)
+        ["さん", "ちゃん", "さま", "的", "化"],
+
+        # 27 Onomatopoeia (擬音語/擬態語)
+        ["ドキドキ", "ワクワク", "ぺらぺら", "ごろごろ", "さらさら"],
+
+        # 28 Interjections (感動詞)
+        ["はい", "いいえ", "ああ", "おお", "やった"],
+
+        # 29 Auxiliary nouns / nominalizers (補助名詞)
+        ["こと", "もの", "ところ", "はず", "ため"],
+
+        # 30 Honorific verbs (尊敬語)
+        ["いらっしゃる", "なさる", "おっしゃる", "召し上がる", "ご覧になる"],
+
+        # 31 Humble verbs (謙譲語)
+        ["申す", "伺う", "差し上げる", "拝見する", "いたす"],
+
+        # 32 Polite expressions (丁寧語 / 慣用表現)
+        ["ありがとうございます", "すみません", "お願いします", "失礼します", "お疲れ様です"]
+    ]
+    pos_set = set()
+    yup = []
+
+    for pos in japanese_words_by_pos:
+        for word in pos:
+            for item, item2 in zip(full_output_split(word)[0], full_output_split(word)[1]):
+                pos_set.add(item2)
+                yup.append([item, item2])
+
+    pos_set = list(pos_set)
+
+    def uhhuh(pos):
+        results = []
+        counter = 1
+        for item, item2 in yup:
+            if pos == item2:
+                if counter == 2:
+                    return item, item2
+                else:
+                    counter += 1
+
+    poop = []
+
+    for item in pos_set:
+        poop.append(uhhuh(item))
+
+    print(poop)
+
+

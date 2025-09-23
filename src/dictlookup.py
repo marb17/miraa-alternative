@@ -59,6 +59,8 @@ def get_meaning_full_jamdict(input_lyrics: list[str]):
                 if word not in get_definition_local.llm_cache:
                     get_definition_local.llm_cache.update({word: meaning})
                     cache_responses[word] = meaning
+                return meaning
+
         jmd = Jamdict()
 
         if word == '':
@@ -70,15 +72,31 @@ def get_meaning_full_jamdict(input_lyrics: list[str]):
         if re.match(r'[a-zA-Z0-9]', word):
             return None
 
-        meaning = jmd.lookup(word, strict_lookup=False, pos=[f"{splittag.jamdict_translate_pos(pos)}"]).entries
-        globalfuncs.logger.spam(f"'{word}' | {splittag.jamdict_translate_pos(pos)} | {meaning}")
+        meaning = jmd.lookup(word).entries
 
-        if re.match(r'No entries', str(meaning)):
+        entries = []
+
+        if re.search(r'No entries', str(meaning)):
             use_llm()
         else:
+            jamdict_output = []
             for entry in meaning:
-                globalfuncs.logger.spam(f"'{word}' | {entry}")
-            return meaning
+                translated_pos = str(splittag.jamdict_translate_pos(pos))
+                if re.search(f"{translated_pos}", str(entry)):
+                    formatted_entry = re.sub(r'(.*?):', '', str(entry)).strip()
+                    formatted_entry = re.split(r'([0-9]+\.\s?.*?)', formatted_entry) # its a list now
+
+                    for item in formatted_entry:
+                        item = re.sub(r'(\(.*\))', '', item).strip()
+                        if item != '' and not re.match(r'\d+\.', item):
+                            jamdict_output.append(item)
+
+            entries = jamdict_output
+
+            if len(entries) == 0:
+                entries.append(use_llm())
+
+            return entries
 
     get_definition_local.llm_cache = {}
 
@@ -102,17 +120,12 @@ def get_meaning_full_jamdict(input_lyrics: list[str]):
 
         globalfuncs.logger.success(results)
 
+
 # endregion
 
 if __name__ == '__main__':
-    get_meaning_full_jamdict(['見えそうで見えない秘密は蜜の味'])
-
-    jmd = Jamdict()
-
-    for pos in jmd.all_pos():
-        print(pos)  # pos is a string
-
-    print()
-
-    for ne_type in jmd.all_ne_type():
-        print(ne_type)  # ne_type is a string
+    get_meaning_full_jamdict(['見えそうで見えない秘密は蜜の味', "今日何食べた？好きな本は？"])
+    # uhhuh = [("たい", "助動詞"), ('犬', '名詞'), ('静か', '形状詞'), ('あの', '感動詞'), ('ある', '連体詞'), ('ない', '形容詞'), ('は', '助詞'), ('すぐ', '副詞'), ('食べる', '動詞'), ('私', '代名詞'), ('ます', '助動詞'), ('そして', '接続詞'), ('匹', '接尾辞'), ('本', '接頭辞')]
+    #
+    # for word, pos in uhhuh:
+    #     print(get_meaning_full_jamdict([word]))
