@@ -120,6 +120,7 @@ def get_meaning_full_jamdict(input_lyrics: list[str]):
 
         globalfuncs.logger.success(results)
 
+    return results
 
 # endregion
 
