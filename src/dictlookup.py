@@ -21,6 +21,8 @@ import jamdict, jamdict_data
 with open('globalconfig.json', 'r') as f:
     config = json.load(f)
 
+llm_batch_size_dict_translation = config['llm_batch_size_dict_translation']
+
 _llm_lock = threading.Lock()
 
 cache_responses = {}
@@ -43,26 +45,9 @@ def get_meaning_full_jamdict(input_lyrics: list[str]):
 
     @functools.lru_cache(maxsize=None)
     def get_definition_local(word: str, pos: str) -> str:
-        def use_llm():
-            with _llm_lock:
-                if word in get_definition_local.llm_cache:
-                    globalfuncs.logger.debug(f"Using LLM cached word '{word}'")
-                    return get_definition_local.llm_cache[word]
-
-                call_llm()
-                while True:
-                    try:
-                        meaning = str(llmjptoen.get_definition_of_phrase(word))
-                        break
-                    except Exception as e:
-                        globalfuncs.logger.notice(f"Error while fetching definition of '{word}' using LLM, retrying")
-                if word not in get_definition_local.llm_cache:
-                    get_definition_local.llm_cache.update({word: meaning})
-                    cache_responses[word] = meaning
-                return meaning
-
         jmd = Jamdict()
 
+        # invalid checks
         if word == '':
             return None
 
@@ -76,9 +61,12 @@ def get_meaning_full_jamdict(input_lyrics: list[str]):
 
         entries = []
 
+        # empty check
         if re.search(r'No entries', str(meaning)):
-            use_llm()
+            entries.append(True)
+            globalfuncs.logger.warning("No entries found")
         else:
+            # clean up output
             jamdict_output = []
             for entry in meaning:
                 translated_pos = str(splittag.jamdict_translate_pos(pos))
@@ -93,8 +81,10 @@ def get_meaning_full_jamdict(input_lyrics: list[str]):
 
             entries = jamdict_output
 
+            # empty check
             if len(entries) == 0:
-                entries.append(use_llm())
+                entries.append(True)
+                globalfuncs.logger.warning(f"No entries found, len == 0 | {word} | {splittag.jamdict_translate_pos(pos)} | {meaning}")
 
             return entries
 
@@ -115,10 +105,108 @@ def get_meaning_full_jamdict(input_lyrics: list[str]):
 
     globalfuncs.logger.verbose(input_lyrics)
 
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=15) as executor:
         results = list(executor.map(get_definition_line_local, input_lyrics))
 
         globalfuncs.logger.success(results)
+
+
+    # call llm for missing words
+    def use_llm():
+        call_llm()
+        while True:
+            try:
+                meaning = str(llmjptoen.get_definition_of_phrase(word))
+                break
+            except Exception as e:
+                globalfuncs.logger.notice(f"Error while fetching definition of '{word}' using LLM, retrying")
+
+        return meaning
+
+    def get_def_llm():
+        nonlocal prompt_data
+
+        counter = 0
+        while True:
+            try:
+                call_llm()
+                response = llmjptoen.batch_get_definition_of_phrase(prompt_data)
+                break
+            except Exception as e:
+                globalfuncs.logger.notice(f"{e} | Error while fetching definition of '{prompt_data}'")
+
+        prompt_data = []
+
+        sub_break_off = False
+        for main_counter in range(len(results)):
+            lyric = input_lyrics[main_counter]
+            words = [x[0] for x in splittag.full_parse_jp_text(lyric)]
+
+            # find items that have true
+            result_item = results[main_counter]
+            for sub_counter in range(len(result_item)):
+                if result_item[sub_counter] == [True] or result_item[sub_counter] == True or result_item[sub_counter] == ['True'] or result_item[sub_counter] == 'True':
+                    # replace "true" items with llm meaning
+                    result_item[sub_counter] = response[counter]
+                    try:
+                        if words[sub_counter] not in llm_cache:
+                            llm_cache[f'{words[sub_counter]}'] = response[counter]
+                    except Exception as e:
+                        globalfuncs.logger.error(f"{words} | {result_item}")
+                        raise Exception(f"{words} | {result_item}")
+                    counter += 1
+                    if counter == len(response):
+                        sub_break_off = True
+                        break
+            if sub_break_off:
+                break
+            # write to main list
+            results[main_counter] = result_item
+
+    prompt_data = []
+    llm_cache = {}
+    while True:
+        break_off = False
+        finished = True
+
+        for main_counter in range(len(results)):
+            lyric = input_lyrics[main_counter]
+            result_item = results[main_counter]
+            words = [x[0] for x in splittag.full_parse_jp_text(lyric)]
+
+            for sub_counter in range(len(result_item)):
+                # caching system
+                if words[sub_counter] in llm_cache and (result_item[sub_counter] == [True] or result_item[sub_counter] == True or result_item[sub_counter] == ['True'] or result_item[sub_counter] == 'True'):
+                    globalfuncs.logger.verbose(f"Using cache for '{words[sub_counter]}'")
+                    result_item[sub_counter] = llm_cache[words[sub_counter]]
+                    results[main_counter] = result_item
+                    prompt_data = []
+                    break_off = True
+                    break
+                elif result_item[sub_counter] == [True] or result_item[sub_counter] == True or result_item[sub_counter] == ['True'] or result_item[sub_counter] == 'True':
+                    # batching
+                    prompt_data.append(words[sub_counter])
+                    globalfuncs.logger.verbose(f"'{words[sub_counter]}'")
+
+                if len(prompt_data) == llm_batch_size_dict_translation:
+                    get_def_llm()
+                    break_off = True
+                    break
+
+            if break_off:
+                break
+
+        if prompt_data:
+            get_def_llm()
+
+        # check if all defs have actual meanings
+        for item in results:
+            for sub_item in item:
+                if sub_item == [True]:
+                    finished = False
+
+        if finished:
+            break
 
     return results
 

@@ -14,6 +14,15 @@ import shutil
 import os
 import re
 
+'''
+Green: Success
+Yellow: Warn / Fallback
+Cyan: Check Fail
+Red: Error
+Blue: On Process
+Magenta: Info
+'''
+
 # global config
 with open('globalconfig.json', 'r') as f:
     config = json.load(f)
@@ -465,4 +474,3 @@ if __name__ == '__main__':
     # main('https://www.youtube.com/watch?v=QnkqCv0dZTk', 'genius')
     main('youtube.com/watch?v=ZRtdQ81jPUQ', 'genius')
     # main('https://www.youtube.com/watch?v=Mhl9FaxiQ_E', 'genius')
-
