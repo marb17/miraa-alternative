@@ -14,15 +14,6 @@ import shutil
 import os
 import re
 
-'''
-Green: Success
-Yellow: Warn / Fallback
-Cyan: Check Fail
-Red: Error
-Blue: On Process
-Magenta: Info
-'''
-
 # global config
 with open('globalconfig.json', 'r') as f:
     config = json.load(f)
