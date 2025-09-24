@@ -31,7 +31,7 @@ except OSError:
     console_width = 20
 
 # main loop
-def main(url: str, use_genius: str, use_jisho: str, skip_dict_lookup=False, skip_llm_exp=True, skip_llm_trans=True):
+def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=True, skip_llm_trans=True):
     """
     Returns JSON file, includes: lyrics, timestamps, translations, meanings, POS
     :param url: Input the URL of the song (YouTube Only)
@@ -315,7 +315,7 @@ def main(url: str, use_genius: str, use_jisho: str, skip_dict_lookup=False, skip
             globalfuncs.logger.verbose(str(dict_lookup_res))
             for item in dict_lookup_res: globalfuncs.write_json(item, filepath_json,
                                                                 ['lyrics', 'definition', 'jamdict'],
-                                                                as_list=True, extend=True)
+                                                                as_list=True, extend=False)
             globalfuncs.logger.success(f"Finished getting definitions")
     else:
         globalfuncs.logger.success("Skipping dictionary look up for words")
@@ -463,5 +463,6 @@ def main(url: str, use_genius: str, use_jisho: str, skip_dict_lookup=False, skip
 
 if __name__ == '__main__':
     # main('https://www.youtube.com/watch?v=QnkqCv0dZTk', 'genius')
-    main('youtube.com/watch?v=ZRtdQ81jPUQ', 'genius', False)
+    main('youtube.com/watch?v=ZRtdQ81jPUQ', 'genius')
     # main('https://www.youtube.com/watch?v=Mhl9FaxiQ_E', 'genius')
+
