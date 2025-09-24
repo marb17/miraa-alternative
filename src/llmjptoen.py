@@ -167,6 +167,36 @@ Word: {phrase}
 
     return output
 
+def batch_get_definition_of_phrase(phrase: list) -> list:
+    global tokenizer, model
+
+    prompt_list = []
+
+    for item in phrase:
+        prompt_list.append(f"""
+You are a concise Japanese-to-English dictionary assistant.  
+Given a Japanese word, output its translation STRICTLY in this format without adding extra information or commentary:
+
+**Meaning:** <short English definition>  
+
+Word: {item}
+    """)
+
+    output = batch_generate_response(prompt_list, 40, 0.25, 0.95, 1.15, True)
+    # output = str(output).split("[END]")[1]
+
+    results = []
+
+    for item in output:
+        globalfuncs.logger.verbose(f"{item}")
+        item = (re.findall(r'Meaning:(?:[\*\s]*?)([\w\s\S]+?)(?:\n|\[|E|\])', item)[1]).strip()
+        item = re.sub(r'\*', '', item).strip()
+        results.append(item)
+
+    globalfuncs.logger.verbose(f"Found definitions of {phrase} using LLM: {results}")
+
+    return results
+
 def batch_translate_lyric_to_en(input_data: list) -> list:
     global tokenizer, model
 
