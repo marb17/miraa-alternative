@@ -24,7 +24,7 @@
 
   "jp_tag_model_name": "../model/electra-ginza",
 
-  "llm_batch_size_explanation": 10,
+  "llm_batch_size_explanation": 20,
   "llm_batch_size_translation": 30,
 
   "llm_batch_size_dict_translation": 30

@@ -354,8 +354,6 @@ Here is the tokenized sentence:
 def pull_info_from_llm(text: str):
     # ? text = re.findall(r'\[END\]([\s\S]*?)(?:\[END]|---|Lyric line:)', text)[0]
 
-    print(text)
-
     text = re.sub(r'\*', '', text)
 
     meaning = (re.findall(r'Meaning:(?:[\*\s]*?)(.+?)\n', text)[2]).strip()
