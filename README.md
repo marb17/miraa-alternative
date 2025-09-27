@@ -7,7 +7,7 @@ An open-source alternative to **Miraa**, a Japanese transcription and translatio
 This diagram shows how the program functions:
 
 ### Backend
-![Backend Flowchart](https://github.com/marb17/miraa-alternative/blob/ea729c6d213d41f6f6d4b014f2272bf17439e51e/docs/flowchart%20backend.png)
+![docs/flowchart backend.png](https://github.com/marb17/miraa-alternative/blob/d284f08067cdab9cb6e36af7ba55a2100769a292/docs/flowchart%20backend.png)
 
 ---
 
