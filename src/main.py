@@ -31,18 +31,16 @@ except OSError:
     console_width = 20
 
 # main loop
-def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=True, skip_llm_trans=True):
+def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, skip_llm_trans=True):
     """
     Returns JSON file, includes: lyrics, timestamps, translations, meanings, POS
     :param url: Input the URL of the song (YouTube Only)
     :param use_genius: if 'genius', uses Genius API to get lyrics, otherwise 'ai' uses AI transcription (unreliable)
-    :param use_jisho: scraps jisho website data if true (slow), uses local jamdict if false
     :param skip_dict_lookup:
     :param skip_llm_exp:
+    :param skip_llm_trans:
     :return:
     """
-
-    global unsplit_en_lyrics
 
     globalfuncs.logger.verbose(f"URL: {url}, use_genius: {use_genius}, skip_dict_lookup: {skip_dict_lookup}")
 
@@ -342,8 +340,10 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=True, s
 
         counter = 0
         attempt_try = 0
+        check_counter = 0
 
         prompt_batch = []
+        exclude_list = []
 
         def call_llm_and_save():
             nonlocal prompt_batch, counter, attempt_try, llm_result
@@ -352,15 +352,34 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=True, s
 
             while True:
                 try:
-                    response = llmjptoen.explain_word_in_line(prompt_batch)
+                    send_prompt_batch = [x for x in prompt_batch if x != True]
+                    response = llmjptoen.explain_word_in_line(send_prompt_batch)
                     break
                 except:
                     attempt_try += 1
                     globalfuncs.logger.notice(f"LLM Failure, trying again. Attempt: {attempt_try}")
 
-            for item, input_data in zip(response, prompt_batch):
+            formatted_response = []
+            response_counter = 0
+            for input_prompt in prompt_batch:
+                if input_prompt == True:
+                    formatted_response.append([])
+                else:
+                    formatted_response.append(response[response_counter])
+                    response_counter += 1
+
+            for item, input_data in zip(formatted_response, prompt_batch):
                 globalfuncs.logger.spam(f"{input_data} | {item}")
-                if input_data[0] != '' or input_data[1] is not None:
+                if counter in exclude_list:
+                    llm_result.append(None)
+                    globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
+                    counter += 1
+                elif input_data == True:
+                    globalfuncs.write_json(item, filepath_json, ['llm', 'explanation', 'tokens'], as_list=True,
+                                           extend=False)
+                    llm_result.append(item)
+                    counter += 1
+                elif input_data[0] != '' or input_data[1] is not None:
                     globalfuncs.write_json(item, filepath_json, ['llm', 'explanation', 'tokens'], as_list=True,
                                            extend=False)
                     llm_result.append(item)
@@ -370,38 +389,52 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=True, s
                     globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
                     counter += 1
 
-        for lyric, lyric_line in zip(dict_lookup_res, jp_lyrics):
+        for lyric, lyric_line, line_counter in zip(dict_lookup_res, jp_lyrics, range(len(jp_lyrics))):
+            continue_off = False
+
             globalfuncs.logger.spam(f"{lyric_line} | {lyric}")
-            if lyric is None or lyric == '':
+            #? Not sure if redundant
+            if lyric is None or lyric == '' or lyric == []:
                 llm_result.append(None)
                 globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
-                counter += 1
                 continue
-
-            pos = [pos for pos in lyric[1] if pos != 'Unknown']
 
             token = lyric[0]
+            pos = lyric[1]
             meaning = lyric[2]
 
-            if meaning == [] or pos == []:
-                llm_result.append(None)
-                globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
-                counter += 1
-                continue
-
-            for word, s_pos, meaning in zip(token, pos, meaning):
+            for s_word, s_pos, s_meaning in zip(token, pos, meaning):
                 if counter < cur_length_of_json_llm:
                     llm_result.append(llm_data[counter])
-                    globalfuncs.logger.verbose(f"Found {word} in data, skipping. Counter: {counter}")
+                    globalfuncs.logger.verbose(f"Found {s_word} in data, skipping. Counter: {counter}")
                     counter += 1
+                    check_counter += 1
 
+                    continue
+
+                if meaning == [] or pos == [] or line_counter in missing_lines:
+                    # llm_result.append(None)
+                    # globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
+                    for _ in range(len(token)):
+                        prompt_batch.append(True)
+                        exclude_list.append(check_counter)
+                        check_counter += 1
+                    if len(token) == 0:
+                        prompt_batch.append(True)
+                        exclude_list.append(check_counter)
+                        check_counter += 1
+                    continue_off = True
+                    continue
+
+                if continue_off:
                     continue
 
                 if len(prompt_batch) == llm_batch_size_explanation:
                     call_llm_and_save()
                     prompt_batch = []
 
-                prompt_batch.append([lyric_line, word, s_pos, unsplit_jp_lyrics])
+                prompt_batch.append([lyric_line, s_word, s_pos, unsplit_jp_lyrics])
+                check_counter += 1
 
         if prompt_batch:
             call_llm_and_save()
@@ -465,4 +498,3 @@ if __name__ == '__main__':
     # main('https://www.youtube.com/watch?v=QnkqCv0dZTk', 'genius')
     main('youtube.com/watch?v=ZRtdQ81jPUQ', 'genius')
     # main('https://www.youtube.com/watch?v=Mhl9FaxiQ_E', 'genius')
-
