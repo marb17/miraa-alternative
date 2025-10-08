@@ -1,3 +1,5 @@
+from typing import Any
+
 from transformers import AutoModelForCausalLM, AutoTokenizer, StoppingCriteria, StoppingCriteriaList, BitsAndBytesConfig
 import torch
 import bitsandbytes
@@ -39,9 +41,11 @@ def create_model(precision='fp16') -> None:
             local_dir,
             torch_dtype=torch.bfloat16,
             device_map="auto",
+            offload_folder="offload",
+            low_cpu_mem_usage=True,
             attn_implementation="sdpa"
         )
-        model = torch.compile(model)
+        # model = torch.compile(model)
     if precision == 'b8':
         bnb_config = BitsAndBytesConfig(load_in_8bit=True)
 
@@ -78,35 +82,56 @@ def generate_response(text: str, tokens: int, temp: float, nucleus: float, reppe
 
     return response
 
-def batch_generate_response(prompts: list, tokens: int, temp: float, nucleus: float, reppen: float, dosample: bool) -> list:
+def batch_generate_response(prompts: list, tokens: int, temp: float, nucleus: float, reppen: float, dosample: bool, grad_check=True) -> list:
     global tokenizer, model
 
     inputs = tokenizer(prompts, return_tensors="pt", padding=True, truncation=True).to(model.device)
 
-    outputs = model.generate(
-        **inputs,
-        max_new_tokens=tokens,
-        temperature=temp,
-        top_p=nucleus,
-        repetition_penalty=reppen,
-        do_sample=dosample,
-        eos_token_id=tokenizer.eos_token_id,
-        pad_token_id=tokenizer.eos_token_id,
-    )
+    if grad_check:
+        with torch.no_grad():
+            outputs = model.generate(
+                **inputs,
+                max_new_tokens=tokens,
+                temperature=temp,
+                top_p=nucleus,
+                repetition_penalty=reppen,
+                do_sample=dosample,
+                eos_token_id=tokenizer.eos_token_id,
+                pad_token_id=tokenizer.eos_token_id,
+            )
+    else:
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=tokens,
+            temperature=temp,
+            top_p=nucleus,
+            repetition_penalty=reppen,
+            do_sample=dosample,
+            eos_token_id=tokenizer.eos_token_id,
+            pad_token_id=tokenizer.eos_token_id,
+        )
 
     responses = [tokenizer.decode(o, skip_special_tokens=True) for o in outputs]
+
+    del inputs
+    del outputs
+    torch.cuda.empty_cache()
+    gc.collect()
 
     return responses
 
 def clear_model() -> None:
     global model
-    if "model" in globals() and model is not None:
-        del model
-        model = None
-        torch.cuda.empty_cache()
-        gc.collect()
+    try:
+        if "model" in globals() and model is not None:
+            del model
+            model = None
+    except:
+        pass
+    torch.cuda.empty_cache()
+    gc.collect()
 
-def explain_word_in_line(input_data) -> list:
+def explain_word_in_line(input_data) -> list[list[Any]]:
     global tokenizer, model
 
     prompt_list = []
@@ -134,15 +159,33 @@ def explain_word_in_line(input_data) -> list:
 
     output = batch_generate_response(prompt_list, 200, 0.8, 0.9, 1.15, True)
 
+    globalfuncs.logger.info(f"Generated explanation: {output}")
+
     results = []
+
+    def is_japanese(input_data) -> bool:
+        for data in input_data:
+            jp_letter_counter = 0
+            len_data = len(data)
+            for letter in data:
+                if re.match(r'[\u3040-\u30FF\u4E00-\u9FFF]', letter):
+                    jp_letter_counter += 1
+
+            if jp_letter_counter / len_data > 0.4:
+                return True
+
+        return False
 
     for result in output:
         results.append(list(pull_info_from_llm(result)))
+        if is_japanese(result):
+            raise Exception
+
+    del prompt_list
+    del output
+    gc.collect()
 
     return results
-
-    # return output
-
 
 def get_definition_of_phrase(phrase: str) -> str:
     global tokenizer, model

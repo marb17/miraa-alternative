@@ -13,6 +13,8 @@ import json
 import shutil
 import os
 import re
+import torch
+import gc
 
 # global config
 with open('globalconfig.json', 'r') as f:
@@ -324,6 +326,10 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
     # region explanations for each token
     if not skip_llm_exp:
         globalfuncs.logger.info(f"Getting explanations of tokens")
+
+        torch.cuda.empty_cache()
+        gc.collect()
+
         llmjptoen.create_model()
 
         llm_result = []
@@ -355,14 +361,16 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
                     send_prompt_batch = [x for x in prompt_batch if x != True]
                     response = llmjptoen.explain_word_in_line(send_prompt_batch)
                     break
-                except:
+                except Exception as e:
                     attempt_try += 1
-                    globalfuncs.logger.notice(f"LLM Failure, trying again. Attempt: {attempt_try}")
+                    globalfuncs.logger.notice(f"LLM Failure, trying again. Attempt: {attempt_try} | Error: {e}")
+                    torch.cuda.empty_cache()
+                    gc.collect()
 
             formatted_response = []
             response_counter = 0
             for input_prompt in prompt_batch:
-                if input_prompt == True:
+                if input_prompt:
                     formatted_response.append([])
                 else:
                     formatted_response.append(response[response_counter])
@@ -388,6 +396,12 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
                     llm_result.append(None)
                     globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
                     counter += 1
+
+                del send_prompt_batch
+                del response
+                del formatted_response
+                torch.cuda.empty_cache()
+                gc.collect()
 
         for lyric, lyric_line, line_counter in zip(dict_lookup_res, jp_lyrics, range(len(jp_lyrics))):
             continue_off = False
