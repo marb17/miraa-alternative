@@ -11,6 +11,8 @@ import functools
 import threading
 import globalfuncs
 import jamdict, jamdict_data
+import torch
+import gc
 
 # global config
 with open('globalconfig.json', 'r') as f:
@@ -191,6 +193,10 @@ def get_meaning_full_jamdict(input_lyrics: list[str]):
 
         if finished:
             break
+
+    torch.cuda.empty_cache()
+    gc.collect()
+    llmjptoen.clear_model()
 
     return results
 
