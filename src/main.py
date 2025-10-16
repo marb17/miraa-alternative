@@ -404,8 +404,6 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
                 gc.collect()
 
         for lyric, lyric_line, line_counter in zip(dict_lookup_res, jp_lyrics, range(len(jp_lyrics))):
-            continue_off = False
-
             globalfuncs.logger.spam(f"{lyric_line} | {lyric}")
 
             token = lyric[0]
@@ -433,10 +431,6 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
                     exclude_list.append(check_counter)
                     check_counter += 1
 
-                    # continue_off = True
-                    continue
-
-                if continue_off:
                     continue
 
                 prompt_batch.append([lyric_line, s_word, s_pos, unsplit_jp_lyrics])
