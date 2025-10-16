@@ -178,8 +178,8 @@ def explain_word_in_line(input_data) -> list[list[Any]]:
 
     for result in output:
         results.append(list(pull_info_from_llm(result)))
-        if is_japanese(result):
-            raise Exception
+        if is_japanese(results[-1]):
+            raise Exception(f"Token is japanese {results[-1]}")
 
     del prompt_list
     del output
@@ -320,7 +320,6 @@ STOP IMMEDIATELY after the translation.
             raise Exception
 
     return results
-
 
 def translate_lyric_to_en(full_lyrics: str, lyric: str) -> str:
     global tokenizer, model

@@ -359,7 +359,10 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
             while True:
                 try:
                     send_prompt_batch = [x for x in prompt_batch if x != True]
-                    response = llmjptoen.explain_word_in_line(send_prompt_batch)
+                    if send_prompt_batch == []:
+                        response = []
+                    else:
+                        response = llmjptoen.explain_word_in_line(send_prompt_batch)
                     break
                 except Exception as e:
                     attempt_try += 1
@@ -370,7 +373,7 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
             formatted_response = []
             response_counter = 0
             for input_prompt in prompt_batch:
-                if input_prompt:
+                if input_prompt == True:
                     formatted_response.append([])
                 else:
                     formatted_response.append(response[response_counter])
@@ -397,9 +400,6 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
                     globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
                     counter += 1
 
-                del send_prompt_batch
-                del response
-                del formatted_response
                 torch.cuda.empty_cache()
                 gc.collect()
 
@@ -407,15 +407,15 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
             continue_off = False
 
             globalfuncs.logger.spam(f"{lyric_line} | {lyric}")
-            #? Not sure if redundant
-            if lyric is None or lyric == '' or lyric == []:
-                llm_result.append(None)
-                globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
-                continue
 
             token = lyric[0]
             pos = lyric[1]
             meaning = lyric[2]
+
+            if token == [] and pos == []:
+                prompt_batch.append(True)
+                exclude_list.append(check_counter)
+                check_counter += 1
 
             for s_word, s_pos, s_meaning in zip(token, pos, meaning):
                 if counter < cur_length_of_json_llm:
@@ -426,29 +426,25 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
 
                     continue
 
-                if meaning == [] or pos == [] or line_counter in missing_lines:
+                if s_meaning == [] or s_pos == [] or line_counter in missing_lines:
                     # llm_result.append(None)
                     # globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
-                    for _ in range(len(token)):
-                        prompt_batch.append(True)
-                        exclude_list.append(check_counter)
-                        check_counter += 1
-                    if len(token) == 0:
-                        prompt_batch.append(True)
-                        exclude_list.append(check_counter)
-                        check_counter += 1
-                    continue_off = True
+                    prompt_batch.append(True)
+                    exclude_list.append(check_counter)
+                    check_counter += 1
+
+                    # continue_off = True
                     continue
 
                 if continue_off:
                     continue
 
-                if len(prompt_batch) == llm_batch_size_explanation:
-                    call_llm_and_save()
-                    prompt_batch = []
-
                 prompt_batch.append([lyric_line, s_word, s_pos, unsplit_jp_lyrics])
                 check_counter += 1
+
+                if len([x for x in prompt_batch if x != True]) >= llm_batch_size_explanation:
+                    call_llm_and_save()
+                    prompt_batch = []
 
         if prompt_batch:
             call_llm_and_save()
