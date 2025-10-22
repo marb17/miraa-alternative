@@ -410,15 +410,10 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
             pos = lyric[1]
             meaning = lyric[2]
 
-            if token == [] and pos == []:
-                prompt_batch.append(True)
-                exclude_list.append(check_counter)
-                check_counter += 1
-
             for s_word, s_pos, s_meaning in zip(token, pos, meaning):
                 if counter < cur_length_of_json_llm:
                     llm_result.append(llm_data[counter])
-                    globalfuncs.logger.verbose(f"Found {s_word} in data, skipping. Counter: {counter}")
+                    globalfuncs.logger.verbose(f"Found {s_word} in data, skipping. Counter: {counter}. Meaning: {llm_result[-1]}")
                     counter += 1
                     check_counter += 1
 
