@@ -271,7 +271,6 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
             tagged_lyrics.append(splittag.full_output_split(str(line))[0])
             full_tagged_lyrics.append(splittag.full_parse_jp_text(str(line)))
 
-    natural_lyrics_split = [splittag.natural_split(lyric) for lyric in jp_lyrics]
     # endregion
 
     # * finding all types of particles for debug
@@ -287,12 +286,31 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
 
     natural_lyrics_split = [splittag.natural_split(lyric) for lyric in jp_lyrics]
 
+    furigana = []
+
+    for lyric in tagged_lyrics:
+        try:
+            holding = []
+            for token in lyric:
+                furigana_out = splittag.get_furigana(token)
+                if token != furigana_out:
+                    holding.append(furigana_out)
+                else:
+                    holding.append(None)
+        except TypeError:
+            furigana.append([])
+            continue
+
+        furigana.append(holding)
+
     if 'tagged' not in file_data.get('lyrics', {}):
         for item in tagged_lyrics: globalfuncs.write_json(item, filepath_json, ['lyrics', 'tagged', 'token'],
                                                           as_list=True)
         for item in full_tagged_lyrics: globalfuncs.write_json(item, filepath_json, ['lyrics', 'tagged', 'full_parse'],
                                                                as_list=True)
         for item in natural_lyrics_split: globalfuncs.write_json(item, filepath_json, ['lyrics', 'tagged', 'natural'],
+                                                               as_list=True)
+        for item in furigana: globalfuncs.write_json(item, filepath_json, ['lyrics', 'tagged', 'furigana'],
                                                                as_list=True)
     # endregion
 
@@ -438,6 +456,20 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
         if prompt_batch:
             call_llm_and_save()
             prompt_batch = []
+
+        # TODO check after all prompts are made to redo the invalid ones
+        def is_japanese(input_data) -> bool:
+            for data in input_data:
+                jp_letter_counter = 0
+                len_data = len(data)
+                for letter in data:
+                    if re.match(r'[\u3040-\u30FF\u4E00-\u9FFF]', letter):
+                        jp_letter_counter += 1
+
+                if jp_letter_counter / len_data > 0.4:
+                    return True
+
+            return False
 
         llmjptoen.clear_model()
         globalfuncs.logger.info(f"Finished getting explanations of tokens")
