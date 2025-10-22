@@ -176,10 +176,17 @@ def explain_word_in_line(input_data) -> list[list[Any]]:
 
         return False
 
-    for result in output:
-        results.append(list(pull_info_from_llm(result)))
+    for result, prompt_input in zip(output, prompt_list):
+        input_word = prompt_input[1]
+
+        holding = list(pull_info_from_llm(result))
+        results.append(holding)
+
+        if holding == [True, True, True, True, True]:
+            globalfuncs.logger.notice(f"LLM Failure, passing and setting temporary value for {input_word} | Error: list index out of range")
+
         if is_japanese(results[-1]):
-            raise Exception(f"Token is japanese {results[-1]}")
+            globalfuncs.logger.notice(f"LLM Failure, passing and setting temporary value for {input_word} | Error: token is japanese")
 
     del prompt_list
     del output
@@ -396,15 +403,18 @@ Here is the tokenized sentence:
 def pull_info_from_llm(text: str):
     # ? text = re.findall(r'\[END\]([\s\S]*?)(?:\[END]|---|Lyric line:)', text)[0]
 
-    text = re.sub(r'\*', '', text)
-
-    meaning = (re.findall(r'Meaning:(?:[\*\s]*?)(.+?)\n', text)[2]).strip()
-    grammar = (re.findall(r'Gramm?atica?l? Role:(?:[\*\s]*?)(.+?)\n', text)[1]).strip()
-    nuance = (re.findall(r'Nuance:(?:[\*\s]*?)(.+?)\n', text)[1]).strip()
-    impact = (re.findall(r'Impact on Meaning:(?:[\*\s]*?)(.+?)\n', text)[1]).strip()
     try:
-        summary = (re.findall(r'Summary:(?:[\*\s]*?)(.+?)(?:\n|[<]?END[\\\_]+?EXPLANATION[>]?)', text)[1]).strip()
+        text = re.sub(r'\*', '', text)
+
+        meaning = (re.findall(r'Meaning:(?:[\*\s]*?)(.+?)\n', text)[2]).strip()
+        grammar = (re.findall(r'Gramm?atica?l? Role:(?:[\*\s]*?)(.+?)\n', text)[1]).strip()
+        nuance = (re.findall(r'Nuance:(?:[\*\s]*?)(.+?)\n', text)[1]).strip()
+        impact = (re.findall(r'Impact on Meaning:(?:[\*\s]*?)(.+?)\n', text)[1]).strip()
+        try:
+            summary = (re.findall(r'Summary:(?:[\*\s]*?)(.+?)(?:\n|[<]?END[\\\_]+?EXPLANATION[>]?)', text)[1]).strip()
+        except IndexError:
+            summary = (re.findall(r'Summary:(?:[\*\s]*?)(.*)', text)[1]).strip()
     except IndexError:
-        summary = (re.findall(r'Summary:(?:[\*\s]*?)(.*)', text)[1]).strip()
+        return True, True, True, True, True
 
     return meaning, grammar, nuance, impact, summary

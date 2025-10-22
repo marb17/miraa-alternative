@@ -8,10 +8,9 @@ def full_output_split(text: str) -> tuple:
     lem_tagger = Tagger('-Owakati')
     return [word.surface for word in lem_tagger(text)], [word.feature.pos1 for word in lem_tagger(text)], [
         word.feature.lemma for word in lem_tagger(text)]
-
+    del lem_tagger
 # full tag
 def full_parse_jp_text(text):
-    tagger = MeCab.Tagger()
     if text is None:
         return None
 
@@ -103,11 +102,6 @@ def jamdict_translate_pos(pos: str) -> str:
     # fall back
     return pos
 
-def lemmatize(text: str) -> tuple:
-    lem_tagger = Tagger('-Owakati')
-    for word in lem_tagger.parse(text):
-        return word.feature.lemma
-
 def natural_split(text: str) -> list:
     surface, pos, lemma = full_output_split(text)
 
@@ -156,130 +150,16 @@ def natural_split(text: str) -> list:
 
     return [str(token) for token in final_output if token != '']
 
+def get_furigana(text: str) -> str:
+    def kata_to_hira(katakana: str) -> str:
+        # Convert all Katakana characters to Hiragana
+        return ''.join(
+            chr(ord(ch) - 0x60) if 'ァ' <= ch <= 'ン' else ch
+            for ch in katakana
+        )
+    furi_tagger = Tagger('-Owakati')
+    for word in furi_tagger(text):
+        return kata_to_hira(word.feature.kana)
+
 if __name__ == '__main__':
-    japanese_words_by_pos = [
-        # 1 Nouns (名詞)
-        ["犬", "学校", "本", "時間", "友達"],
-
-        # 2 Proper nouns (固有名詞)
-        ["東京", "太郎", "日本", "富士山", "マイクロソフト"],
-
-        # 3 Pronouns (代名詞)
-        ["私", "僕", "彼", "彼女", "あなた"],
-
-        # 4 Numerals (数詞)
-        ["一", "二", "三", "十", "百"],
-
-        # 5 Counters (助数詞)
-        ["人", "本", "匹", "枚", "回"],
-
-        # 6 Ichidan verbs (一段動詞)
-        ["食べる", "見る", "起きる", "信じる", "教える"],
-
-        # 7 Godan verbs (五段動詞)
-        ["書く", "遊ぶ", "話す", "待つ", "死ぬ"],
-
-        # 8 Irregular verbs (不規則動詞)
-        ["する", "来る", "行く", "ある", "おる"],
-
-        # 9 Transitive verbs (他動詞)
-        ["読む", "閉める", "始める", "止める", "作る"],
-
-        # 10 Intransitive verbs (自動詞)
-        ["開く", "始まる", "止まる", "眠る", "落ちる"],
-
-        # 11 Auxiliary verbs (助動詞)
-        ["ます", "たい", "ない", "られる", "た"],
-
-        # 12 Copula / 判定詞
-        ["だ", "です", "である", "だろう", "ではない"],
-
-        # 13 I-adjectives (い形容詞)
-        ["高い", "新しい", "暑い", "面白い", "大きい"],
-
-        # 14 Na-adjectives (な形容詞 / 形容動詞)
-        ["静か", "有名", "便利", "安全", "元気"],
-
-        # 15 Taru-adjectives (古語・タル形)
-        ["堂々たる", "断固たる", "確固たる", "勇敢たる", "崇高たる"],
-
-        # 16 Adverbs (副詞)
-        ["すぐに", "よく", "ときどき", "はっきり", "たまに"],
-
-        # 17 Degree adverbs (程度副詞)
-        ["とても", "かなり", "少し", "まったく", "ほとんど"],
-
-        # 18 Conjunctions (接続詞)
-        ["そして", "しかし", "だから", "また", "それに"],
-
-        # 19 Case particles (格助詞)
-        ["は", "が", "を", "に", "で"],
-
-        # 20 Listing / coordination particles (並立助詞)
-        ["と", "や", "か", "とか", "やら"],
-
-        # 21 Auxiliary particles (副助詞)
-        ["しか", "だけ", "こそ", "さえ", "まで"],
-
-        # 22 Sentence-final particles (終助詞)
-        ["ね", "よ", "ぞ", "か", "な"],
-
-        # 23 Conjunctive particles (接続助詞)
-        ["から", "ので", "けれど", "ながら", "つつ"],
-
-        # 24 Pre-nominal words (連体詞)
-        ["この", "その", "あの", "ある", "どの"],
-
-        # 25 Prefixes (接頭辞)
-        ["お", "ご", "不", "非", "超"],
-
-        # 26 Suffixes (接尾辞)
-        ["さん", "ちゃん", "さま", "的", "化"],
-
-        # 27 Onomatopoeia (擬音語/擬態語)
-        ["ドキドキ", "ワクワク", "ぺらぺら", "ごろごろ", "さらさら"],
-
-        # 28 Interjections (感動詞)
-        ["はい", "いいえ", "ああ", "おお", "やった"],
-
-        # 29 Auxiliary nouns / nominalizers (補助名詞)
-        ["こと", "もの", "ところ", "はず", "ため"],
-
-        # 30 Honorific verbs (尊敬語)
-        ["いらっしゃる", "なさる", "おっしゃる", "召し上がる", "ご覧になる"],
-
-        # 31 Humble verbs (謙譲語)
-        ["申す", "伺う", "差し上げる", "拝見する", "いたす"],
-
-        # 32 Polite expressions (丁寧語 / 慣用表現)
-        ["ありがとうございます", "すみません", "お願いします", "失礼します", "お疲れ様です"]
-    ]
-    pos_set = set()
-    yup = []
-
-    for pos in japanese_words_by_pos:
-        for word in pos:
-            for item, item2 in zip(full_output_split(word)[0], full_output_split(word)[1]):
-                pos_set.add(item2)
-                yup.append([item, item2])
-
-    pos_set = list(pos_set)
-
-    def uhhuh(pos):
-        results = []
-        counter = 1
-        for item, item2 in yup:
-            if pos == item2:
-                if counter == 2:
-                    return item, item2
-                else:
-                    counter += 1
-
-    poop = []
-
-    for item in pos_set:
-        poop.append(uhhuh(item))
-
-    print(poop)
-
-
+    pass
