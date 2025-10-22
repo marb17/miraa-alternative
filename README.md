@@ -15,10 +15,10 @@ This diagram shows how the program functions:
 This project uses multiple heavy ML models, so a decent GPU is recommended.
 
 **Minimum Requirements:**
-- GPU: RTX 3050 or higher (≥ 6GB VRAM)
-- CPU: Intel i5-11400
-- RAM: 8GB
-- Storage: 15GB
+- GPU: Any GPU with enough VRAM for the model (in the pre-setup case around 12GB)
+- CPU: Any CPU that can handle some light multi-threading and enough to handle the GPU load
+- RAM: 4GB + Any off-load amount if the model doesn't fit in the GPU
+- Storage: Enough for all the models, around 40GB in my case
 - Internet: WiFi/Ethernet (50Mbps, only for downloading models)
 
 **Recommended Specs (My Setup):**
