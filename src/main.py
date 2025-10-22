@@ -303,6 +303,34 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
 
         furigana.append(holding)
 
+    def kata_to_hira(katakana: str) -> str:
+        # Convert all Katakana characters to Hiragana
+        return ''.join(
+            chr(ord(ch) - 0x60) if 'ァ' <= ch <= 'ン' else ch
+            for ch in katakana
+        )
+
+    kanji_or_kata = []
+
+    for furigana_lyric, tagged_lyric in zip(furigana, tagged_lyrics):
+        if tagged_lyric is None:
+            kanji_or_kata.append([])
+            continue
+
+        try:
+            holding = []
+            for furi, token in zip(furigana_lyric, tagged_lyric):
+                if kata_to_hira(token) == furi and furi is not None:
+                    holding.append('kata')
+                elif furi is not None:
+                    holding.append('kanji')
+                else:
+                    holding.append(None)
+        except TypeError:
+            kanji_or_kata.append([])
+
+        kanji_or_kata.append(holding)
+
     if 'tagged' not in file_data.get('lyrics', {}):
         for item in tagged_lyrics: globalfuncs.write_json(item, filepath_json, ['lyrics', 'tagged', 'token'],
                                                           as_list=True)
@@ -311,6 +339,8 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
         for item in natural_lyrics_split: globalfuncs.write_json(item, filepath_json, ['lyrics', 'tagged', 'natural'],
                                                                as_list=True)
         for item in furigana: globalfuncs.write_json(item, filepath_json, ['lyrics', 'tagged', 'furigana'],
+                                                               as_list=True)
+        for item in kanji_or_kata: globalfuncs.write_json(item, filepath_json, ['lyrics', 'tagged', 'kanji_or_kata'],
                                                                as_list=True)
     # endregion
 
