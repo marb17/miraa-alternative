@@ -163,19 +163,6 @@ def explain_word_in_line(input_data) -> list[list[Any]]:
 
     results = []
 
-    def is_japanese(input_data) -> bool:
-        for data in input_data:
-            jp_letter_counter = 0
-            len_data = len(data)
-            for letter in data:
-                if re.match(r'[\u3040-\u30FF\u4E00-\u9FFF]', letter):
-                    jp_letter_counter += 1
-
-            if jp_letter_counter / len_data > 0.4:
-                return True
-
-        return False
-
     for result, prompt_input in zip(output, prompt_list):
         input_word = prompt_input[1]
 
@@ -184,9 +171,9 @@ def explain_word_in_line(input_data) -> list[list[Any]]:
 
         if holding == [True, True, True, True, True]:
             globalfuncs.logger.notice(f"LLM Failure, passing and setting temporary value for {input_word} | Error: list index out of range")
-
-        if is_japanese(results[-1]):
-            globalfuncs.logger.notice(f"LLM Failure, passing and setting temporary value for {input_word} | Error: token is japanese")
+        else:
+            if globalfuncs.is_japanese(results[-1]):
+                globalfuncs.logger.notice(f"LLM Failure, passing and setting temporary value for {input_word} | Error: token is japanese")
 
     del prompt_list
     del output

@@ -488,18 +488,87 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
             prompt_batch = []
 
         # TODO check after all prompts are made to redo the invalid ones
-        def is_japanese(input_data) -> bool:
-            for data in input_data:
-                jp_letter_counter = 0
-                len_data = len(data)
-                for letter in data:
-                    if re.match(r'[\u3040-\u30FF\u4E00-\u9FFF]', letter):
-                        jp_letter_counter += 1
 
-                if jp_letter_counter / len_data > 0.4:
-                    return True
+        inline_tagged_lyrics = []
+        for item in dict_lookup_res:
+            item = item[0]
+            for lyric in item:
+                inline_tagged_lyrics.append(lyric)
 
-            return False
+        holding = []
+        for result, token in zip(llm_result, inline_tagged_lyrics):
+            if not globalfuncs.is_japanese(token, 0.9):
+                holding.append([None])
+            else:
+                holding.append(result)
+        llm_result = holding
+        globalfuncs.write_json(llm_result, filepath_json, ['llm', 'explanation', 'tokens'], as_list=True, extend=False, overwrite=True)
+
+        def overwrite_call_llm_and_save():
+            nonlocal prompt_batch, attempt_try, llm_result
+
+            attempt_try = 1
+
+            while True:
+                try:
+                    response = llmjptoen.explain_word_in_line(prompt_batch)
+                    break
+                except Exception as e:
+                    attempt_try += 1
+                    globalfuncs.logger.notice(f"LLM Failure, trying again. Attempt: {attempt_try} | Error: {e}")
+                    torch.cuda.empty_cache()
+                    gc.collect()
+
+            holding = []
+            counter = 0
+            for result in llm_result:
+                if globalfuncs.is_japanese(result) or result == [True, True, True, True, True]:
+                    holding.append(response[counter])
+                    counter += 1
+                else:
+                    holding.append(result)
+            llm_result = holding
+            globalfuncs.write_json(llm_result, filepath_json, ['llm', 'explanation', 'tokens'], as_list=True,
+                                   extend=False, overwrite=True)
+
+        formatted_llm_result = []
+        list_index = 0
+        for lyric, tagged, dict in zip(jp_lyrics, tagged_lyrics, dict_lookup_res):
+            holding = []
+            for _ in range(len(dict[0])):
+                holding.append(llm_result[list_index])
+                list_index += 1
+
+            formatted_llm_result.append(holding)
+
+        break_off = False
+        while True:
+            prompt_batch = []
+            for lyric, lyric_line, result in zip(dict_lookup_res, jp_lyrics, formatted_llm_result):
+                token = lyric[0]
+                pos = lyric[1]
+                meaning = lyric[2]
+
+                for s_word, s_pos, s_meaning, s_result in zip(token, pos, meaning, result):
+                    if globalfuncs.is_japanese(s_result) or s_result == [True, True, True, True, True]:
+                        prompt_batch.append([lyric_line, s_word, s_pos, unsplit_jp_lyrics])
+
+                    if len(prompt_batch) >= llm_batch_size_explanation:
+                        print(prompt_batch)
+                        overwrite_call_llm_and_save()
+                        prompt_batch = []
+
+            if prompt_batch:
+                print(prompt_batch)
+                overwrite_call_llm_and_save()
+                prompt_batch = []
+
+            for meaning in llm_result:
+                if not globalfuncs.is_japanese(meaning) and meaning != [True, True, True, True, True]:
+                    break_off = True
+                    break
+            if break_off:
+                break
 
         llmjptoen.clear_model()
         globalfuncs.logger.info(f"Finished getting explanations of tokens")
