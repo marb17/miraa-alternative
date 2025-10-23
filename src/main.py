@@ -522,11 +522,11 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
             holding = []
             counter = 0
             for result in llm_result:
-                if globalfuncs.is_japanese(result) or result == [True, True, True, True, True]:
-                    holding.append(response[counter])
-                    counter += 1
-                else:
-                    holding.append(result)
+                    if (globalfuncs.is_japanese(result) or result == [True, True, True, True, True]) and counter < len(response):
+                        holding.append(response[counter])
+                        counter += 1
+                    else:
+                        holding.append(result)
             llm_result = holding
             globalfuncs.write_json(llm_result, filepath_json, ['llm', 'explanation', 'tokens'], as_list=True,
                                    extend=False, overwrite=True)
