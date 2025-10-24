@@ -468,8 +468,6 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
                     continue
 
                 if s_meaning == [] or s_pos == [] or line_counter in missing_lines:
-                    # llm_result.append(None)
-                    # globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
                     prompt_batch.append(True)
                     exclude_list.append(check_counter)
                     check_counter += 1
@@ -486,8 +484,6 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
         if prompt_batch:
             call_llm_and_save()
             prompt_batch = []
-
-        # TODO check after all prompts are made to redo the invalid ones
 
         inline_tagged_lyrics = []
         for item in dict_lookup_res:
@@ -633,3 +629,4 @@ if __name__ == '__main__':
     # main('https://www.youtube.com/watch?v=QnkqCv0dZTk', 'genius')
     main('youtube.com/watch?v=ZRtdQ81jPUQ', 'genius')
     # main('https://www.youtube.com/watch?v=Mhl9FaxiQ_E', 'genius')
+
