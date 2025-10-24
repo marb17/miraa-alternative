@@ -33,7 +33,7 @@ except OSError:
     console_width = 20
 
 # main loop
-def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, skip_llm_trans=True):
+def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, skip_llm_trans=False):
     """
     Returns JSON file, includes: lyrics, timestamps, translations, meanings, POS
     :param url: Input the URL of the song (YouTube Only)
@@ -468,6 +468,8 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
                     continue
 
                 if s_meaning == [] or s_pos == [] or line_counter in missing_lines:
+                    # llm_result.append(None)
+                    # globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
                     prompt_batch.append(True)
                     exclude_list.append(check_counter)
                     check_counter += 1
@@ -493,7 +495,6 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
             for lyric in item:
                 inline_tagged_lyrics.append(lyric)
 
-        # delete all llm results that origin from english words as to not waste computing power
         holding = []
         for result, token in zip(llm_result, inline_tagged_lyrics):
             if not globalfuncs.is_japanese(token, 0.9):
@@ -540,7 +541,6 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
 
             formatted_llm_result.append(holding)
 
-        break_off = False
         while True:
             prompt_batch = []
             for lyric, lyric_line, result in zip(dict_lookup_res, jp_lyrics, formatted_llm_result):
@@ -551,22 +551,28 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
                 for s_word, s_pos, s_meaning, s_result in zip(token, pos, meaning, result):
                     if globalfuncs.is_japanese(s_result) or s_result == [True, True, True, True, True]:
                         prompt_batch.append([lyric_line, s_word, s_pos, unsplit_jp_lyrics])
+                        globalfuncs.logger.spam(f"Redoing: {s_word}")
 
                     if len(prompt_batch) >= llm_batch_size_explanation:
-                        print(prompt_batch)
+                        globalfuncs.logger.spam(str(prompt_batch))
                         overwrite_call_llm_and_save()
                         prompt_batch = []
 
             if prompt_batch:
-                print(prompt_batch)
+                globalfuncs.logger.spam(str(prompt_batch))
                 overwrite_call_llm_and_save()
                 prompt_batch = []
 
-            for meaning in llm_result:
-                if not globalfuncs.is_japanese(meaning) and meaning != [True, True, True, True, True]:
-                    break_off = True
-                    break
-            if break_off:
+            length_of_results = len(llm_result)
+            check_counter = length_of_results
+            for item in llm_result:
+                if globalfuncs.is_japanese(item) or item == [True, True, True, True, True]:
+                    check_counter -= 1
+
+            if check_counter != length_of_results:
+                globalfuncs.logger.verbose(f"Result still contains {check_counter} out of {length_of_results} valid responses, continuing")
+            else:
+                globalfuncs.logger.verbose(f"Result has no invalid responses, breaking off")
                 break
 
         llmjptoen.clear_model()
