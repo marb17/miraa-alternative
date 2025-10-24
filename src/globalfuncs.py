@@ -108,7 +108,7 @@ import os
 
 import json, os
 
-def write_json(new_data, filename, path, as_list=True, extend=False):
+def write_json(new_data, filename, path, as_list=True, extend=False, overwrite=False):
     # If file doesn’t exist or is empty, start with {}
     if not os.path.exists(filename) or os.stat(filename).st_size == 0:
         file_data = {}
@@ -126,21 +126,40 @@ def write_json(new_data, filename, path, as_list=True, extend=False):
 
     final_key = path[-1]
 
-    if as_list:
-        # Ensure it's a list
-        current.setdefault(final_key, [])
-        # Wrap single items in list before extending
-        if not isinstance(new_data, list):
-            new_data = [new_data]
-        if not extend:
-            current[final_key].append(new_data)
+    if not overwrite:
+        if as_list:
+            # Ensure it's a list
+            current.setdefault(final_key, [])
+            # Wrap single items in list before extending
+            if not isinstance(new_data, list):
+                new_data = [new_data]
+            if not extend:
+                current[final_key].append(new_data)
+            else:
+                current[final_key].extend(new_data)
         else:
-            current[final_key].extend(new_data)
+            # Dict mode: final_key itself is used as the dict key
+            current[final_key] = new_data
     else:
-        # Dict mode: final_key itself is used as the dict key
-        current[final_key] = new_data
+        if as_list and not isinstance(new_data, list):
+            new_data = [new_data]
+        current[final_key] = new_data  # overwrite instead of append/extend
 
     # Write back to file
     with open(filename, 'w', encoding='utf-8') as file:
         json.dump(file_data, file, indent=4, ensure_ascii=False)
 
+import re
+
+def is_japanese(input_data, threshold=0.4) -> bool:
+    if input_data == [None] or input_data == [True, True, True, True, True]:
+        return False
+    for data in input_data:
+        jp_letter_counter = 0
+        len_data = len(data)
+        for letter in data:
+            if re.match(r'[\u3040-\u30FF\u4E00-\u9FFF]', letter):
+                jp_letter_counter += 1
+        if jp_letter_counter / len_data > threshold:
+            return True
+    return False
