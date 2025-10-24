@@ -21,8 +21,11 @@
 
   "jp_en_model_name": "../model/shisav2",
   "jp_model_precision_level": "fp16",
+  "llm_jp_model_device": "cuda",
+  "llm_jp_model_device_override": false,
 
   "llm_batch_size_explanation": 20,
+
   "llm_batch_size_translation": 30,
 
   "llm_batch_size_dict_translation": 30

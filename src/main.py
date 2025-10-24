@@ -372,6 +372,27 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
     # endregion
 
     # region explanations for each token
+    inline_tagged_lyrics = []
+    for item in dict_lookup_res:
+        item = item[0]
+        for lyric in item:
+            inline_tagged_lyrics.append(lyric)
+
+    if 'tokens' in file_data.get('llm', {}).get('explanation', {}):
+        read_llm_result = file_data['llm']['explanation']['tokens']
+        if len(read_llm_result) == len(inline_tagged_lyrics):
+            length_of_read_results = len(read_llm_result)
+            check_counter = length_of_read_results
+            for item in read_llm_result:
+                if globalfuncs.is_japanese(item) or item == [True, True, True, True, True]:
+                    check_counter -= 1
+
+            if check_counter == length_of_read_results:
+                globalfuncs.logger.verbose(f"Passing getting explanations of tokens, info is already complete")
+                skip_llm_exp = True
+            else:
+                pass
+
     if not skip_llm_exp:
         globalfuncs.logger.info(f"Getting explanations of tokens")
 
@@ -485,12 +506,6 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
             call_llm_and_save()
             prompt_batch = []
 
-        inline_tagged_lyrics = []
-        for item in dict_lookup_res:
-            item = item[0]
-            for lyric in item:
-                inline_tagged_lyrics.append(lyric)
-
         holding = []
         for result, token in zip(llm_result, inline_tagged_lyrics):
             if not globalfuncs.is_japanese(token, 0.9):
@@ -599,18 +614,20 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
                     try:
                         responses = llmjptoen.batch_translate_lyric_to_en(prompt_batch)
                         break
-                    except:
+                    except Exception as e:
                         attempt_try += 1
-                        globalfuncs.logger.notice(f"Translation failure, attempt: {attempt_try}")
+                        globalfuncs.logger.notice(f"Translation failure, attempt: {attempt_try} | Error: {e}")
 
                 for item, lyric in zip(responses, prompt_batch):
                     if lyric[1] != '':
                         globalfuncs.logger.spam(f"{item}")
                         globalfuncs.write_json(item, filepath_json, ['lyrics', 'genius_jp', 'en_lyrics_ai_translate'],
                                                as_list=True, extend=True)
+                        llm_trans_result.append(item)
                     else:
                         globalfuncs.write_json('', filepath_json, ['lyrics', 'genius_jp', 'en_lyrics_ai_translate'],
                                                as_list=True, extend=True)
+                        llm_trans_result.append(item)
 
                 prompt_batch = []
 
@@ -629,4 +646,3 @@ if __name__ == '__main__':
     # main('https://www.youtube.com/watch?v=QnkqCv0dZTk', 'genius')
     main('youtube.com/watch?v=ZRtdQ81jPUQ', 'genius')
     # main('https://www.youtube.com/watch?v=Mhl9FaxiQ_E', 'genius')
-
