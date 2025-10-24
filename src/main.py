@@ -468,8 +468,6 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
                     continue
 
                 if s_meaning == [] or s_pos == [] or line_counter in missing_lines:
-                    # llm_result.append(None)
-                    # globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
                     prompt_batch.append(True)
                     exclude_list.append(check_counter)
                     check_counter += 1
@@ -495,6 +493,7 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
             for lyric in item:
                 inline_tagged_lyrics.append(lyric)
 
+        # delete all llm results that origin from english words as to not waste computing power
         holding = []
         for result, token in zip(llm_result, inline_tagged_lyrics):
             if not globalfuncs.is_japanese(token, 0.9):
