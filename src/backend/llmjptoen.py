@@ -243,7 +243,7 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
 
     prompt_list = []
     lyric_list = []
-    for full_lyrics, lyric, full_en_lyrics in input_data:
+    for full_lyrics, lyric in input_data:
         lyric_list.append(lyric)
 
         prompt_list.append(f"""

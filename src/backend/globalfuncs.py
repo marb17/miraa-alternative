@@ -158,7 +158,7 @@ def is_japanese(input_data, threshold=0.4) -> bool:
         jp_letter_counter = 0
         len_data = len(data)
         for letter in data:
-            if re.match(r'[\u3040-\u30FF\u4E00-\u9FFF]', letter):
+            if re.search(r'[\u3040-\u30FF\u4E00-\u9FFF]', letter):
                 jp_letter_counter += 1
         if jp_letter_counter / len_data > threshold:
             return True
