@@ -2,20 +2,16 @@ from jamdict import Jamdict
 import json
 import splittag
 import re
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
-import requests
-import time
-import random
+from concurrent.futures import ThreadPoolExecutor
 import llmjptoen
 import functools
 import threading
 import globalfuncs
-import jamdict, jamdict_data
 import torch
 import gc
 
 # global config
-with open('globalconfig.json', 'r') as f:
+with open('../config/globalconfig.json', 'r') as f:
     config = json.load(f)
 
 llm_batch_size_dict_translation = config['llm_batch_size_dict_translation']

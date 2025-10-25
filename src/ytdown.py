@@ -6,7 +6,7 @@ import globalfuncs
 
 
 # global config
-with open('globalconfig.json', 'r') as f:
+with open('../config/globalconfig.json', 'r') as f:
     config = json.load(f)
 
 quiet_mode = bool(config['ytdown_quiet_mode'])
@@ -27,7 +27,7 @@ def extract_video_title(url: str) -> json:
         # output the title only
         return info["title"]
 
-def youtube_download_audio(url: str, output_dir='../database/songs/') -> tuple:
+def youtube_download_audio(url: str, output_dir='../../database/songs/') -> tuple:
     """
     Downloads the audio from a YouTube video
     :param url: URL of a YouTube video as a string

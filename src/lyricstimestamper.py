@@ -5,7 +5,7 @@ import gc
 import json
 
 # global config
-with open('globalconfig.json', 'r') as f:
+with open('../config/globalconfig.json', 'r') as f:
     config = json.load(f)
 
 whisper_model = str(config["whisper_model"])

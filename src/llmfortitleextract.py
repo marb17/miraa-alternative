@@ -1,18 +1,12 @@
 from transformers import BitsAndBytesConfig, AutoTokenizer, AutoModelForCausalLM
 import torch
-from dotenv import load_dotenv
-import os
 import json
-import sentencepiece
-import tiktoken
-import accelerate
 import gc
-import bitsandbytes
 import re
 import globalfuncs
 
 # global config
-with open('globalconfig.json', 'r') as f:
+with open('../config/globalconfig.json', 'r') as f:
     config = json.load(f)
 
 model_name = config['large_model_name']

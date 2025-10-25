@@ -1,22 +1,21 @@
 from typing import Any
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, StoppingCriteria, StoppingCriteriaList, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 import torch
-import bitsandbytes
 import json
 import gc
 import re
 from transformers import GenerationConfig
-from tqdm import tqdm
-import accelerate
 import globalfuncs
 
 # global config
-with open('globalconfig.json', 'r') as f:
+with open('../config/globalconfig.json', 'r') as f:
     config = json.load(f)
 
 local_dir = config['jp_en_model_name']
 precision_level = config['jp_model_precision_level']
+llm_jp_model_device = config['llm_jp_model_device']
+llm_jp_model_device_override = config['llm_jp_model_device_override']
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -24,7 +23,7 @@ gen_config = GenerationConfig.from_pretrained(local_dir)
 gen_config.use_cache = True
 
 # main functions
-def create_model(precision='fp16') -> None:
+def create_model(precision='fp16', cuda=False) -> None:
     global tokenizer, model
     # tokenizer
     tokenizer = AutoTokenizer.from_pretrained(local_dir)
@@ -35,12 +34,17 @@ def create_model(precision='fp16') -> None:
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
 
+    if llm_jp_model_device_override:
+        device_map_str = llm_jp_model_device
+    else:
+        device_map_str = "cuda" if cuda else "auto"
+
     # set precision level
     if precision == 'fp16':
         model = AutoModelForCausalLM.from_pretrained(
             local_dir,
             torch_dtype=torch.bfloat16,
-            device_map="auto",
+            device_map=device_map_str,
             offload_folder="offload",
             low_cpu_mem_usage=True,
             attn_implementation="sdpa"
@@ -53,7 +57,7 @@ def create_model(precision='fp16') -> None:
             local_dir,
             quantization_config=bnb_config,
             llm_int8_enable_fp32_cpu_offload=True,
-            device_map="auto",
+            device_map=device_map_str,
             attn_implementation="sdpa"
         )
     if precision == 'b4':
@@ -62,7 +66,7 @@ def create_model(precision='fp16') -> None:
         model = AutoModelForCausalLM.from_pretrained(
             local_dir,
             quantization_config=bnb_config,
-            device_map="auto",
+            device_map=device_map_str,
             attn_implementation="sdpa"
         )
 
@@ -243,74 +247,61 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
         lyric_list.append(lyric)
 
         prompt_list.append(f"""
-You are a professional translator of Japanese song lyrics specializing in capturing emotional depth and cultural nuance.
-You must strictly follow the output format with NO exceptions.
+        You are a **professional Japanese lyric translator** who captures emotional depth, poetic nuance, and cultural context. 
+        Your goal is to translate naturally and beautifully — as if the song were written in English — while respecting the original emotion and imagery.
 
-TRANSLATION PHILOSOPHY:
-- Capture the FEELING and emotional resonance, not just literal words
-- Consider cultural context and implicit meanings in Japanese
-- Use natural, flowing English that sounds like it was written by a native speaker
-- Preserve poetic elements, metaphors, and imagery
-- Consider how the line would feel when sung, not just read
+        ### TRANSLATION PRINCIPLES ###
+        - Prioritize FEELING and resonance over literal wording.
+        - Preserve metaphors, imagery, and poetic tone.
+        - Use natural, flowing English suited for singing.
+        - Reflect the cultural and emotional context faithfully.
 
-CRITICAL RULES:
-1. Translate ONLY the single line specified in "Lyric:" below
-2. Output exactly ONE translation - do not repeat "**Translation:**" multiple times
-3. Do not provide alternatives, parenthetical explanations, or multiple interpretations
-4. If the line contains [Verse], [Chorus], [Bridge], [Outro], [Intro], or any bracket notation, output exactly: **Translation:**
-5. If the line is empty, contains only punctuation, or is metadata/credits, output exactly: **Translation:**
-6. Do not add any text after your translation (no explanations, no commentary, nothing)
-7. Your response must be exactly one line: "**Translation:** <your translation>"
+        ### RULES ###
+        1. Translate **only** the given line in "Lyric:" below.
+        2. Output exactly one line: `**Translation:** <your translation>`
+        3. If the line is empty, punctuation-only, or contains tags like [Verse], [Chorus], [Bridge], [Intro], [Outro], or credits → output `**Translation:**` only (leave blank after the colon).
+        4. Do not add explanations, alternatives, or commentary. Ever.
+        5. Stop immediately after the translation line.
 
-EXAMPLES OF EMOTIONAL NUANCE:
-Lyric: 君がいない夜は長すぎる
-**Translation:** The nights without you stretch on forever
+        ### EXAMPLES ###
+        Lyric: 君がいない夜は長すぎる  
+        **Translation:** The nights without you stretch on forever  
 
-Lyric: 心の奥で泣いている
-**Translation:** I'm crying deep inside my soul
+        Lyric: 心の奥で泣いている  
+        **Translation:** I'm crying deep inside my soul  
 
-Lyric: 桜が散る時のように
-**Translation:** Like cherry blossoms falling away
+        Lyric: 桜が散る時のように  
+        **Translation:** Like cherry blossoms falling away  
 
-Lyric: もう一度だけ
-**Translation:** Just one more time
+        Lyric: [Chorus]  
+        **Translation:**  
 
-Lyric: [Chorus]
-**Translation:**
+        ---
 
-Use the full lyrics for context:
-{full_lyrics}
+        Full lyrics for context:
+        {full_lyrics}
 
-### STRICT OUTPUT FORMAT ###
-**Translation:** <English translation with emotional depth>
+        Now translate the following line with emotional depth and natural phrasing:
+        Lyric: {lyric}
 
-Translate the following lyric line into natural, emotionally resonant English that captures both the literal meaning and the deeper feeling:
-Lyric: {lyric}
+        **Output exactly:**
+        **Translation:** <your translation>
+        """)
 
-OUTPUT EXACTLY: **Translation:** <translation>
-STOP IMMEDIATELY after the translation.
-""")
-
-    output = batch_generate_response(prompt_list, 30, 0.4, 0.95, 1.15, True)
+    output = batch_generate_response(prompt_list, 30, 0.4, 0.90, 1.15, True)
 
     results = []
 
     for item, lyric in zip(output, lyric_list):
         globalfuncs.logger.spam(f"{item}")
-        for line in item.split('\n'):
-            if 'Translation' in line:
-                globalfuncs.logger.verbose(line)
-            if 'Lyric line to translate' in line:
-                globalfuncs.logger.verbose(line)
         try:
             if lyric == '':
                 results.append('')
             elif re.match(r'^(?:\[|-)(.+?)(?:\]|-)$', lyric):
                 results.append('')
             else:
-                results.append((re.sub(r'\*|\:', '', (re.findall(r'Translation(?:[\:\*\s]*?)(.+?)(?:\n|$)', item)[5]))).strip())
+                results.append((re.sub(r'\*|\:', '', (re.findall(r'Translation(?:[\:\*\s]*?)(.+?)(?:\n|$)', item)[7]))).strip())
         except:
-            globalfuncs.logger.verbose(item)
             raise Exception
 
     return results
