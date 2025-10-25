@@ -11,7 +11,7 @@ import difflib
 import globalfuncs
 
 # global config
-with open('globalconfig.json', 'r') as f:
+with open('../config/globalconfig.json', 'r') as f:
     config = json.load(f)
 
 rem_brak = bool(config["remove_brackets_genius_lyr_search"])

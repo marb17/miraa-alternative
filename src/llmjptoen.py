@@ -1,18 +1,15 @@
 from typing import Any
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, StoppingCriteria, StoppingCriteriaList, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 import torch
-import bitsandbytes
 import json
 import gc
 import re
 from transformers import GenerationConfig
-from tqdm import tqdm
-import accelerate
 import globalfuncs
 
 # global config
-with open('globalconfig.json', 'r') as f:
+with open('../config/globalconfig.json', 'r') as f:
     config = json.load(f)
 
 local_dir = config['jp_en_model_name']

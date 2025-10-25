@@ -6,13 +6,11 @@ import os
 import gc
 import json
 import globalfuncs
-import numpy
 from pedalboard import Pedalboard, Reverb
-from pedalboard.io import AudioFile
 import soundfile
 
 # global config
-with open('globalconfig.json', 'r') as f:
+with open('../config/globalconfig.json', 'r') as f:
     config = json.load(f)
 
 demucs_shifts = int(config["demucs_shifts"])

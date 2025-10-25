@@ -12,12 +12,12 @@ import globalfuncs
 import json
 import shutil
 import os
-import re
 import torch
 import gc
+import re
 
 # global config
-with open('globalconfig.json', 'r') as f:
+with open('../config/globalconfig.json', 'r') as f:
     config = json.load(f)
 
 llm_batch_size_explanation = config['llm_batch_size_explanation']
@@ -53,8 +53,8 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
     # endregion
 
     # region filepath for current song dir
-    filepath = f"../database/songs/{base58path}"
-    filepath_json = f"../database/songs/{base58path}/data.json"
+    filepath = f"../../database/songs/{base58path}"
+    filepath_json = f"../../database/songs/{base58path}/data.json"
     # endregion
 
     # region creating or loading json file
@@ -85,9 +85,9 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
     globalfuncs.logger.plain(f"{"-" * console_width}")
 
     # region relative paths for audios
-    filepath_audio = f"../database/songs/{base58path}/audio.wav"
-    filepath_vocal = f"../database/songs/{base58path}/audio_vocals.wav"
-    filepath_vocal_trans = f"../database/songs/{base58path}/audio_vocals_trans.wav"
+    filepath_audio = f"../../database/songs/{base58path}/audio.wav"
+    filepath_vocal = f"../../database/songs/{base58path}/audio_vocals.wav"
+    filepath_vocal_trans = f"../../database/songs/{base58path}/audio_vocals_trans.wav"
     # endregion
 
     # region separate vox
@@ -337,11 +337,11 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
         for item in full_tagged_lyrics: globalfuncs.write_json(item, filepath_json, ['lyrics', 'tagged', 'full_parse'],
                                                                as_list=True)
         for item in natural_lyrics_split: globalfuncs.write_json(item, filepath_json, ['lyrics', 'tagged', 'natural'],
-                                                               as_list=True)
+                                                                 as_list=True)
         for item in furigana: globalfuncs.write_json(item, filepath_json, ['lyrics', 'tagged', 'furigana'],
-                                                               as_list=True)
+                                                     as_list=True)
         for item in kanji_or_kata: globalfuncs.write_json(item, filepath_json, ['lyrics', 'tagged', 'kanji_or_kata'],
-                                                               as_list=True)
+                                                          as_list=True)
     # endregion
 
     globalfuncs.logger.verbose(str(tagged_lyrics))
@@ -605,35 +605,58 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
         prompt_batch = []
         attempt_try = 1
 
-        for jp_lyric in jp_lyrics:
-            prompt_batch.append([unsplit_jp_lyrics, jp_lyric, unsplit_en_lyrics])
+        if 'en_lyrics_ai_translate' in file_data.get('lyrics', {}).get('genius_jp', {}):
+            llm_trans_result = file_data['lyrics']['genius_jp']['en_lyrics_ai_translate']
+
+        def call_translate_llm_and_save():
+            nonlocal prompt_batch, attempt_try, llm_result
+
+            globalfuncs.logger.spam(f"{prompt_batch}")
+            while True:
+                try:
+                    responses = llmjptoen.batch_translate_lyric_to_en(prompt_batch)
+                    break
+                except Exception as e:
+                    attempt_try += 1
+                    globalfuncs.logger.notice(f"Translation failure, attempt: {attempt_try} | Error: {e}")
+
+            for item, lyric in zip(responses, prompt_batch):
+                if lyric[1] != '':
+                    globalfuncs.logger.spam(f"{item}")
+                    globalfuncs.write_json(item, filepath_json, ['lyrics', 'genius_jp', 'en_lyrics_ai_translate'],
+                                           as_list=True, extend=True)
+                    llm_trans_result.append(item)
+                else:
+                    globalfuncs.write_json('', filepath_json, ['lyrics', 'genius_jp', 'en_lyrics_ai_translate'],
+                                           as_list=True, extend=True)
+                    llm_trans_result.append(item)
+
+            prompt_batch = []
+
+        for jp_lyric, counter in zip(jp_lyrics, range(len(jp_lyrics))):
+            if counter < len(llm_trans_result):
+                globalfuncs.logger.spam(f"Lyric is already translated, skipping lyric: {jp_lyric}")
+            else:
+                prompt_batch.append([unsplit_jp_lyrics, jp_lyric, unsplit_en_lyrics])
 
             if len(prompt_batch) == llm_batch_size_translation:
-                globalfuncs.logger.spam(f"{prompt_batch}")
-                while True:
-                    try:
-                        responses = llmjptoen.batch_translate_lyric_to_en(prompt_batch)
-                        break
-                    except Exception as e:
-                        attempt_try += 1
-                        globalfuncs.logger.notice(f"Translation failure, attempt: {attempt_try} | Error: {e}")
-
-                for item, lyric in zip(responses, prompt_batch):
-                    if lyric[1] != '':
-                        globalfuncs.logger.spam(f"{item}")
-                        globalfuncs.write_json(item, filepath_json, ['lyrics', 'genius_jp', 'en_lyrics_ai_translate'],
-                                               as_list=True, extend=True)
-                        llm_trans_result.append(item)
-                    else:
-                        globalfuncs.write_json('', filepath_json, ['lyrics', 'genius_jp', 'en_lyrics_ai_translate'],
-                                               as_list=True, extend=True)
-                        llm_trans_result.append(item)
-
-                prompt_batch = []
+                call_translate_llm_and_save()
 
         if prompt_batch:
-            pass
-            # TODO add the thing for fallback
+            call_translate_llm_and_save()
+
+        # validation check
+        for lyric, llm_result, counter in zip(jp_lyrics, llm_trans_result, range(len(jp_lyrics))):
+            prompt_batch = []
+            if lyric != "" and llm_result == "":
+                globalfuncs.logger.verbose(f"Redoing: {lyric}")
+                prompt_batch.append(lyric)
+            elif (re.search(r'([tT])ranslated', llm_result) or
+                  re.search(r'([tT])o capture the essence', llm_result) or
+                  re.search(r'[oO]riginal [lL]yric', llm_result)):
+                globalfuncs.logger.verbose(f"Redoing: {lyric}")
+                prompt_batch.append(lyric)
+
     else:
         globalfuncs.logger.verbose(f"Skipping translation of lyrics")
 
