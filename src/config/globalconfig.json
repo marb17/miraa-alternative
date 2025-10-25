@@ -1,0 +1,32 @@
+{
+  "ytdown_quiet_mode": false,
+
+  "remove_brackets_genius_lyr_search": true,
+  "console_out_genius_lyr_search": true,
+
+  "demucs_shifts": 2,
+  "demucs_worker_num": 10,
+  "demucs_quiet_mode": false,
+  "demucs_model": "mdx_extra",
+  "demucs_model_2": "htdemucs_ft",
+  "demucs_weight": 0.4,
+  "demucs_2_weight": 0.6,
+  "demucs_post_processing": true,
+  "demucs_ensemble": true,
+
+  "whisper_model": "large-v3",
+  "whisper_quiet_mode": false,
+
+  "large_model_name": "../../model/.llama/checkpoints/Llama3.2-3B-Instruct-conv",
+
+  "translation_model_name": "../../model/elan-mt-bt-ja-en",
+
+  "jp_en_model_name": "../../model/shisav2",
+  "jp_model_precision_level": "fp16",
+  "llm_jp_model_device": "cuda",
+  "llm_jp_model_device_override": false,
+
+  "llm_batch_size_explanation": 20,
+  "llm_batch_size_translation": 30,
+  "llm_batch_size_dict_translation": 30
+}
