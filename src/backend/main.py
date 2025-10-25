@@ -385,7 +385,7 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
                 if send_prompt_batch == []:
                     response = []
                 else:
-                    response = llmjptoen.explain_word_in_line(send_prompt_batch)
+                    response = llmjptoen.explain_word_in_line(send_prompt_batch, temperature_offset=((attempt_try/100) - 0.01)*-1)
                 break
             except Exception as e:
                 attempt_try += 1
@@ -433,7 +433,7 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
 
         while True:
             try:
-                response = llmjptoen.explain_word_in_line(prompt_batch)
+                response = llmjptoen.explain_word_in_line(prompt_batch, temperature_offset=((attempt_try/100) - 0.01)*-1)
                 break
             except Exception as e:
                 attempt_try += 1
@@ -641,7 +641,7 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
         globalfuncs.logger.spam(f"{prompt_batch}")
         while True:
             try:
-                responses = llmjptoen.batch_translate_lyric_to_en(prompt_batch)
+                responses = llmjptoen.batch_translate_lyric_to_en(prompt_batch, temperature_offset=((attempt_try/100) - 0.01) * -1)
                 break
             except Exception as e:
                 attempt_try += 1
@@ -697,7 +697,7 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
 
             while True:
                 try:
-                    responses = llmjptoen.batch_translate_lyric_to_en(prompt_batch, temperature_offset=((attempt_try/100) - 0.01)*-1)
+                    responses = llmjptoen.batch_translate_lyric_to_en(prompt_batch, temperature_offset=((attempt_try/100) - 0.01) * -1)
                     break
                 except Exception as e:
                     attempt_try += 1
