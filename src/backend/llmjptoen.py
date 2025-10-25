@@ -238,7 +238,7 @@ Word: {item}
 
     return results
 
-def batch_translate_lyric_to_en(input_data: list) -> list:
+def batch_translate_lyric_to_en(input_data: list, temperature_offset=0) -> list:
     global tokenizer, model
 
     prompt_list = []
@@ -288,12 +288,11 @@ def batch_translate_lyric_to_en(input_data: list) -> list:
         **Translation:** <your translation>
         """)
 
-    output = batch_generate_response(prompt_list, 30, 0.4, 0.90, 1.15, True)
+    output = batch_generate_response(prompt_list, 30, (0.4+temperature_offset), 0.90, 1.15, True)
 
     results = []
 
     for item, lyric in zip(output, lyric_list):
-        globalfuncs.logger.spam(f"{item}")
         try:
             if lyric == '':
                 results.append('')

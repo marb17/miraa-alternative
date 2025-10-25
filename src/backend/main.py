@@ -564,6 +564,7 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
 
             formatted_llm_result.append(holding)
 
+        # validation check
         while True:
             prompt_batch = []
             for lyric, lyric_line, result in zip(dict_lookup_res, jp_lyrics, formatted_llm_result):
@@ -603,25 +604,30 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
     # region translating jp lyrics to en
     def is_translated_lyric_valid(i_lyric, i_llm_result, i_counter):
         if i_lyric != "" and i_llm_result == "" and globalfuncs.is_japanese(i_lyric):
+            globalfuncs.logger.spam(f"Invalid: {i_lyric} | {i_llm_result}")
             return False
         elif (re.search(r'([tT])ranslated', i_llm_result) or
               re.search(r'([tT])o capture the essence', i_llm_result) or
               re.search(r'[oO]riginal [lL]yric', i_llm_result)):
+            globalfuncs.logger.spam(f"Invalid: {i_lyric} | {i_llm_result}")
             return False
         elif len(i_llm_result) > 80:
+            globalfuncs.logger.spam(f"Invalid: {i_lyric} | {i_llm_result}")
             return False
 
         return True
 
-    def is_translated_result_valid(input_data):
+    def is_translated_result_valid(input_data, counter=-1):
         len_res = len(input_data)
         check = len_res
 
         for x_lyric, x_llm_result, x_counter in zip(jp_lyrics, input_data, range(len(jp_lyrics))):
-            if is_translated_lyric_valid(x_lyric, x_llm_result, x_counter):
+            if not is_translated_lyric_valid(x_lyric, x_llm_result, x_counter) and x_counter not in missing_lines:
                 check -= 1
 
-        if check != len_res:
+        if counter in missing_lines:
+            return True
+        elif check != len_res:
             globalfuncs.logger.verbose(f"Result still contains {check} out of {len_res} valid responses, continuing")
             return False
         else:
@@ -629,6 +635,9 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
 
     def call_translate_llm_and_save():
         nonlocal prompt_batch, attempt_try, llm_result
+
+        attempt_try = 0
+
         globalfuncs.logger.spam(f"{prompt_batch}")
         while True:
             try:
@@ -682,13 +691,13 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
         while True:
             prompt_batch = []
             for lyric, llm_result, counter in zip(jp_lyrics, llm_trans_result, range(len(jp_lyrics))):
-                if not is_translated_lyric_valid(lyric, llm_result, counter):
-                    globalfuncs.logger.verbose(f"Redoing: {lyric}")
+                if (not is_translated_lyric_valid(lyric, llm_result, counter)) and (counter not in missing_lines):
+                    globalfuncs.logger.verbose(f"Redoing line {counter}: {lyric} | {llm_result}")
                     prompt_batch.append([unsplit_jp_lyrics, lyric])
 
             while True:
                 try:
-                    responses = llmjptoen.batch_translate_lyric_to_en(prompt_batch)
+                    responses = llmjptoen.batch_translate_lyric_to_en(prompt_batch, temperature_offset=((attempt_try/100) - 0.01)*-1)
                     break
                 except Exception as e:
                     attempt_try += 1
@@ -697,12 +706,9 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
             holding = []
             counter = 0
             for j_lyric, j_llm_result, j_counter in zip(jp_lyrics, llm_trans_result, range(len(jp_lyrics))):
-                if is_translated_lyric_valid(j_lyric, j_llm_result, j_counter):
-                    try:
-                        holding.append(responses[counter])
-                        counter += 1
-                    except IndexError:
-                        pass
+                if not is_translated_lyric_valid(j_lyric, j_llm_result, j_counter) and counter < len(responses):
+                    holding.append(responses[counter])
+                    counter += 1
                 else:
                     holding.append(j_llm_result)
             llm_trans_result = holding
@@ -714,12 +720,20 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
             else:
                 globalfuncs.logger.verbose(f"Result has no invalid responses, breaking off")
                 break
-
-
     else:
         globalfuncs.logger.verbose(f"Skipping translation of lyrics")
 
     llmjptoen.clear_model()
+
+    for item, counter, lyric in zip(llm_trans_result, range(len(llm_trans_result)), jp_lyrics):
+        if (re.search(r'[\(\[\{](.*?)[\)\]\}]', item) or counter in missing_lines) or globalfuncs.is_japanese(lyric) == False:
+            holding.append("")
+        else:
+            holding.append(item)
+    llm_trans_result = holding
+    globalfuncs.write_json(llm_trans_result, filepath_json, ['lyrics', 'genius_jp', 'en_lyrics_ai_translate'],
+                           as_list=True,
+                           extend=False, overwrite=True)
     # endregion
 
     # TODO add timestamp thing so u can display it later
