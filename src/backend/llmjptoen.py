@@ -16,6 +16,8 @@ local_dir = config['jp_en_model_name']
 precision_level = config['jp_model_precision_level']
 llm_jp_model_device = config['llm_jp_model_device']
 llm_jp_model_device_override = config['llm_jp_model_device_override']
+llm_explanation_reduce_temp_per_fail = config['llm_explanation_reduce_temp_per_fail']
+llm_translation_reduce_temp_per_fail = config['llm_translation_reduce_temp_per_fail']
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -135,7 +137,7 @@ def clear_model() -> None:
     torch.cuda.empty_cache()
     gc.collect()
 
-def explain_word_in_line(input_data) -> list[list[Any]]:
+def explain_word_in_line(input_data, temperature_offset=0) -> list[list[Any]]:
     global tokenizer, model
 
     prompt_list = []
@@ -161,7 +163,12 @@ def explain_word_in_line(input_data) -> list[list[Any]]:
     Part of speech: {prompt[2]}  
     """)
 
-    output = batch_generate_response(prompt_list, 200, 0.8, 0.9, 1.15, True)
+    if llm_explanation_reduce_temp_per_fail:
+        pass
+    else:
+        temperature_offset = 0
+
+    output = batch_generate_response(prompt_list, 200, 0.8+temperature_offset, 0.9, 1.15, True)
 
     globalfuncs.logger.info(f"Generated explanation: {output}")
 
@@ -287,6 +294,11 @@ def batch_translate_lyric_to_en(input_data: list, temperature_offset=0) -> list:
         **Output exactly:**
         **Translation:** <your translation>
         """)
+
+    if llm_translation_reduce_temp_per_fail:
+        pass
+    else:
+        temperature_offset = 0
 
     output = batch_generate_response(prompt_list, 30, (0.4+temperature_offset), 0.90, 1.15, True)
 
