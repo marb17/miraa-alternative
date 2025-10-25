@@ -16,6 +16,8 @@ import torch
 import gc
 import re
 
+from src.backend.globalfuncs import is_japanese
+
 # global config
 with open('../config/globalconfig.json', 'r') as f:
     config = json.load(f)
@@ -372,26 +374,125 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
     # endregion
 
     # region explanations for each token
+    def call_llm_and_save():
+        nonlocal prompt_batch, counter, attempt_try, llm_result
+
+        attempt_try = 1
+
+        while True:
+            try:
+                send_prompt_batch = [x for x in prompt_batch if x != True]
+                if send_prompt_batch == []:
+                    response = []
+                else:
+                    response = llmjptoen.explain_word_in_line(send_prompt_batch)
+                break
+            except Exception as e:
+                attempt_try += 1
+                globalfuncs.logger.notice(f"LLM Failure, trying again. Attempt: {attempt_try} | Error: {e}")
+                torch.cuda.empty_cache()
+                gc.collect()
+
+        formatted_response = []
+        response_counter = 0
+        for input_prompt in prompt_batch:
+            if input_prompt == True:
+                formatted_response.append([])
+            else:
+                formatted_response.append(response[response_counter])
+                response_counter += 1
+
+        for item, input_data in zip(formatted_response, prompt_batch):
+            globalfuncs.logger.spam(f"{input_data} | {item}")
+            if counter in exclude_list:
+                llm_result.append(None)
+                globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
+                counter += 1
+            elif input_data == True:
+                globalfuncs.write_json(item, filepath_json, ['llm', 'explanation', 'tokens'], as_list=True,
+                                       extend=False)
+                llm_result.append(item)
+                counter += 1
+            elif input_data[0] != '' or input_data[1] is not None:
+                globalfuncs.write_json(item, filepath_json, ['llm', 'explanation', 'tokens'], as_list=True,
+                                       extend=False)
+                llm_result.append(item)
+                counter += 1
+            else:
+                llm_result.append(None)
+                globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
+                counter += 1
+
+            torch.cuda.empty_cache()
+            gc.collect()
+
+    def overwrite_call_llm_and_save():
+        nonlocal prompt_batch, attempt_try, llm_result, holding, counter
+
+        attempt_try = 1
+
+        while True:
+            try:
+                response = llmjptoen.explain_word_in_line(prompt_batch)
+                break
+            except Exception as e:
+                attempt_try += 1
+                globalfuncs.logger.notice(f"LLM Failure, trying again. Attempt: {attempt_try} | Error: {e}")
+                torch.cuda.empty_cache()
+                gc.collect()
+
+        holding = []
+        counter = 0
+        for result in llm_result:
+            if is_explanation_valid(result) and counter < len(response):
+                holding.append(response[counter])
+                counter += 1
+            else:
+                holding.append(result)
+        llm_result = holding
+        globalfuncs.write_json(llm_result, filepath_json, ['llm', 'explanation', 'tokens'], as_list=True,
+                               extend=False, overwrite=True)
+
+    def is_explanation_valid(input_data):
+        if input_data == True or input_data == [None]:
+            return True
+        elif globalfuncs.is_japanese(input_data) or input_data == [True, True, True, True, True]:
+            return False
+        else:
+            return True
+
+    def is_explanation_result_valid(input_data):
+        len_res = len(input_data)
+        check = len_res
+        for explanation in input_data:
+            if not is_explanation_valid(explanation):
+                check -= 1
+
+        if check != len_res:
+            globalfuncs.logger.verbose(f"Result still contains {check} out of {len_res} valid responses, continuing")
+            return False
+        else:
+            return True
+
     inline_tagged_lyrics = []
     for item in dict_lookup_res:
         item = item[0]
         for lyric in item:
             inline_tagged_lyrics.append(lyric)
 
-    if 'tokens' in file_data.get('llm', {}).get('explanation', {}):
-        read_llm_result = file_data['llm']['explanation']['tokens']
-        if len(read_llm_result) == len(inline_tagged_lyrics):
-            length_of_read_results = len(read_llm_result)
-            check_counter = length_of_read_results
-            for item in read_llm_result:
-                if globalfuncs.is_japanese(item) or item == [True, True, True, True, True]:
-                    check_counter -= 1
+    try:
+        cur_length_of_json_llm = len(file_data['llm']['explanation']['tokens'])
+        llm_data = file_data['llm']['explanation']['tokens']
+    except KeyError:
+        cur_length_of_json_llm = 0
+        llm_data = []
 
-            if check_counter == length_of_read_results:
-                globalfuncs.logger.verbose(f"Passing getting explanations of tokens, info is already complete")
-                skip_llm_exp = True
-            else:
-                pass
+    if len(llm_data) == len(inline_tagged_lyrics):
+        if is_explanation_result_valid(llm_data):
+            globalfuncs.logger.verbose(f"Passing getting explanations of tokens, info is already complete")
+            skip_llm_exp = True
+        else:
+            pass
 
     if not skip_llm_exp:
         globalfuncs.logger.info(f"Getting explanations of tokens")
@@ -403,74 +504,12 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
 
         llm_result = []
 
-        try:
-            cur_length_of_json_llm = len(file_data['llm']['explanation']['tokens'])
-        except KeyError:
-            cur_length_of_json_llm = 0
-
-        try:
-            llm_data = file_data['llm']['explanation']['tokens']
-        except KeyError:
-            llm_data = []
-
         counter = 0
         attempt_try = 0
         check_counter = 0
 
         prompt_batch = []
         exclude_list = []
-
-        def call_llm_and_save():
-            nonlocal prompt_batch, counter, attempt_try, llm_result
-
-            attempt_try = 1
-
-            while True:
-                try:
-                    send_prompt_batch = [x for x in prompt_batch if x != True]
-                    if send_prompt_batch == []:
-                        response = []
-                    else:
-                        response = llmjptoen.explain_word_in_line(send_prompt_batch)
-                    break
-                except Exception as e:
-                    attempt_try += 1
-                    globalfuncs.logger.notice(f"LLM Failure, trying again. Attempt: {attempt_try} | Error: {e}")
-                    torch.cuda.empty_cache()
-                    gc.collect()
-
-            formatted_response = []
-            response_counter = 0
-            for input_prompt in prompt_batch:
-                if input_prompt == True:
-                    formatted_response.append([])
-                else:
-                    formatted_response.append(response[response_counter])
-                    response_counter += 1
-
-            for item, input_data in zip(formatted_response, prompt_batch):
-                globalfuncs.logger.spam(f"{input_data} | {item}")
-                if counter in exclude_list:
-                    llm_result.append(None)
-                    globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
-                    counter += 1
-                elif input_data == True:
-                    globalfuncs.write_json(item, filepath_json, ['llm', 'explanation', 'tokens'], as_list=True,
-                                           extend=False)
-                    llm_result.append(item)
-                    counter += 1
-                elif input_data[0] != '' or input_data[1] is not None:
-                    globalfuncs.write_json(item, filepath_json, ['llm', 'explanation', 'tokens'], as_list=True,
-                                           extend=False)
-                    llm_result.append(item)
-                    counter += 1
-                else:
-                    llm_result.append(None)
-                    globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
-                    counter += 1
-
-                torch.cuda.empty_cache()
-                gc.collect()
 
         for lyric, lyric_line, line_counter in zip(dict_lookup_res, jp_lyrics, range(len(jp_lyrics))):
             globalfuncs.logger.spam(f"{lyric_line} | {lyric}")
@@ -515,33 +554,6 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
         llm_result = holding
         globalfuncs.write_json(llm_result, filepath_json, ['llm', 'explanation', 'tokens'], as_list=True, extend=False, overwrite=True)
 
-        def overwrite_call_llm_and_save():
-            nonlocal prompt_batch, attempt_try, llm_result
-
-            attempt_try = 1
-
-            while True:
-                try:
-                    response = llmjptoen.explain_word_in_line(prompt_batch)
-                    break
-                except Exception as e:
-                    attempt_try += 1
-                    globalfuncs.logger.notice(f"LLM Failure, trying again. Attempt: {attempt_try} | Error: {e}")
-                    torch.cuda.empty_cache()
-                    gc.collect()
-
-            holding = []
-            counter = 0
-            for result in llm_result:
-                    if (globalfuncs.is_japanese(result) or result == [True, True, True, True, True]) and counter < len(response):
-                        holding.append(response[counter])
-                        counter += 1
-                    else:
-                        holding.append(result)
-            llm_result = holding
-            globalfuncs.write_json(llm_result, filepath_json, ['llm', 'explanation', 'tokens'], as_list=True,
-                                   extend=False, overwrite=True)
-
         formatted_llm_result = []
         list_index = 0
         for lyric, tagged, dict in zip(jp_lyrics, tagged_lyrics, dict_lookup_res):
@@ -560,7 +572,7 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
                 meaning = lyric[2]
 
                 for s_word, s_pos, s_meaning, s_result in zip(token, pos, meaning, result):
-                    if globalfuncs.is_japanese(s_result) or s_result == [True, True, True, True, True]:
+                    if not is_explanation_valid(s_result):
                         prompt_batch.append([lyric_line, s_word, s_pos, unsplit_jp_lyrics])
                         globalfuncs.logger.spam(f"Redoing: {s_word}")
 
@@ -574,14 +586,8 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
                 overwrite_call_llm_and_save()
                 prompt_batch = []
 
-            length_of_results = len(llm_result)
-            check_counter = length_of_results
-            for item in llm_result:
-                if globalfuncs.is_japanese(item) or item == [True, True, True, True, True]:
-                    check_counter -= 1
-
-            if check_counter != length_of_results:
-                globalfuncs.logger.verbose(f"Result still contains {check_counter} out of {length_of_results} valid responses, continuing")
+            if not is_explanation_result_valid:
+                pass
             else:
                 globalfuncs.logger.verbose(f"Result has no invalid responses, breaking off")
                 break
@@ -595,9 +601,64 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
     globalfuncs.logger.plain(f"{"-" * console_width}")
 
     # region translating jp lyrics to en
-    if not skip_llm_trans:
+    def is_translated_lyric_valid(i_lyric, i_llm_result, i_counter):
+        if i_lyric != "" and i_llm_result == "" and globalfuncs.is_japanese(i_lyric):
+            return False
+        elif (re.search(r'([tT])ranslated', i_llm_result) or
+              re.search(r'([tT])o capture the essence', i_llm_result) or
+              re.search(r'[oO]riginal [lL]yric', i_llm_result)):
+            return False
+        elif len(i_llm_result) > 80:
+            return False
+
+        return True
+
+    def is_translated_result_valid(input_data):
+        len_res = len(input_data)
+        check = len_res
+
+        for x_lyric, x_llm_result, x_counter in zip(jp_lyrics, input_data, range(len(jp_lyrics))):
+            if is_translated_lyric_valid(x_lyric, x_llm_result, x_counter):
+                check -= 1
+
+        if check != len_res:
+            globalfuncs.logger.verbose(f"Result still contains {check} out of {len_res} valid responses, continuing")
+            return False
+        else:
+            return True
+
+    def call_translate_llm_and_save():
+        nonlocal prompt_batch, attempt_try, llm_result
+        globalfuncs.logger.spam(f"{prompt_batch}")
+        while True:
+            try:
+                responses = llmjptoen.batch_translate_lyric_to_en(prompt_batch)
+                break
+            except Exception as e:
+                attempt_try += 1
+                globalfuncs.logger.notice(f"Translation failure, attempt: {attempt_try} | Error: {e}")
+        for item, lyric in zip(responses, prompt_batch):
+            if lyric[1] != '':
+                globalfuncs.logger.spam(f"{item}")
+                globalfuncs.write_json(item, filepath_json, ['lyrics', 'genius_jp', 'en_lyrics_ai_translate'],
+                                       as_list=True, extend=True)
+                llm_trans_result.append(item)
+            else:
+                globalfuncs.write_json('', filepath_json, ['lyrics', 'genius_jp', 'en_lyrics_ai_translate'],
+                                       as_list=True, extend=True)
+                llm_trans_result.append(item)
+        prompt_batch = []
+
+    if 'en_lyrics_ai_translate' in file_data.get('lyrics', {}).get('genius_jp', {}):
+        llm_trans_result = file_data['lyrics']['genius_jp']['en_lyrics_ai_translate']
+    else:
         llm_trans_result = []
 
+    if is_translated_result_valid(llm_trans_result) and llm_trans_result != []:
+        skip_llm_trans = True
+        globalfuncs.logger.verbose(f"Passing getting translations of tokens, data is already complete")
+
+    if not skip_llm_trans:
         globalfuncs.logger.info(f"Translating each lyric")
 
         llmjptoen.create_model()
@@ -605,39 +666,11 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
         prompt_batch = []
         attempt_try = 1
 
-        if 'en_lyrics_ai_translate' in file_data.get('lyrics', {}).get('genius_jp', {}):
-            llm_trans_result = file_data['lyrics']['genius_jp']['en_lyrics_ai_translate']
-
-        def call_translate_llm_and_save():
-            nonlocal prompt_batch, attempt_try, llm_result
-
-            globalfuncs.logger.spam(f"{prompt_batch}")
-            while True:
-                try:
-                    responses = llmjptoen.batch_translate_lyric_to_en(prompt_batch)
-                    break
-                except Exception as e:
-                    attempt_try += 1
-                    globalfuncs.logger.notice(f"Translation failure, attempt: {attempt_try} | Error: {e}")
-
-            for item, lyric in zip(responses, prompt_batch):
-                if lyric[1] != '':
-                    globalfuncs.logger.spam(f"{item}")
-                    globalfuncs.write_json(item, filepath_json, ['lyrics', 'genius_jp', 'en_lyrics_ai_translate'],
-                                           as_list=True, extend=True)
-                    llm_trans_result.append(item)
-                else:
-                    globalfuncs.write_json('', filepath_json, ['lyrics', 'genius_jp', 'en_lyrics_ai_translate'],
-                                           as_list=True, extend=True)
-                    llm_trans_result.append(item)
-
-            prompt_batch = []
-
         for jp_lyric, counter in zip(jp_lyrics, range(len(jp_lyrics))):
             if counter < len(llm_trans_result):
                 globalfuncs.logger.spam(f"Lyric is already translated, skipping lyric: {jp_lyric}")
             else:
-                prompt_batch.append([unsplit_jp_lyrics, jp_lyric, unsplit_en_lyrics])
+                prompt_batch.append([unsplit_jp_lyrics, jp_lyric])
 
             if len(prompt_batch) == llm_batch_size_translation:
                 call_translate_llm_and_save()
@@ -646,16 +679,42 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
             call_translate_llm_and_save()
 
         # validation check
-        for lyric, llm_result, counter in zip(jp_lyrics, llm_trans_result, range(len(jp_lyrics))):
+        while True:
             prompt_batch = []
-            if lyric != "" and llm_result == "":
-                globalfuncs.logger.verbose(f"Redoing: {lyric}")
-                prompt_batch.append(lyric)
-            elif (re.search(r'([tT])ranslated', llm_result) or
-                  re.search(r'([tT])o capture the essence', llm_result) or
-                  re.search(r'[oO]riginal [lL]yric', llm_result)):
-                globalfuncs.logger.verbose(f"Redoing: {lyric}")
-                prompt_batch.append(lyric)
+            for lyric, llm_result, counter in zip(jp_lyrics, llm_trans_result, range(len(jp_lyrics))):
+                if not is_translated_lyric_valid(lyric, llm_result, counter):
+                    globalfuncs.logger.verbose(f"Redoing: {lyric}")
+                    prompt_batch.append([unsplit_jp_lyrics, lyric])
+
+            while True:
+                try:
+                    responses = llmjptoen.batch_translate_lyric_to_en(prompt_batch)
+                    break
+                except Exception as e:
+                    attempt_try += 1
+                    globalfuncs.logger.notice(f"Translation failure, attempt: {attempt_try} | Error: {e}")
+
+            holding = []
+            counter = 0
+            for j_lyric, j_llm_result, j_counter in zip(jp_lyrics, llm_trans_result, range(len(jp_lyrics))):
+                if is_translated_lyric_valid(j_lyric, j_llm_result, j_counter):
+                    try:
+                        holding.append(responses[counter])
+                        counter += 1
+                    except IndexError:
+                        pass
+                else:
+                    holding.append(j_llm_result)
+            llm_trans_result = holding
+            globalfuncs.write_json(llm_trans_result, filepath_json, ['lyrics', 'genius_jp', 'en_lyrics_ai_translate'], as_list=True,
+                                   extend=False, overwrite=True)
+
+            if not is_translated_result_valid(llm_trans_result):
+                pass
+            else:
+                globalfuncs.logger.verbose(f"Result has no invalid responses, breaking off")
+                break
+
 
     else:
         globalfuncs.logger.verbose(f"Skipping translation of lyrics")
