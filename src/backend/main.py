@@ -16,8 +16,6 @@ import torch
 import gc
 import re
 
-from src.backend.globalfuncs import is_japanese
-
 # global config
 with open('../config/globalconfig.json', 'r') as f:
     config = json.load(f)
@@ -35,11 +33,12 @@ except OSError:
     console_width = 20
 
 # main loop
-def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, skip_llm_trans=False):
+def main(url: str, use_genius: str, title_override='', skip_dict_lookup=False, skip_llm_exp=False, skip_llm_trans=False):
     """
     Returns JSON file, includes: lyrics, timestamps, translations, meanings, POS
     :param url: Input the URL of the song (YouTube Only)
     :param use_genius: if 'genius', uses Genius API to get lyrics, otherwise 'ai' uses AI transcription (unreliable)
+    :param title_override: Override title of the song, if the song title is not clear
     :param skip_dict_lookup:
     :param skip_llm_exp:
     :param skip_llm_trans:
@@ -125,6 +124,9 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
     globalfuncs.logger.plain(f"{"-" * console_width}")
 
     # region retrieve lyrics (jp and en)
+    if title_override != '':
+        filename = title_override
+
     if use_genius == 'genius':
         if 'jp_lyrics' in file_data.get('lyrics', {}).get('genius_jp', {}) and 'en_lyrics' in file_data.get('lyrics',{}).get('genius_en', {}):
             jp_lyrics = file_data['lyrics']['genius_jp']['jp_lyrics']
@@ -405,8 +407,8 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
         for item, input_data in zip(formatted_response, prompt_batch):
             globalfuncs.logger.spam(f"{input_data} | {item}")
             if counter in exclude_list:
-                llm_result.append(None)
-                globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
+                llm_result.append([None])
+                globalfuncs.write_json([None], filepath_json, ['llm', 'explanation', 'tokens'])
                 counter += 1
             elif input_data == True:
                 globalfuncs.write_json(item, filepath_json, ['llm', 'explanation', 'tokens'], as_list=True,
@@ -419,8 +421,8 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
                 llm_result.append(item)
                 counter += 1
             else:
-                llm_result.append(None)
-                globalfuncs.write_json(None, filepath_json, ['llm', 'explanation', 'tokens'])
+                llm_result.append([None])
+                globalfuncs.write_json([None], filepath_json, ['llm', 'explanation', 'tokens'])
                 counter += 1
 
             torch.cuda.empty_cache()
@@ -444,7 +446,7 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
         holding = []
         counter = 0
         for result in llm_result:
-            if is_explanation_valid(result) and counter < len(response):
+            if not is_explanation_valid(result) and counter < len(response):
                 holding.append(response[counter])
                 counter += 1
             else:
@@ -587,11 +589,11 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
                 overwrite_call_llm_and_save()
                 prompt_batch = []
 
-            if not is_explanation_result_valid:
-                pass
-            else:
+            if is_explanation_result_valid(llm_result):
                 globalfuncs.logger.verbose(f"Result has no invalid responses, breaking off")
                 break
+            else:
+                pass
 
         llmjptoen.clear_model()
         globalfuncs.logger.info(f"Finished getting explanations of tokens")
@@ -663,14 +665,14 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
     else:
         llm_trans_result = []
 
-    if is_translated_result_valid(llm_trans_result) and llm_trans_result != []:
+    if is_translated_result_valid(llm_trans_result) and llm_trans_result != [] and len(llm_trans_result) == len(jp_lyrics):
         skip_llm_trans = True
         globalfuncs.logger.verbose(f"Passing getting translations of tokens, data is already complete")
 
     if not skip_llm_trans:
         globalfuncs.logger.info(f"Translating each lyric")
 
-        llmjptoen.create_model()
+        llmjptoen.create_model(cuda=True)
 
         prompt_batch = []
         attempt_try = 1
@@ -706,7 +708,7 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
             holding = []
             counter = 0
             for j_lyric, j_llm_result, j_counter in zip(jp_lyrics, llm_trans_result, range(len(jp_lyrics))):
-                if not is_translated_lyric_valid(j_lyric, j_llm_result, j_counter) and counter < len(responses):
+                if not is_translated_lyric_valid(j_lyric, j_llm_result, j_counter) and counter < len(responses) and j_counter not in missing_lines:
                     holding.append(responses[counter])
                     counter += 1
                 else:
@@ -715,16 +717,17 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
             globalfuncs.write_json(llm_trans_result, filepath_json, ['lyrics', 'genius_jp', 'en_lyrics_ai_translate'], as_list=True,
                                    extend=False, overwrite=True)
 
-            if not is_translated_result_valid(llm_trans_result):
-                pass
-            else:
+            if is_translated_result_valid(llm_trans_result):
                 globalfuncs.logger.verbose(f"Result has no invalid responses, breaking off")
                 break
+            else:
+                pass
     else:
         globalfuncs.logger.verbose(f"Skipping translation of lyrics")
 
     llmjptoen.clear_model()
 
+    holding = []
     for item, counter, lyric in zip(llm_trans_result, range(len(llm_trans_result)), jp_lyrics):
         if (re.search(r'[\(\[\{](.*?)[\)\]\}]', item) or counter in missing_lines) or globalfuncs.is_japanese(lyric) == False:
             holding.append("")
@@ -740,5 +743,6 @@ def main(url: str, use_genius: str, skip_dict_lookup=False, skip_llm_exp=False, 
 
 if __name__ == '__main__':
     # main('https://www.youtube.com/watch?v=QnkqCv0dZTk', 'genius')
-    main('youtube.com/watch?v=ZRtdQ81jPUQ', 'genius')
+    # main('youtube.com/watch?v=ZRtdQ81jPUQ', 'genius')
     # main('https://www.youtube.com/watch?v=Mhl9FaxiQ_E', 'genius')
+    main('https://www.youtube.com/watch?v=vEyPvak2K9o', 'genius')
