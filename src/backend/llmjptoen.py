@@ -41,6 +41,8 @@ def create_model(precision='fp16', cuda=False) -> None:
     else:
         device_map_str = "cuda" if cuda else "auto"
 
+    globalfuncs.logger.verbose(f"Device: {device_map_str} | Override: {llm_jp_model_device_override}")
+
     # set precision level
     if precision == 'fp16':
         model = AutoModelForCausalLM.from_pretrained(
