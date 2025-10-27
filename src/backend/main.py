@@ -126,6 +126,7 @@ def main(url: str, use_genius: str, title_override='', skip_dict_lookup=False, s
     # region retrieve lyrics (jp and en)
     if title_override != '':
         filename = title_override
+        globalfuncs.logger.verbose(f'Overwriting title: {filename}')
 
     if use_genius == 'genius':
         if 'jp_lyrics' in file_data.get('lyrics', {}).get('genius_jp', {}) and 'en_lyrics' in file_data.get('lyrics',{}).get('genius_en', {}):
@@ -143,14 +144,10 @@ def main(url: str, use_genius: str, title_override='', skip_dict_lookup=False, s
 
             fallbacks = [
                 lambda: lyricextract.genius_get_song_id_jp(filename),
-                lambda: lyricextract.genius_get_song_id_jp(
-                    llmfortitleextract.get_title_from_song(filename, False, True)),
-                lambda: lyricextract.genius_get_song_id_jp(
-                    llmfortitleextract.get_title_from_song(filename, True, True)),
-                lambda: lyricextract.genius_get_song_id_jp(
-                    llmfortitleextract.get_title_from_song(filename, True, False)),
-                lambda: lyricextract.genius_get_song_id_multi(
-                    llmfortitleextract.get_title_from_song(filename, False, False), True),
+                lambda: lyricextract.genius_get_song_id_jp(llmfortitleextract.get_title_from_song(filename, False, True)),
+                lambda: lyricextract.genius_get_song_id_jp(llmfortitleextract.get_title_from_song(filename, True, True)),
+                lambda: lyricextract.genius_get_song_id_jp(llmfortitleextract.get_title_from_song(filename, True, False)),
+                lambda: lyricextract.genius_get_song_id_multi(llmfortitleextract.get_title_from_song(filename, False, False), True),
                 lambda: lyricextract.genius_get_song_id_multi(filename, False),
             ]
 
@@ -168,27 +165,47 @@ def main(url: str, use_genius: str, title_override='', skip_dict_lookup=False, s
             llmfortitleextract.clear_model()
 
             globalfuncs.logger.success(f"Genius Link Obtained: {jp_song_id} | {filename}")
-            en_song_id = lyricextract.genius_get_translated(jp_song_id)
+            try:
+                en_song_id = lyricextract.genius_get_translated(jp_song_id)
 
-            # multithread for faster load times
-            with ThreadPoolExecutor() as executor:
-                f_jp_lyrics = executor.submit(lyricextract.extract_lyrics, str(jp_song_id))
-                f_en_lyrics = executor.submit(lyricextract.extract_lyrics, en_song_id)
+                # multithread for faster load times
+                with ThreadPoolExecutor() as executor:
+                    f_jp_lyrics = executor.submit(lyricextract.extract_lyrics, str(jp_song_id))
+                    f_en_lyrics = executor.submit(lyricextract.extract_lyrics, en_song_id)
 
-                jp_lyrics_res = f_jp_lyrics.result()
-                en_lyrics_res = f_en_lyrics.result()
+                    jp_lyrics_res = f_jp_lyrics.result()
+                    en_lyrics_res = f_en_lyrics.result()
 
-                jp_lyrics_no_header = jp_lyrics_res[1].split('\n')
+                    jp_lyrics_no_header = jp_lyrics_res[1].split('\n')
 
-                jp_lyrics = jp_lyrics_res[0]
-                en_lyrics = en_lyrics_res[0]
+                    jp_lyrics = jp_lyrics_res[0]
+                    en_lyrics = en_lyrics_res[0]
 
-                # split the lyrics
-                unsplit_jp_lyrics = jp_lyrics
-                jp_lyrics = jp_lyrics.split('\n')
+                    # split the lyrics
+                    unsplit_jp_lyrics = jp_lyrics
+                    jp_lyrics = jp_lyrics.split('\n')
 
-                unsplit_en_lyrics = en_lyrics
-                en_lyrics = en_lyrics.split('\n')
+                    unsplit_en_lyrics = en_lyrics
+                    en_lyrics = en_lyrics.split('\n')
+            except Exception:
+                globalfuncs.logger.error(f"Could not find english translation for {jp_song_id}")
+
+                en_song_id = None
+
+                # multithread for faster load times
+                with ThreadPoolExecutor() as executor:
+                    f_jp_lyrics = executor.submit(lyricextract.extract_lyrics, str(jp_song_id))
+
+                    jp_lyrics_res = f_jp_lyrics.result()
+
+                    jp_lyrics_no_header = jp_lyrics_res[1].split('\n')
+
+                    jp_lyrics = jp_lyrics_res[0]
+                    # split the lyrics
+                    unsplit_jp_lyrics = jp_lyrics
+                    jp_lyrics = jp_lyrics.split('\n')
+
+                unsplit_en_lyrics, en_lyrics = [None], [None]
 
             # find the differences for the two lyrics (jp with and w/o headers)
 
@@ -740,9 +757,13 @@ def main(url: str, use_genius: str, title_override='', skip_dict_lookup=False, s
     # endregion
 
     # TODO add timestamp thing so u can display it later
+    # region timestamp sync
+    
+    # endregion
 
 if __name__ == '__main__':
     # main('https://www.youtube.com/watch?v=QnkqCv0dZTk', 'genius')
-    # main('youtube.com/watch?v=ZRtdQ81jPUQ', 'genius')
+    main('youtube.com/watch?v=ZRtdQ81jPUQ', 'genius')
     # main('https://www.youtube.com/watch?v=Mhl9FaxiQ_E', 'genius')
-    main('https://www.youtube.com/watch?v=vEyPvak2K9o', 'genius')
+    # main('https://www.youtube.com/watch?v=vEyPvak2K9o', 'genius')
+    # main('https://www.youtube.com/watch?v=0skXAu6h6To', 'genius', title_override='JET - POLKADOT STINGRAY')
