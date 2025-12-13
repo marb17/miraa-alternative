@@ -244,9 +244,17 @@ def main(url: str, use_genius: str, title_override='', skip_dict_lookup=False, s
             globalfuncs.logger.info("Start timestamp words (Forced Align Vox)")
             forced_align_vox_lyrics = transcribeforcealign.transcribe_force_align(filepath_audio, jp_lyrics_no_headers)
 
+            forced_align_vox_words = []
+            for phrase in forced_align_vox_lyrics:
+                globalfuncs.logger.verbose(f"{type(phrase)}, {phrase}")
+
+                for word in phrase['words']:
+                    forced_align_vox_words.append(word)
+
             globalfuncs.logger.verbose(str(forced_align_vox_lyrics))
 
             for item in forced_align_vox_lyrics: globalfuncs.write_json(item, filepath_json, ['transcribe', 'forced_align_vox_lyrics'])
+            for item in forced_align_vox_words: globalfuncs.write_json(item, filepath_json, ['transcribe', 'forced_align_vox_words'])
 
             globalfuncs.logger.success("Finished timestamp words")
     # endregion
