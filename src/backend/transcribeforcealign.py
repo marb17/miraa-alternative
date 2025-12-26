@@ -26,7 +26,7 @@ with open('../config/globalconfig.json', 'r') as f:
 
 whisperx_batch_size = int(config['whisperx_batch_size'])
 
-def transcribe_force_align(audio_path, lyrics_text, use_lyric=True, bad_result_threshold=0.7):
+def transcribe_force_align(audio_path, lyrics_text, use_lyric=True, bad_result_threshold=0.4):
     y, sr = librosa.load(audio_path, sr=None)
     duration = librosa.get_duration(y=y, sr=sr)
 
@@ -53,12 +53,14 @@ def transcribe_force_align(audio_path, lyrics_text, use_lyric=True, bad_result_t
 
         result['segments'] = [{
             "text": str_lyrics,
-            "start": 0.0,
+            "start": result['segments'][0]['start'],
             "end": duration,
         }]
 
     model_a, metadata = whisperx.load_align_model(language_code=result['language'], device=device)
     result = whisperx.align(result['segments'], model_a, metadata, audio, device, return_char_alignments=False)
+
+    print(result['segments'])
 
     while True:
         last_result = result["segments"]
@@ -130,7 +132,8 @@ def transcribe_force_align(audio_path, lyrics_text, use_lyric=True, bad_result_t
         else:
             print(result['segments'])
 
-print(transcribe_force_align("../../database/songs/RzMh/audio_vocals_trans.wav", [
+if __name__ == '__main__':
+    print(transcribe_force_align("../../database/songs/RzMh/audio_vocals.wav", [
                 "Taking off, taking off",
                 "姿形の見えない魔物",
                 "どこへでも連れて行くよ",
@@ -197,4 +200,4 @@ print(transcribe_force_align("../../database/songs/RzMh/audio_vocals_trans.wav",
                 "Nobody like you, ooh-ooh, ooh-ooh",
                 "Moving on, moving on",
                 "Nobody like you are my star"
-            ]))
+            ], use_lyric=False))

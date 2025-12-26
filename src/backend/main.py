@@ -743,6 +743,6 @@ def main(url: str, use_genius: str, title_override='', skip_dict_lookup=False, s
 if __name__ == '__main__':
     # main('https://www.youtube.com/watch?v=QnkqCv0dZTk', 'genius')
     # main('youtube.com/watch?v=ZRtdQ81jPUQ', 'genius')
-    # main('https://www.youtube.com/watch?v=Mhl9FaxiQ_E', 'genius')
+    main('https://www.youtube.com/watch?v=Mhl9FaxiQ_E', 'genius')
     # main('https://www.youtube.com/watch?v=vEyPvak2K9o', 'genius')
-    main('https://www.youtube.com/watch?v=0skXAu6h6To', 'genius', title_override='JET - POLKADOT STINGRAY')
+    # main('https://www.youtube.com/watch?v=0skXAu6h6To', 'genius', title_override='JET - POLKADOT STINGRAY')
