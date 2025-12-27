@@ -130,8 +130,8 @@ def create_model() -> None:
         model_name,
         device_map="auto",
         # quantization_config=bnb_config,
-        torch_dtype=torch.float16,
-    ).to("cuda")
+        torch_dtype=torch.float16)
+    # ).to("cuda")
 
 def generate_word_by_word_exp(prompt, max_tokens):
     model_inputs = tokenizer(prompt, return_tensors='pt').to('cuda')

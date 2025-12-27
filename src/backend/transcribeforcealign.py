@@ -133,7 +133,7 @@ def transcribe_force_align(audio_path, lyrics_text, use_lyric=True, bad_result_t
             print(result['segments'])
 
 if __name__ == '__main__':
-    print(transcribe_force_align("../../database/songs/RzMh/audio_vocals.wav", [
+    print(transcribe_force_align("../../database/songs/RzMh/audio_vocals_trans.wav", [
                 "Taking off, taking off",
                 "姿形の見えない魔物",
                 "どこへでも連れて行くよ",
@@ -200,4 +200,4 @@ if __name__ == '__main__':
                 "Nobody like you, ooh-ooh, ooh-ooh",
                 "Moving on, moving on",
                 "Nobody like you are my star"
-            ], use_lyric=False))
+            ], use_lyric=True))

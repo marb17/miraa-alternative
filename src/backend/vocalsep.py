@@ -48,7 +48,7 @@ def separate_audio(filepath: str, split=True, device="cuda" if torch.cuda.is_ava
             length=length
         )
 
-    globalfuncs.logger.verbose(f"Post Processing: {demucs_post_processing}, Ensemble: {demucs_ensemble}, Models: '{demucs_model}' and '{demucs_model_2}'")
+    globalfuncs.logger.verbose(f"Post Processing: {demucs_post_processing}, Models: '{demucs_model}' and '{demucs_model_2}'")
 
     # demucs model
     model = get_model(demucs_model)
