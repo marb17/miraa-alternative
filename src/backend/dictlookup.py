@@ -193,6 +193,7 @@ def get_meaning_full_jamdict(input_lyrics: list[str]):
     torch.cuda.empty_cache()
     gc.collect()
     llmjptoen.clear_model()
+    call_llm.counter = 0
 
     return results
 

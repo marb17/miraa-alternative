@@ -234,29 +234,31 @@ def main(url: str, use_genius: str, title_override='', skip_dict_lookup=False, s
     globalfuncs.logger.plain(f"{"-" * console_width}")
 
     # region get time stamped transcription for video sync (FORCED ALIGNED)
-    if 'forced_align_vox_lyrics' in file_data.get('transcribe', {}):
-        forced_align_vox_lyrics = file_data['transcribe']['forced_align_vox_lyrics']
-        globalfuncs.logger.verbose("Skipping timestamp words, data already exists")
-    else:
-        if use_genius == 'ai':
-            globalfuncs.logger.verbose("Skipping forced align transcription, no lyrics to base it off")
-        else:
-            globalfuncs.logger.info("Start timestamp words (Forced Align Vox)")
-            forced_align_vox_lyrics = transcribeforcealign.transcribe_force_align(filepath_audio, jp_lyrics_no_headers)
+    #! UNCOMMENT AFTER FINISH FORCE ALIGNMENT SYSTEM (too buggy)
 
-            forced_align_vox_words = []
-            for phrase in forced_align_vox_lyrics:
-                globalfuncs.logger.verbose(f"{type(phrase)}, {phrase}")
-
-                for word in phrase['words']:
-                    forced_align_vox_words.append(word)
-
-            globalfuncs.logger.verbose(str(forced_align_vox_lyrics))
-
-            for item in forced_align_vox_lyrics: globalfuncs.write_json(item, filepath_json, ['transcribe', 'forced_align_vox_lyrics'])
-            for item in forced_align_vox_words: globalfuncs.write_json(item, filepath_json, ['transcribe', 'forced_align_vox_words'])
-
-            globalfuncs.logger.success("Finished timestamp words")
+    # if 'forced_align_vox_lyrics' in file_data.get('transcribe', {}):
+    #     forced_align_vox_lyrics = file_data['transcribe']['forced_align_vox_lyrics']
+    #     globalfuncs.logger.verbose("Skipping timestamp words, data already exists")
+    # else:
+    #     if use_genius == 'ai':
+    #         globalfuncs.logger.verbose("Skipping forced align transcription, no lyrics to base it off")
+    #     else:
+    #         globalfuncs.logger.info("Start timestamp words (Forced Align Vox)")
+    #         forced_align_vox_lyrics = transcribeforcealign.transcribe_force_align(filepath_audio, jp_lyrics_no_headers)
+    #
+    #         forced_align_vox_words = []
+    #         for phrase in forced_align_vox_lyrics:
+    #             globalfuncs.logger.verbose(f"{type(phrase)}, {phrase}")
+    #
+    #             for word in phrase['words']:
+    #                 forced_align_vox_words.append(word)
+    #
+    #         globalfuncs.logger.verbose(str(forced_align_vox_lyrics))
+    #
+    #         for item in forced_align_vox_lyrics: globalfuncs.write_json(item, filepath_json, ['transcribe', 'forced_align_vox_lyrics'])
+    #         for item in forced_align_vox_words: globalfuncs.write_json(item, filepath_json, ['transcribe', 'forced_align_vox_words'])
+    #
+    #         globalfuncs.logger.success("Finished timestamp words")
     # endregion
 
     # region tag and get pos of word and natural split
@@ -741,8 +743,17 @@ def main(url: str, use_genius: str, title_override='', skip_dict_lookup=False, s
     # endregion
 
 if __name__ == '__main__':
-    # main('https://www.youtube.com/watch?v=QnkqCv0dZTk', 'genius')
-    # main('youtube.com/watch?v=ZRtdQ81jPUQ', 'genius')
-    main('https://www.youtube.com/watch?v=Mhl9FaxiQ_E', 'genius')
-    # main('https://www.youtube.com/watch?v=vEyPvak2K9o', 'genius')
-    # main('https://www.youtube.com/watch?v=0skXAu6h6To', 'genius', title_override='JET - POLKADOT STINGRAY')
+    # main('https://www.youtube.com/watch?v=QnkqCv0dZTk', 'genius') # demon slayer theme
+    # main('youtube.com/watch?v=ZRtdQ81jPUQ', 'genius') # idol
+    # main('https://www.youtube.com/watch?v=Mhl9FaxiQ_E', 'genius') # fuyu no hanashi
+    # main('https://www.youtube.com/watch?v=vEyPvak2K9o', 'genius') # yoru ni kakeru
+    # main('https://www.youtube.com/watch?v=0skXAu6h6To', 'genius', title_override='JET - POLKADOT STINGRAY') # jet
+    # main('https://www.youtube.com/watch?v=P6NMxTUTyXY', 'genius') # morii no chiisana restaurant
+    main('https://www.youtube.com/watch?v=9mWbCPJuoIo', 'genius', title_override='Oddloop - Frederic') # oddloop
+    main('https://www.youtube.com/watch?v=unau6nthttg', 'genius', title_override='ヘビーローテーション - AKB48') # heavy rotation
+    main('https://www.youtube.com/watch?v=-J9FuvPmMoI', 'genius', title_override='Sparkle - RADWIMPS') #sparkle
+    main('https://www.youtube.com/watch?v=UpmSK1GPlBc', 'genius', title_override='光るなら - Goose House') # hikarunara
+    main('https://www.youtube.com/watch?v=O48gok_FLCg', 'genius', title_override='オレンジ - 7!!') # orenji
+    main('https://www.youtube.com/watch?v=-LwBbLa_Vhc', 'genius', title_override='星座になれたら - kessoku band') # if i could be a constellation
+    main('https://www.youtube.com/watch?v=F9GXgPHeKfA', 'genius', 'crossing field - LiSA') #CROSSING FIELD
+    main('https://www.youtube.com/watch?v=XyuLpZAywH0', 'genius', 'fiction - sumika')
