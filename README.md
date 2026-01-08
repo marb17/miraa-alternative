@@ -1,5 +1,39 @@
 # Miraa Alternative
 An open-source alternative to **Miraa**, a Japanese transcription and translation app.
+Multilingual audio analysis and alignment system for transcription, translation, and visualization.
+
+## 🚀 What it does
+- Processes music into aligned, translated text and explained using a LLM
+- Supports en-jp transcription and translation
+- Visualizes timing, confidence, and alignment results
+- Searches through Japanese dictionaries to find definitons of words
+- Separates audio using demucs and masks for better separation
+- Auto downloading from YouTube for better input
+
+## 🧠 How it works
+- Splits audio into stems (vocal & instrumental)
+- Audio preprocessing & segmentation (VAD-based)
+- Speech recognition & translation using pretrained models
+- Using Genius API to get lyrics
+- Saves data to a .json file for easy viewing (debugging)
+- HTML-based interactive visualization (soon)
+
+## 🛠 Tech Stack
+- Python
+- PyTorch / torchaudio
+- Speech & translation models
+- Transformers
+- HTML / JS for dashboards
+- External APIs & web scraping
+
+## 📊 Results
+- Improved alignment accuracy through iterative refinement (fine-tuning)
+- Explanation of Japanese songs and their meaning (for studying the language)
+- Robust handling of noisy real-world audio (actual songs)
+- Scalable pipeline design (soon)
+
+## 🧪 Status
+Actively iterating and experimenting
 
 ---
 
@@ -7,57 +41,8 @@ An open-source alternative to **Miraa**, a Japanese transcription and translatio
 This diagram shows how the program functions:
 
 ### Backend
-![docs/flowchart backend.png](https://github.com/marb17/miraa-alternative/blob/d284f08067cdab9cb6e36af7ba55a2100769a292/docs/flowchart%20backend.png)
+[![docs/flowchart backend.png](https://github.com/marb17/miraa-alternative/blob/d284f08067cdab9cb6e36af7ba55a2100769a292/docs/flowchart%20backend.png)](https://github.com/marb17/miraa-alternative/blob/7663ed75dd34546ef8b782e0813336fcebe6a8a4/docs/flowchart%20backend.drawio.png)
 
 ---
 
-## System Requirements **OUTDATED**
-This project uses multiple heavy ML models, so a decent GPU is recommended.
 
-**Minimum Requirements:**
-- GPU: Any GPU with enough VRAM for the model (in the pre-setup case around 12GB)
-- CPU: Any CPU that can handle some light multi-threading and enough to handle the GPU load
-- RAM: 4GB + Any off-load amount if the model doesn't fit in the GPU
-- Storage: Enough for all the models, around 40GB in my case
-- Internet: WiFi/Ethernet (50Mbps, only for downloading models)
-
-**Recommended Specs (My Setup):**
-- CPU: Intel i7-13700F
-- RAM: 32GB DDR5
-- Storage: SSD + HDD
-- GPU: RTX 4060 (8GB VRAM)
-
----
-
-## Prerequisites **OUTDATED**
-Install the required Python packages:
-
-```bash
-pip install yt-dlp
-pip install base58
-pip install requests
-pip install python-dotenv
-pip install lyricsgenius
-pip install demucs
-pip install torch  # CUDA version recommended
-pip install faster-whisper
-pip install hf-xet
-pip install MeCab
-pip install unidic-lite
-````
-
-> ⚠️ **Note:** For torch, download the CUDA version compatible with your GPU for faster processing.
-
----
-
-## Usage
-```bash
-```
-
----
-
-## Contributing
-
-Contributions are welcome! Feel free to open issues or pull requests.
-
----
