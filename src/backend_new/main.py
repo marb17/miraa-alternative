@@ -1,10 +1,19 @@
 class Analyzer:
+    DEFAULT_CONFIG = {
+        "version": "1.0.0",
+    }
+
+    DEFAULT_ENV_VARS = [
+        "SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET",
+    ]
+
     def __init__(self) -> None:
         """Initialize the analyzer."""
         import logger
         self._logger = logger.Logger()
 
         self._setup_main_directories()
+        self._load_env_file()
         self._setup_config_file()
 
     # region Helper Functions
@@ -23,16 +32,9 @@ class Analyzer:
         from pathlib import Path
         import json
 
-        defaults = {
-            "version" : "1.0.0",
-            "settings" : {
-                "song_download_source" : ['youtube', 'spoti', 'apple', 'tidal']
-            }
-        }
-
         self._config_file = Path(self._base_dir / "config/config.json")
         if not self._config_file.exists():
-            config_json = json.dumps(defaults, indent=4)
+            config_json = json.dumps(self.DEFAULT_CONFIG, indent=4)
             self._config_file.write_text(config_json)
             self._logger.debug("Created config file and set default values.")
         else:
@@ -42,6 +44,28 @@ class Analyzer:
         self._config_json = json.loads(config_json)
 
         self._logger.info(f"miraa-alternative Version: {self._config_json['version']}")
+
+    def _load_env_file(self) -> None:
+        """
+        Loads the environment variables from the .env file.
+        Creates a new .env file if it doesn't exist.
+        DOES NOT check if the file is filled
+        """
+        import os
+        from pathlib import Path
+        from dotenv import load_dotenv
+
+        self._env_file = Path(self._base_dir / "config/.env")
+        if self._env_file.exists():
+            load_dotenv(dotenv_path=self._env_file)
+            self._logger.debug("Loaded .env file.")
+        else:
+            self._logger.critical("No .env file found. Creating empty .env file. Do NOT reorder the variables")
+            self._env_file.write_text("\n".join([f"{var}=" for var in self.DEFAULT_ENV_VARS]))
+            raise FileNotFoundError(".env file not found, creating one. Please add your credentials to the .env file.")
+
+        load_dotenv()
+        self._env_data = dict([(var, os.getenv(var))for var in self.DEFAULT_ENV_VARS])
 
     @staticmethod
     def _str_to_base58(string: str) -> str:
@@ -59,13 +83,11 @@ class Analyzer:
         Downloads a file from a given link.
         :param link: The link to the file to download. Supports ...
         """
-        ...
+        import downloader
 
 
 def main() -> None:
     ana = Analyzer()
-    # ana._download("https://open.spotify.com/track/0UFmgncRMHavVzYxtpF0IZ?si=1b46c029e46744db")
-    ana._download("https://www.youtube.com/watch?v=0skXAu6h6To")
 
 
 if __name__ == "__main__":
