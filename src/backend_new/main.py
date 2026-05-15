@@ -98,14 +98,12 @@ class Analyzer:
 
     def _search_song(self) -> dict:
         self._init_downloader()
-
-        self._dl.search_song()
+        ...
 
 def main() -> None:
     ana = Analyzer()
     # ana._download("https://open.spotify.com/track/0UFmgncRMHavVzYxtpF0IZ?si=1c86deb161b24778")
     # ana._download("https://open.spotify.com/track/0VPkaJMRQIhYWXiE1LqaCK?si=a867127aa85a4769")
-    ana._search_song()
 
 
 if __name__ == "__main__":

@@ -17,8 +17,6 @@ class Downloader:
 
         self._sp = spotipy.Spotify(auth_manager=auth_manager)
 
-    # TODO search songs in spotify by qureying their data base
-
     def search_song_metadata(self, query: str = '') -> dict:
         if query == '':
             raise Exception('Spotify query is required')
@@ -45,37 +43,46 @@ class Downloader:
             return extract_title_artist(track_data)
         elif metadata is not None:
             return extract_title_artist(metadata)
-        return '' # so my static code checker doesnt get angry at me
+        return '' # so my static code checker doesn't get angry at me
 
-    def search_song(self, limit: int = 5) -> dict:
+    def cli_search_song(self, limit: int = 10) -> dict:
         import questionary as q
 
-        user_title = q.text("Enter song of title: ").ask()
-        user_artist = q.text("Enter song of artist (optional): ").ask()
+        if q.select("Please choose query type", choices=["Plain query", "Search by track and artist"]).ask() == "Search by track and artist":
+            _user_title = q.text("Enter title of song: ").ask()
+            _user_artist = q.text("Enter artist of song (optional): ").ask()
 
-        query = f"track:{user_title}"
-        if user_artist != '':
-            query += f" artist:{user_artist}"
+            _query = f"track:{_user_title}"
+            if _user_artist != '':
+                _query += f" artist:{_user_artist}"
+        else:
+            _query = q.text("Enter the query to search: ").ask()
 
-        offset = 0
+        _offset = 0
 
         while True:
-            song_list = self._sp.search(q=query, limit=limit, offset=offset)
+            _song_list = self._sp.search(q=_query, limit=limit, offset=_offset)
 
-            song_list_ask = [f"{song["name"]} | {song["artists"][0]["name"]}" for song in song_list['tracks']['items']]
-            song_list_ask.append("Next ->")
-            song_list_ask.append("Previous <-")
+            _song_list_ask = [f"{song["name"]} | {song["artists"][0]["name"]}" for song in _song_list['tracks']['items']]
+            _song_list_ask.append("Next ->")
+            _song_list_ask.append("Previous <-")
 
-            user_song_choice = q.select("Please choose the song:", choices=song_list_ask).ask()
+            _user_song_choice = q.select("Please choose the song:", choices=_song_list_ask).ask()
 
-            if user_song_choice == 'Next ->':
-                offset += 5
-            elif user_song_choice == 'Previous <-':
-                if offset < 5:
+            if _user_song_choice == 'Next ->':
+                _offset += 5
+            elif _user_song_choice == 'Previous <-':
+                if _offset < 5:
                     pass
                 else:
-                    offset -= 5
+                    _offset -= 5
             else:
                 break
 
-        print(user_song_choice)
+        return _user_song_choice
+
+    def download_song_youtube(self, query: str = ''):
+        import yt_dlp
+        # TODO finish downlad song
+
+    # TODO add lyric puller
