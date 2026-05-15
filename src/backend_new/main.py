@@ -84,26 +84,14 @@ class Analyzer:
         if self._dl is None:
             import downloader
             self._dl = downloader.Downloader(spotify_client_id=self._env_data["SPOTIFY_CLIENT_ID"],
-                                       spotify_client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"])
+                                             spotify_client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"])
 
-    def _download(self, link: str) -> None:
-        """
-        Downloads a file from a given link.
-        :param link: The link to the file to download. Supports ...
-        """
-        self._init_downloader()
-
-        track_name = self._dl.get_title_artist(link)
-        print(track_name)
-
-    def _search_song(self) -> dict:
-        self._init_downloader()
-        ...
 
 def main() -> None:
     ana = Analyzer()
     # ana._download("https://open.spotify.com/track/0UFmgncRMHavVzYxtpF0IZ?si=1c86deb161b24778")
     # ana._download("https://open.spotify.com/track/0VPkaJMRQIhYWXiE1LqaCK?si=a867127aa85a4769")
+    ana._search_song()
 
 
 if __name__ == "__main__":

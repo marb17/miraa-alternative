@@ -1,3 +1,6 @@
+import yt_dlp
+
+
 class Downloader:
     def __init__(self, spotify_client_id: str = '', spotify_client_secret: str = '') -> None:
         if spotify_client_id == '' or spotify_client_secret == '':
@@ -9,6 +12,9 @@ class Downloader:
         self._authenticate()
 
     def _authenticate(self) -> None:
+        """
+        Initializes the spotipy client
+        """
         import spotipy
         from spotipy.oauth2 import SpotifyClientCredentials
 
@@ -18,6 +24,11 @@ class Downloader:
         self._sp = spotipy.Spotify(auth_manager=auth_manager)
 
     def search_song_metadata(self, query: str = '') -> dict:
+        """
+        Searches for a song on Spotify and returns the metadata
+        :param query: Query to be searched for
+        :return: metadata of the song
+        """
         if query == '':
             raise Exception('Spotify query is required')
 
@@ -28,7 +39,7 @@ class Downloader:
         """
         Returns the title and artist given a query or metadata, only returns the featured artist
         :param query: A query of a spotify song, a URL
-        :param metadata: A dict from a songs metadata, from search_song_metadata
+        :param metadata: A dict from a song metadata, from search_song_metadata
         :return: a str in the form of "TITLE - ARTIST"
         """
         if query is not None and metadata is not None:
@@ -45,7 +56,12 @@ class Downloader:
             return extract_title_artist(metadata)
         return '' # so my static code checker doesn't get angry at me
 
-    def cli_search_song(self, limit: int = 10) -> dict:
+    def cli_search_song(self, limit: int = 10) -> dict: # TODO make limit in config file
+        """
+        Searches a song using spotify querying
+        :param limit: How many songs to show at a time
+        :return: A str of the song name and artist
+        """
         import questionary as q
 
         if q.select("Please choose query type", choices=["Plain query", "Search by track and artist"]).ask() == "Search by track and artist":
@@ -59,7 +75,6 @@ class Downloader:
             _query = q.text("Enter the query to search: ").ask()
 
         _offset = 0
-
         while True:
             _song_list = self._sp.search(q=_query, limit=limit, offset=_offset)
 
@@ -81,8 +96,62 @@ class Downloader:
 
         return _user_song_choice
 
-    def download_song_youtube(self, query: str = ''):
+    @staticmethod
+    def youtube_query(query: str = '', limit: int = 3, choose_top_result: bool = False) -> str:
+        """
+        Searches for a song on YouTube and returns the id of the song
+        :param query: Query to search for
+        :param limit: How many to search for
+        :param choose_top_result: Will always return the first result without asking the user
+        :return: YouTube video id
+        """
         import yt_dlp
-        # TODO finish downlad song
 
-    # TODO add lyric puller
+        _limit = 1 if choose_top_result else limit
+        search_query = f"ytsearch{_limit}:{query}"
+
+        ydl_opts = {'quiet': True,
+                    'no_warnings': True,
+                    'extract_flat': True}
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            _info = ydl.extract_info(search_query, download=False)
+            _info = ydl.sanitize_info(_info)
+            if _info is None:
+                raise Exception("No results found")
+            _results = _info.get("entries", [])
+
+            _formatted_results = []
+            for track in _results:
+                _formatted_results.append({
+                    "id": track.get("id"),
+                    "title": track.get("title"),
+                    "channel": track.get("uploader")
+                })
+
+        if choose_top_result:
+            return _formatted_results[0]["id"]
+        else:
+            import questionary as q
+            _choices = [{"name": f"{song['title']} | {song['channel']} | {song['id']}", "value": index} for index, song in enumerate(_formatted_results)]
+            _user_song_choice = q.select("Please choose the song:", choices=_choices).ask()
+            return _formatted_results[int(_user_song_choice)]["id"]
+
+    @staticmethod
+    def download_youtube_video(url: str = '') -> None:
+        """
+        Downloads a YouTube video to .temp
+        :param url: A url to the video ID
+        """
+        if url == '':
+            raise Exception('YouTube URL is required')
+
+        ydl_opts = {'format': 'm4a/bestaudio/best',
+                    'paths': {'home': '../.temp'},
+                    'postprocessors': [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'wav',
+                    }]}
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            error_code = ydl.download([url])
