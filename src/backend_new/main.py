@@ -1,3 +1,6 @@
+from typing import Any
+from pathlib import Path
+
 class Analyzer:
     DEFAULT_CONFIG = {
         "version": "1.0.0",
@@ -85,12 +88,14 @@ class Analyzer:
         return base58.b58decode(string).decode('utf-8')
     # endregion
 
+    # region preprocessing
     def _init_downloader(self) -> None:
         if self._dl is None:
             import downloader
             import questionary as q
             import json
             from dotenv import set_key
+            from helper_funcs import read_json_file, write_json_file
 
             if self._config_json["youtube_downloader"]["use_cookies"]:
                 if self._env_data["YOUTUBE_COOKIE_PATH"] == '' or self._env_data["YOUTUBE_COOKIE_PATH"] is None:
@@ -100,9 +105,8 @@ class Analyzer:
                         self._env_data["YOUTUBE_COOKIE_PATH"] = _cookie_path
                         set_key(self._env_file, "YOUTUBE_COOKIE_PATH", _cookie_path, quote_mode="never")
                     else:
-                        config_json = json.loads(self._config_file.read_text())
-                        config_json["youtube_downloader"]["use_cookies"] = False
-                        self._config_file.write_text(json.dumps(config_json, indent=4))
+                        read_json_file(self._config_file)
+                        write_json_file(self._config_file, False, ["youtube_downloader", "use_cookies"])
                         set_key(self._env_file, "YOUTUBE_COOKIE_PATH", '', quote_mode="never")
             else:
                 if self._env_data["YOUTUBE_COOKIE_PATH"] != '':
@@ -130,21 +134,19 @@ class Analyzer:
         _file_path.write_text(_json_data)
         self._logger.info(f"Saved song data: {_view_name} -> {_file_path}")
 
-    def download_song(self) -> None:
+    def download_song(self, json_file: Path = None) -> None:
         """
         Downloads a song from YouTube using metadata present in .temp
         When no files are present, it will query spotify
-        :return:
+        :param json_file: A path to a json file containing metadata, optional
         """
         from pathlib import Path
-        from itertools import batched
-        import questionary as q
-        import json
+        from helper_funcs import questionary_select, write_json_file, read_json_file
         import asyncio
 
-        def get_youtube_id_from_json(file_path: Path) -> str:
+        def get_youtube_id_from_json(file_path: Path) -> str | None:
             if file_path.suffix == ".json":
-                return str(json.loads(file_path.read_text())["pre_processing"]["youtube_id"])
+                return str(read_json_file(file_path)["pre_processing"]["youtube_id"])
             return None
 
         async def _download(file_path: Path | str) -> None:
@@ -155,91 +157,113 @@ class Analyzer:
 
         _break_off = False
 
-        while True:
-            if _break_off:
-                break
+        if json_file is None:
+            while True:
+                if _break_off:
+                    break
 
-            _all_files = list(self._temp_dir.iterdir())
-            _all_files_stem = [file.stem for file in _all_files]
-            _available_json_files = [file for file in _all_files if file.suffix == ".json" and get_youtube_id_from_json(file) not in _all_files_stem]
+                _all_files = list(self._temp_dir.iterdir())
+                _all_files_stem = [file.stem for file in _all_files]
+                _available_json_files = [file for file in _all_files if file.suffix == ".json" and get_youtube_id_from_json(file) not in _all_files_stem]
 
-            # if songs are available, ask user which one to download or download the only one present
-            if _available_json_files:
-                # if only one song is available, download it
-                if len(_available_json_files) == 1:
-                    target_id = get_youtube_id_from_json(_available_json_files[0])
-                    try:
-                        loop = asyncio.get_running_loop()
-                        loop.create_task(_download(target_id))
-                    except RuntimeError:
-                        asyncio.run(_download(target_id))
-                # if multiple songs are available, ask user which one to download
-                elif len(_available_json_files) > 1:
-                    _offset = 0
+                # if songs are available, ask user which one to download or download the only one present
+                if _available_json_files:
+                    # if only one song is available, download it
+                    if len(_available_json_files) == 1:
+                        target_id = get_youtube_id_from_json(_available_json_files[0])
+                        try:
+                            loop = asyncio.get_running_loop()
+                            loop.create_task(_download(target_id))
+                        except RuntimeError:
+                            asyncio.run(_download(target_id))
+                    # if multiple songs are available, ask user which one to download
+                    elif len(_available_json_files) > 1:
+                        _offset = 0
 
-                    while True:
-                        _all_files = list(self._temp_dir.iterdir())
-                        _all_files_stem = [file.stem for file in _all_files]
-                        _available_json_files = [file for file in _all_files
-                                                 if file.suffix == ".json" and
-                                                 get_youtube_id_from_json(file) not in _all_files_stem]
-                        _batched_files = list(batched(_available_json_files, 10))
+                        while True:
+                            _all_files = list(self._temp_dir.iterdir())
+                            _all_files_stem = [file.stem for file in _all_files]
+                            _available_json_files = [file for file in _all_files
+                                                     if file.suffix == ".json" and
+                                                     get_youtube_id_from_json(file) not in _all_files_stem]
 
-                        _file_list = [{"name": file.stem, "value": file} for file in _batched_files[_offset]]
-                        _file_list.append(q.Separator())
-                        _file_list.append({"name": "Next ->", "value": "__next__"})
-                        _file_list.append({"name": "Previous <-", "value": "__prev__"})
-                        _file_list.append({"name": "Download All", "value": "__all__"})
-                        _file_list.append({"name": "Exit", "value": "__exit__"})
+                            _file_list = [{"name": file.stem, "value": file} for file in _available_json_files]
 
-                        _user_choice = q.select("Please choose the song:", choices=_file_list).ask()
+                            _user_choice = questionary_select("Please choose the song:",
+                                                              choose_data=_file_list,
+                                                              enable_pages=True,
+                                                              enable_all="Download All",
+                                                              enable_exit="Exit",
+                                                              batch_data=True)
 
-                        if _user_choice == "__next__":
-                            if _offset + 1 >= len(_batched_files) :
-                                pass
+                            if _user_choice == "__all__":
+                                _target_ids = [get_youtube_id_from_json(file) for file in _available_json_files]
+                                _tasks = [_download(y_id) for y_id in _target_ids]
+
+                                async def run_batch():
+                                    await asyncio.gather(*_tasks)
+
+                                try:
+                                    loop = asyncio.get_running_loop()
+                                    loop.create_task(run_batch())
+                                except RuntimeError:
+                                    asyncio.run(run_batch())
+
+                                for file in _available_json_files:
+                                    write_json_file(file, True, ["pre_processing", "downloaded"])
+                                _break_off = True
+                                break
                             else:
-                                _offset += 1
-                        elif _user_choice == "__prev__":
-                            if _offset > 0:
-                                _offset -= 1
-                        elif _user_choice == "__all__":
-                            _target_ids = [get_youtube_id_from_json(file) for file in _available_json_files]
-                            _tasks = [_download(y_id) for y_id in _target_ids]
+                                _file_data = read_json_file(_user_choice)
+                                _tasks = [_download(_file_data["pre_processing"]["youtube_id"])]
 
-                            async def run_batch():
-                                await asyncio.gather(*_tasks)
+                                async def run_batch():
+                                    await asyncio.gather(*_tasks)
 
-                            try:
-                                loop = asyncio.get_running_loop()
-                                loop.create_task(run_batch())
-                            except RuntimeError:
-                                asyncio.run(run_batch())
+                                try:
+                                    loop = asyncio.get_running_loop()
+                                    loop.create_task(run_batch())
+                                except RuntimeError:
+                                    asyncio.run(run_batch())
+                # if no songs are available, query spotify
+                else:
+                    self.query_song_spotify()
+        else:
+            target_id = get_youtube_id_from_json(json_file)
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(_download(target_id))
+            except RuntimeError:
+                asyncio.run(_download(target_id))
+    # endregion
 
-                            for file in _available_json_files:
-                                _data_json = json.loads(file.read_text())
-                                _data_json["pre_processing"]["downloaded"] = True
-                                file.write_text(json.dumps(_data_json, indent=4))
+    def process_song(self) -> None:
+        from helper_funcs import questionary_select, write_json_file, read_json_file
+        from lyrics import Lyrics
 
-                            _break_off = True
-                            break
-                        elif _user_choice == "__exit__":
-                            _break_off = True
-                            break
-                        else:
-                            _file_data = json.loads(_user_choice.read_text())
-                            _tasks = [_download(_file_data["pre_processing"]["youtube_id"])]
+        _all_files = [file for file in self._temp_dir.iterdir() if file.suffix == ".json"]
+        _all_files_stem = [file.stem for file in _all_files]
 
-                            async def run_batch():
-                                await asyncio.gather(*_tasks)
+        _song_choice_list = [{"name": file.stem, "value": file} for file in _all_files]
 
-                            try:
-                                loop = asyncio.get_running_loop()
-                                loop.create_task(run_batch())
-                            except RuntimeError:
-                                asyncio.run(run_batch())
-            # if no songs are available, query spotify
-            else:
-                self.query_song_spotify()
+        _user_song_choice = questionary_select("Please choose the song:", choose_data=_song_choice_list)
+        _song_data = read_json_file(_user_song_choice)
+
+        # download the song
+        if _song_data["pre_processing"].get("downloaded", False):
+            self._logger.debug(f"Song already downloaded, skipping")
+        else:
+            self._logger.debug(f"Song not downloaded, downloading it now.")
+            write_json_file(_user_song_choice, True, ["pre_processing", "downloaded"])
+            self.download_song(_user_song_choice)
+
+        # get genius data
+        if _song_data.get("genius_data", None) is None:
+            _genius_data = Lyrics(self._env_data["GENIUS_ACCESS_TOKEN"]).return_metadata(
+                title=_song_data["pre_processing"]["raw_metadata"]["name"],
+                artist=_song_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
+            )
+            write_json_file(_user_song_choice, _genius_data, ["genius_data"])
 
 
 def main() -> None:
@@ -247,8 +271,9 @@ def main() -> None:
     ana._init_downloader()
     # ana._download("https://open.spotify.com/track/0UFmgncRMHavVzYxtpF0IZ?si=1c86deb161b24778")
     # ana._download("https://open.spotify.com/track/0VPkaJMRQIhYWXiE1LqaCK?si=a867127aa85a4769")
-    ana.download_song()
+    # ana.download_song()
     # ana.query_song_spotify()
+    ana.process_song()
 
 
 if __name__ == "__main__":

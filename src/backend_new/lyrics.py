@@ -1,8 +1,8 @@
 from lyricsgenius.types import Song
 
 class Lyrics:
-    def __init__(self, access_token: str = '') -> None:
-        if access_token == '':
+    def __init__(self, access_token: str | None = '') -> None:
+        if access_token == '' or access_token is None:
             raise Exception('Access token is required')
 
         from lyricsgenius import Genius
@@ -25,6 +25,9 @@ class Lyrics:
         elif title != '' and artist != '':
             _data = self._search_song(title=title, artist=artist)
         else:
+            return None
+
+        if _data is None:
             return None
 
         return _data.to_dict()

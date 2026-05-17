@@ -74,32 +74,36 @@ class Downloader:
         :return: A dict of the song metadata (spotify)
         """
         import questionary as q
+        from helper_funcs import questionary_select
 
-        if query != '':
-            _query = query
-        else:
-            if q.select("Please choose query type", choices=["Plain query", "Search by track and artist"]).ask() == "Search by track and artist":
-                _user_title = q.text("Enter title of song: ").ask()
-                _user_artist = q.text("Enter artist of song (optional): ").ask()
+        _query = ''
 
-                _query = f"track:{_user_title}"
-                if _user_artist != '':
-                    _query += f" artist:{_user_artist}"
+        def _ask_for_query() -> None:
+            nonlocal _query
+
+            if query != '':
+                _query = query
             else:
-                _query = q.text("Enter the query to search: ").ask()
+                if questionary_select("Please choose query type", choose_data=["Plain query", "Search by track and artist"]) == "Search by track and artist":
+                    _user_title = q.text("Enter title of song: ").ask()
+                    _user_artist = q.text("Enter artist of song (optional): ").ask()
+
+                    _query = f"track:{_user_title}"
+                    if _user_artist != '':
+                        _query += f" artist:{_user_artist}"
+                else:
+                    _query = q.text("Enter the query to search: ").ask()
+
+        _ask_for_query()
 
         _offset = 0
         while True:
             _song_list = self._sp.search(q=_query, limit=limit, offset=_offset)
-
             _song_list_ask = [{"name": f"{self._extract_title_artist(song)}",
                                "value": song}
                               for song in _song_list['tracks']['items']]
-            _song_list_ask.append(q.Separator())
-            _song_list_ask.append({"name": "Next ->", "value:": "__next__"})
-            _song_list_ask.append({"name": "Previous ->", "value:": "__prev__"})
 
-            _user_song_choice = q.select("Please choose the song:", choices=_song_list_ask).ask()
+            _user_song_choice = questionary_select("Please choose the song:", choose_data=_song_list_ask, enable_pages=True, extra_navigation_options=[{"name": "Retry", "value": "__retry__"}])
 
             if _user_song_choice == '__next__':
                 _offset += 5
@@ -108,6 +112,8 @@ class Downloader:
                     pass
                 else:
                     _offset -= 5
+            elif _user_song_choice == '__retry__':
+                _ask_for_query()
             else:
                 break
 
@@ -152,9 +158,9 @@ class Downloader:
         if choose_top_result:
             return _formatted_results[0]["id"]
         else:
-            import questionary as q
+            from helper_funcs import questionary_select
             _choices = [{"name": f"{song['title']} | {song['channel']} | {song['id']}", "value": index} for index, song in enumerate(_formatted_results)]
-            _user_song_choice = q.select("Please choose the song:", choices=_choices).ask()
+            _user_song_choice = questionary_select("Please choose the song:", choose_data=_choices)
             return _formatted_results[int(_user_song_choice)]["id"]
 
     def download_youtube_video(self, url: str = '', sleep_time_if_fail: float = 5, retry_count: int = 5) -> None:
