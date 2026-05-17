@@ -1,5 +1,11 @@
 class Downloader:
     def __init__(self, spotify_client_id: str = '', spotify_client_secret: str = '', youtube_cookie_path: str = '') -> None:
+        """
+        Initializes the downloader
+        :param spotify_client_id:
+        :param spotify_client_secret:
+        :param youtube_cookie_path: Path to the youtube cookie file, not recommended to use. Cookies require extra authentication and are not guaranteed to work
+        """
         if spotify_client_id == '' or spotify_client_secret == '':
             raise Exception('Spotify client id and secret are required')
 

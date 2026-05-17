@@ -7,7 +7,7 @@ class Analyzer:
     }
 
     DEFAULT_ENV_VARS = [
-        "SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET", "YOUTUBE_COOKIE_PATH"
+        "SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET", "YOUTUBE_COOKIE_PATH", "GENIUS_ACCESS_TOKEN"
     ]
 
     def __init__(self) -> None:
