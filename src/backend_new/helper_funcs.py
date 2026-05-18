@@ -20,7 +20,7 @@ def questionary_select(question_to_ask: str,
     _choose_data = [option for option in choose_data]
 
     def _add_navigation_buttons(input_list: list[dict | str]):
-        if enable_pages or enable_all != '' or enable_exit != '':
+        if enable_pages or enable_all != '' or enable_exit != '' or extra_navigation_options:
             input_list.append(q.Separator())
         if enable_pages:
             input_list.append({"name": "Next ->", "value": "__next__"})

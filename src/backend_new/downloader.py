@@ -6,8 +6,13 @@ class Downloader:
         :param spotify_client_secret:
         :param youtube_cookie_path: Path to the youtube cookie file, not recommended to use. Cookies require extra authentication and are not guaranteed to work
         """
+        from pathlib import Path
+
         if spotify_client_id == '' or spotify_client_secret == '':
             raise Exception('Spotify client id and secret are required')
+
+        self._script_dir = Path(__file__).resolve().parent
+        self._base_dir = self._script_dir.parents[0]
 
         self._spotify_client_id = spotify_client_id
         self._spotify_client_secret = spotify_client_secret
@@ -178,7 +183,7 @@ class Downloader:
             raise Exception('YouTube URL is required')
 
         ydl_opts = {'format': 'm4a/bestaudio/best',
-                    'paths': {'home': '../.temp'},
+                    'paths': {'home': f'{str(self._base_dir / ".temp")}'},
                     'outtmpl': '%(id)s.%(ext)s',
                     'postprocessors': [{
                         'key': 'FFmpegExtractAudio',

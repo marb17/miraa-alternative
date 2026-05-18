@@ -1,4 +1,3 @@
-from typing import Any
 from pathlib import Path
 
 class Analyzer:
@@ -29,20 +28,22 @@ class Analyzer:
         """Sets up the main directories for the analyzer."""
         from pathlib import Path
 
-        self._base_dir = Path("../")
+        self._script_dir = Path(__file__).resolve().parent
+        self._base_dir = self._script_dir.parents[0]
+
         folder = ["data", "config", "models", ".temp"]
         for path in folder:
             Path(self._base_dir / path).mkdir(parents=True, exist_ok=True)
         self._logger.debug("Main Directories created.")
 
         self._temp_dir = Path(self._base_dir / ".temp")
+        self._config_file = Path(self._base_dir / "config/config.json")
+        self._env_file = Path(self._base_dir / "config/.env")
 
     def _setup_config_file(self) -> None:
         """Sets up the config file for the analyzer. Writes default values if it doesn't exist."""
-        from pathlib import Path
         import json
 
-        self._config_file = Path(self._base_dir / "config/config.json")
         if not self._config_file.exists():
             config_json = json.dumps(self.DEFAULT_CONFIG, indent=4)
             self._config_file.write_text(config_json)
@@ -65,7 +66,6 @@ class Analyzer:
         from pathlib import Path
         from dotenv import load_dotenv
 
-        self._env_file = Path(self._base_dir / "config/.env")
         if self._env_file.exists():
             load_dotenv(dotenv_path=self._env_file)
             self._logger.debug("Loaded .env file.")
@@ -240,30 +240,68 @@ class Analyzer:
     def process_song(self) -> None:
         from helper_funcs import questionary_select, write_json_file, read_json_file
         from lyrics import Lyrics
+        import gc
 
-        _all_files = [file for file in self._temp_dir.iterdir() if file.suffix == ".json"]
-        _all_files_stem = [file.stem for file in _all_files]
+        while True:
+            _all_files = [file for file in self._temp_dir.iterdir() if file.suffix == ".json"]
+            _all_files_stem = [file.stem for file in _all_files]
 
-        _song_choice_list = [{"name": file.stem, "value": file} for file in _all_files]
+            _song_choice_list = [{"name": file.stem, "value": file} for file in _all_files]
 
-        _user_song_choice = questionary_select("Please choose the song:", choose_data=_song_choice_list)
+            _user_song_choice = questionary_select("Please choose the song:", choose_data=_song_choice_list, extra_navigation_options=[{"name": "Download New", "value": "__new__"}])
+            if _user_song_choice == "__new__":
+                self.query_song_spotify()
+            else:
+                break
+
         _song_data = read_json_file(_user_song_choice)
 
-        # download the song
-        if _song_data["pre_processing"].get("downloaded", False):
-            self._logger.debug(f"Song already downloaded, skipping")
-        else:
-            self._logger.debug(f"Song not downloaded, downloading it now.")
-            write_json_file(_user_song_choice, True, ["pre_processing", "downloaded"])
-            self.download_song(_user_song_choice)
+        def update_song_data() -> None:
+            nonlocal _song_data
+            _song_data = read_json_file(_user_song_choice)
 
-        # get genius data
-        if _song_data.get("genius_data", None) is None:
-            _genius_data = Lyrics(self._env_data["GENIUS_ACCESS_TOKEN"]).return_metadata(
-                title=_song_data["pre_processing"]["raw_metadata"]["name"],
-                artist=_song_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
-            )
-            write_json_file(_user_song_choice, _genius_data, ["genius_data"])
+        # region all processes, returns True if already done
+        def _download() -> bool:
+            if _song_data.get("pre_processing", {}).get("downloaded", False):
+                self._logger.debug(f"Song already downloaded, skipping")
+                return True
+            else:
+                self._logger.debug(f"Song not downloaded, downloading it now.")
+                write_json_file(_user_song_choice, True, ["pre_processing", "downloaded"])
+                self.download_song(_user_song_choice)
+                return False
+
+        def _genius_pull() -> bool:
+            if _song_data.get("genius_data", None) is not None:
+                self._logger.debug(f"Genius data already present, skipping")
+                return True
+            else:
+                _genius_data = Lyrics(self._env_data["GENIUS_ACCESS_TOKEN"]).return_metadata(
+                    title=_song_data["pre_processing"]["raw_metadata"]["name"],
+                    artist=_song_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
+                )
+                write_json_file(_user_song_choice, _genius_data, ["genius_data"])
+                return False
+
+        def _vocal_sep() -> bool:
+            if _song_data.get("vocal_separation", {}).get("separated", False) is True:
+                self._logger.debug(f"Vocal separation already done, skipping")
+                return True
+            else:
+                from processing import VocalSeparation
+                _vs = VocalSeparation()
+                _vs.separate_vocal(f"../.temp/{_song_data["pre_processing"]["youtube_id"]}.wav")
+                write_json_file(_user_song_choice, True, ["vocal_separation", "separated"])
+
+                del _vs
+                gc.collect()
+                return False
+        # endregion
+
+        # main loop
+        _download()
+        _genius_pull()
+        _vocal_sep()
 
 
 def main() -> None:
