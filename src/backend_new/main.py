@@ -1,10 +1,18 @@
 from pathlib import Path
 
 class Analyzer:
+    class DataMismatchError(Exception):
+        pass
+
     DEFAULT_CONFIG = {
         "version": "1.0.0",
         "youtube_downloader": {
             "use_cookies": False
+        },
+        "skip_processes": {
+            "download_song": False,
+            "genius_metadata": False,
+            "vocal_separation": False
         }
     }
 
@@ -56,6 +64,10 @@ class Analyzer:
 
         self._logger.info(f"miraa-alternative Version: {self._config_json['version']}")
 
+    def _update_json_config(self) -> None:
+        from helper_funcs import read_json_file
+        self._config_json = read_json_file(self._config_file)
+
     def _load_env_file(self) -> None:
         """
         Loads the environment variables from the .env file.
@@ -63,7 +75,6 @@ class Analyzer:
         DOES NOT check if the file is filled
         """
         import os
-        from pathlib import Path
         from dotenv import load_dotenv
 
         if self._env_file.exists():
@@ -118,7 +129,7 @@ class Analyzer:
 
     def query_song_spotify(self) -> None:
         """
-        query a song from spotify and save it to a json file with all data needed
+        query a song from spotify and save it to a JSON file with all data needed
         """
         import json
 
@@ -138,7 +149,7 @@ class Analyzer:
         """
         Downloads a song from YouTube using metadata present in .temp
         When no files are present, it will query spotify
-        :param json_file: A path to a json file containing metadata, optional
+        :param json_file: A path to a JSON file containing metadata, optional
         """
         from pathlib import Path
         from helper_funcs import questionary_select, write_json_file, read_json_file
@@ -149,11 +160,13 @@ class Analyzer:
                 return str(read_json_file(file_path)["pre_processing"]["youtube_id"])
             return None
 
-        async def _download(file_path: Path | str) -> None:
-            if type(file_path) is Path:
-                await asyncio.to_thread(self._dl.download_youtube_video, url=get_youtube_id_from_json(file_path))
+        async def _download(file_path: Path | str | None) -> None:
+            if file_path is None:
+                raise Exception("No file path provided")
             if type(file_path) is str:
                 await asyncio.to_thread(self._dl.download_youtube_video, url=file_path)
+            if type(file_path) is Path:
+                await asyncio.to_thread(self._dl.download_youtube_video, url=get_youtube_id_from_json(file_path))
 
         _break_off = False
 
@@ -238,9 +251,11 @@ class Analyzer:
     # endregion
 
     def process_song(self) -> None:
-        from helper_funcs import questionary_select, write_json_file, read_json_file
-        from lyrics import Lyrics
+        from helper_funcs import questionary_select, questionary_checkbox, write_json_file, read_json_file
+        from questionary import Choice, confirm
         import gc
+
+        self._init_downloader()
 
         while True:
             _all_files = [file for file in self._temp_dir.iterdir() if file.suffix == ".json"]
@@ -263,15 +278,27 @@ class Analyzer:
         # region all processes, returns True if already done
         def _download() -> bool:
             if _song_data.get("pre_processing", {}).get("downloaded", False):
+                if _song_data["pre_processing"].get("youtube_id", None) not in [file.stem for file in self._temp_dir.iterdir() if file.suffix == ".wav"]:
+                    self._logger.warning("Data file says audio has been downloaded, but it isn't present in .temp directory")
+                    self._logger.warning("Please do not rename, convert or alter files in .temp to prevent further errors")
+                    self._logger.warning("Please clear all files in .temp directory to ensure proper functionality")
+                    if confirm("Do you want to retry?").ask():
+                        write_json_file(_user_song_choice, False, ["pre_processing", "downloaded"])
+                        update_song_data()
+                        _download()
+                    else:
+                        raise self.DataMismatchError
                 self._logger.debug(f"Song already downloaded, skipping")
                 return True
             else:
                 self._logger.debug(f"Song not downloaded, downloading it now.")
-                write_json_file(_user_song_choice, True, ["pre_processing", "downloaded"])
                 self.download_song(_user_song_choice)
+                write_json_file(_user_song_choice, True, ["pre_processing", "downloaded"])
                 return False
 
         def _genius_pull() -> bool:
+            from lyrics import Lyrics
+
             if _song_data.get("genius_data", None) is not None:
                 self._logger.debug(f"Genius data already present, skipping")
                 return True
@@ -298,15 +325,59 @@ class Analyzer:
                 return False
         # endregion
 
+        # skip processes
+        _skip_options = self._config_json.get("skip_processes")
+
+        _choice_list = [Choice("Download song",
+                               value="download_song",
+                               checked=_skip_options['download_song'],
+                               disabled="Song already downloaded" if _song_data["pre_processing"]["downloaded"] else None),
+                        Choice("Get Genius metadata",
+                               value="genius_metadata",
+                               checked=_skip_options['genius_metadata'],
+                               disabled="Data already gathered" if _song_data.get("genius_data") else None),
+                        Choice("Separate audio into stems",
+                               value="vocal_separation",
+                               checked=_skip_options['vocal_separation'],
+                               disabled="Stems already separated" if _song_data.get("vocal_separation", {}).get("separated") else None)]
+
+        _skip_processes = questionary_checkbox("Please choose what options to skip", choice_data=_choice_list)
+        if _skip_processes != [k for k in _skip_options if _skip_options[k]]:
+            _write_skip_to_json = confirm("Do you want to set this to default?").ask()
+        else:
+            _write_skip_to_json = False
+
+        for key in _skip_options:
+            if key in _skip_processes:
+                _skip_options[key] = True
+            else:
+                _skip_options[key] = False
+
+        if _write_skip_to_json:
+            write_json_file(self._config_file, _skip_options, ["skip_processes"])
+
+        self._update_json_config()
+
         # main loop
-        _download()
-        _genius_pull()
-        _vocal_sep()
+        while True:
+            if not self._config_json["skip_processes"]["download_song"]:
+                _download()
+            if not self._config_json["skip_processes"]["genius_metadata"]:
+                _genius_pull()
+            if not self._config_json["skip_processes"]["vocal_separation"]:
+                if not _song_data["pre_processing"].get("downloaded", False):
+                    self._logger.info("Audio cannot be separated as it hasn't been downloaded")
+                    if confirm("Would you like to download first?").ask():
+                        _download()
+                    else:
+                        break
+                _vocal_sep()
+
+            break
 
 
 def main() -> None:
     ana = Analyzer()
-    ana._init_downloader()
     # ana._download("https://open.spotify.com/track/0UFmgncRMHavVzYxtpF0IZ?si=1c86deb161b24778")
     # ana._download("https://open.spotify.com/track/0VPkaJMRQIhYWXiE1LqaCK?si=a867127aa85a4769")
     # ana.download_song()

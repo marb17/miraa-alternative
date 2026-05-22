@@ -1,14 +1,14 @@
 class Downloader:
-    def __init__(self, spotify_client_id: str = '', spotify_client_secret: str = '', youtube_cookie_path: str = '') -> None:
+    def __init__(self, spotify_client_id: str | None = None, spotify_client_secret: str | None = None, youtube_cookie_path: str | None = None) -> None:
         """
         Initializes the downloader
         :param spotify_client_id:
         :param spotify_client_secret:
-        :param youtube_cookie_path: Path to the youtube cookie file, not recommended to use. Cookies require extra authentication and are not guaranteed to work
+        :param youtube_cookie_path: Path to the YouTube cookie file, not recommended to use. Cookies require extra authentication and are not guaranteed to work
         """
         from pathlib import Path
 
-        if spotify_client_id == '' or spotify_client_secret == '':
+        if spotify_client_id is None or spotify_client_secret is None:
             raise Exception('Spotify client id and secret are required')
 
         self._script_dir = Path(__file__).resolve().parent
@@ -16,7 +16,7 @@ class Downloader:
 
         self._spotify_client_id = spotify_client_id
         self._spotify_client_secret = spotify_client_secret
-        self._youtube_cookie_path = youtube_cookie_path
+        self._youtube_cookie_path = youtube_cookie_path if youtube_cookie_path else ''
 
         self._authenticate()
 
@@ -90,12 +90,15 @@ class Downloader:
                 _query = query
             else:
                 if questionary_select("Please choose query type", choose_data=["Plain query", "Search by track and artist"]) == "Search by track and artist":
-                    _user_title = q.text("Enter title of song: ").ask()
-                    _user_artist = q.text("Enter artist of song (optional): ").ask()
 
-                    _query = f"track:{_user_title}"
-                    if _user_artist != '':
-                        _query += f" artist:{_user_artist}"
+                    _user_query = q.form(
+                        _user_title=q.text("Enter title of song: ").ask(),
+                        _user_artist = q.text("Enter artist of song (optional): ").ask()
+                    ).ask()
+
+                    _query = f"track:{_user_query['_user_title']}"
+                    if _user_query['_user_artist'] != '':
+                        _query += f" artist:{_user_query['_user_artist']}"
                 else:
                     _query = q.text("Enter the query to search: ").ask()
 
@@ -189,6 +192,8 @@ class Downloader:
                         'key': 'FFmpegExtractAudio',
                         'preferredcodec': 'wav',
                     }]}
+        # TODO add option for macOS since idk if ffmpeg works for macOS
+
         if self._youtube_cookie_path != '':
             ydl_opts["cookiefile"] = self._youtube_cookie_path
             ydl_opts['remote_components'] = ['ejs:github']
@@ -204,5 +209,5 @@ class Downloader:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.download([url])
                     break
-            except (DownloadError, ExtractorError) as e:
+            except (DownloadError, ExtractorError):
                 sleep(sleep_time_if_fail)

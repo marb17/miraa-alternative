@@ -2,9 +2,11 @@ import questionary as q
 from typing import Any
 from itertools import batched
 from pathlib import Path
+from questionary import Choice
 
+# region questionary
 def questionary_select(question_to_ask: str,
-                       choose_data: list[dict | str],
+                       choose_data: list[dict | str] | list[Choice],
                        use_shortcuts: bool = False,
                        enable_pages: bool = False,
                        batch_data: bool = False,
@@ -62,6 +64,14 @@ def questionary_select(question_to_ask: str,
 
     return _user_choice
 
+def questionary_checkbox(question_to_ask: str,
+                         choice_data : list[dict | str] | list[Choice]) -> Any:
+    import questionary as q
+
+    return q.checkbox(question_to_ask, choices=choice_data).ask()
+# endregion
+
+# region json read and write
 def read_json_file(file_path: Path) -> dict:
     import json
     return json.loads(file_path.read_text())
@@ -81,3 +91,4 @@ def write_json_file(file_path: Path, data: Any, keys: list[str] = None) -> None:
         _current_level[keys[-1]] = data
 
     file_path.write_text(json.dumps(_data, indent=4))
+# endregion
