@@ -1,5 +1,8 @@
 class Downloader:
-    def __init__(self, spotify_client_id: str | None = None, spotify_client_secret: str | None = None, youtube_cookie_path: str | None = None) -> None:
+    def __init__(self, spotify_client_id: str = None,
+                 spotify_client_secret: str = None,
+                 youtube_cookie_path: str = None,
+                 cli_output_format: dict[str, bool] = None) -> None:
         """
         Initializes the downloader
         :param spotify_client_id:
@@ -17,6 +20,7 @@ class Downloader:
         self._spotify_client_id = spotify_client_id
         self._spotify_client_secret = spotify_client_secret
         self._youtube_cookie_path = youtube_cookie_path if youtube_cookie_path else ''
+        self._cli_output_format = cli_output_format
 
         self._authenticate()
 
@@ -74,6 +78,7 @@ class Downloader:
     def cli_search_song(self, limit: int = 10, query: str = '') -> dict: # TODO make limit in config file
         """
         Searches a song using spotify querying
+        :param cli_output_format: The output format for the CLI, shows different information to help differentiate duplicate songs when querying
         :param query: A query to search for, defaults to none using CLI interface
         :param limit: How many songs to show at a time
         :return: A dict of the song metadata (spotify)
@@ -104,14 +109,41 @@ class Downloader:
 
         _ask_for_query()
 
+        def milliseconds_to_minutes_and_seconds(milliseconds: int) -> str:
+            seconds = milliseconds // 1000
+            minutes, seconds = divmod(seconds, 60)
+            return f"{minutes:02d}:{seconds:02d}"
+
+        def format_name(song_data: dict, duration: bool = True, album: bool = True, popularity: bool = True) -> str:
+            if self._cli_output_format is not None:
+                name = str(self._extract_title_artist(song_data))
+                if duration:
+                    name += f" | {milliseconds_to_minutes_and_seconds(song_data['duration_ms'])}"
+                if album:
+                    name += f" | {song_data['album']['name']} : {song_data['album']['release_date'][:4]}"
+                if popularity:
+                    name += f" | Relevance: {song_data['popularity']}%"
+                return name
+            else:
+                return str(self._extract_title_artist(song_data))
+
         _offset = 0
         while True:
             _song_list = self._sp.search(q=_query, limit=limit, offset=_offset)
-            _song_list_ask = [{"name": f"{self._extract_title_artist(song)}",
-                               "value": song}
-                              for song in _song_list['tracks']['items']]
+            if self._cli_output_format is not None:
+                _song_list_ask = [{"name": format_name(song, duration=self._cli_output_format.get('duration', False),
+                                                       album=self._cli_output_format.get('album', False),
+                                                       popularity=self._cli_output_format.get('popularity', False)),
+                                   "value": song}
+                                  for song in _song_list['tracks']['items']]
+            else:
+                _song_list_ask = [{"name": format_name(song), "value": song}
+                                  for song in _song_list['tracks']['items']]
 
-            _user_song_choice = questionary_select("Please choose the song: (prefer JP titles)", choose_data=_song_list_ask, enable_pages=True, extra_navigation_options=[{"name": "Retry", "value": "__retry__"}])
+            _user_song_choice = questionary_select("Please choose the song: (prefer JP titles)",
+                                                   choose_data=_song_list_ask,
+                                                   enable_pages=True,
+                                                   extra_navigation_options=[q.Choice("Retry", value='__retry__', shortcut_key='r')])
 
             if _user_song_choice == '__next__':
                 _offset += 5
@@ -127,7 +159,7 @@ class Downloader:
 
         return _user_song_choice
 
-    def youtube_query(self, query: str = '', limit: int = 3, choose_top_result: bool = False) -> str:
+    def youtube_query(self, query: str = '', limit: int = 10, choose_top_result: bool = False) -> str:
         """
         Searches for a song on YouTube and returns the id of the song
         :param query: Query to search for
@@ -160,15 +192,21 @@ class Downloader:
                 _formatted_results.append({
                     "id": track.get("id"),
                     "title": track.get("title"),
-                    "channel": track.get("uploader")
+                    "channel": track.get("uploader"),
+                    "duration": track.get("duration"),
+                    "view_count": track.get("view_count")
                 })
+
+        def format_to_minutes_and_seconds(seconds: int) -> str:
+            minutes, seconds = divmod(int(seconds), 60)
+            return f"{minutes:02d}:{seconds:02d}"
 
         if choose_top_result:
             return _formatted_results[0]["id"]
         else:
             from helper_funcs import questionary_select
-            _choices = [{"name": f"{song['title']} | {song['channel']} | {song['id']}", "value": index} for index, song in enumerate(_formatted_results)]
-            _user_song_choice = questionary_select("Please choose the song: (prefer JP titles)", choose_data=_choices)
+            _choices = [{"name": f"{song['title']} | {song['channel']} | {format_to_minutes_and_seconds(song['duration'])} | {song['view_count']} | {song['id']}", "value": index} for index, song in enumerate(_formatted_results)]
+            _user_song_choice = questionary_select(f"Please choose the song: (prefer JP titles)", choose_data=_choices)
             return _formatted_results[int(_user_song_choice)]["id"]
 
     def download_youtube_video(self, url: str = '', sleep_time_if_fail: float = 5, retry_count: int = 5) -> None:

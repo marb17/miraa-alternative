@@ -109,7 +109,7 @@ class JPSplitTagger:
 
     # TODO do nagisa for main analyzer
     # TODO maybe use SudachiPy or fugashi for backup?
-    # TODO add fall back when lyrics are romanized
+    # TODO add fallback when lyrics are romanized
 
     def tag(self, text: str) -> dict[str, Any]:
         import nagisa

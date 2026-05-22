@@ -6,6 +6,13 @@ class Analyzer:
 
     DEFAULT_CONFIG = {
         "version": "1.0.0",
+        "spotify_downloader": {
+            "output_format": {
+                "duration": True,
+                "album": True,
+                "popularity": True
+            }
+        },
         "youtube_downloader": {
             "use_cookies": False
         },
@@ -125,7 +132,8 @@ class Analyzer:
 
             self._dl = downloader.Downloader(spotify_client_id=self._env_data["SPOTIFY_CLIENT_ID"],
                                              spotify_client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"],
-                                             youtube_cookie_path=self._env_data["YOUTUBE_COOKIE_PATH"])
+                                             youtube_cookie_path=self._env_data["YOUTUBE_COOKIE_PATH"],
+                                             cli_output_format=self._config_json["spotify_downloader"]["output_format"])
 
     def query_song_spotify(self) -> None:
         """
@@ -138,7 +146,6 @@ class Analyzer:
         _data = self._dl.cli_search_song()
         _view_name = self._dl.get_title_artist(metadata=_data)
         _youtube_id = self._dl.youtube_query(query=_view_name)
-
         _json_data = json.dumps({"pre_processing": {"youtube_id": _youtube_id, "view_name": _view_name, "raw_metadata": _data}}, indent=4)
         _file_path = self._temp_dir / f"{_view_name}.json"
 
@@ -263,7 +270,12 @@ class Analyzer:
 
             _song_choice_list = [{"name": file.stem, "value": file} for file in _all_files]
 
-            _user_song_choice = questionary_select("Please choose the song:", choose_data=_song_choice_list, extra_navigation_options=[{"name": "Download New", "value": "__new__"}])
+            if not _song_choice_list:
+                _song_choice_list.append(Choice(title="No songs available, please download a song first", disabled=True))
+
+            _user_song_choice = questionary_select("Please choose the song:",
+                                                   choose_data=_song_choice_list,
+                                                   extra_navigation_options=[Choice("Download New", value="__new__", shortcut_key="n")])
             if _user_song_choice == "__new__":
                 self.query_song_spotify()
             else:
@@ -304,6 +316,7 @@ class Analyzer:
                 self._logger.debug(f"Genius data already present, skipping")
                 return True
             else:
+                self._logger.debug(f"Genius data not present, pulling it now.")
                 _genius_data = GeniusExtractor(self._env_data["GENIUS_ACCESS_TOKEN"]).return_metadata(
                     title=_song_data["pre_processing"]["raw_metadata"]["name"],
                     artist=_song_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
@@ -367,13 +380,16 @@ class Analyzer:
         while True:
             if not self._config_json["skip_processes"]["download_song"]:
                 _download()
+            update_song_data()
             if not self._config_json["skip_processes"]["genius_metadata"]:
                 _genius_pull()
+            update_song_data()
             if not self._config_json["skip_processes"]["vocal_separation"]:
                 if not _song_data["pre_processing"].get("downloaded", False):
                     self._logger.info("Audio cannot be separated as it hasn't been downloaded")
                     if confirm("Would you like to download first?").ask():
                         _download()
+                        continue
                     else:
                         break
                 _vocal_sep()

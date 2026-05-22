@@ -1,19 +1,17 @@
-import questionary as q
 from typing import Any
-from itertools import batched
 from pathlib import Path
 from questionary import Choice
 
 # region questionary
 def questionary_select(question_to_ask: str,
                        choose_data: list[dict | str] | list[Choice],
-                       use_shortcuts: bool = False,
+                       use_shortcuts: bool = True,
                        enable_pages: bool = False,
                        batch_data: bool = False,
                        batch_size: int = 5,
                        enable_all: str = '',
                        enable_exit: str = '',
-                       extra_navigation_options: list[dict | str] = []) -> Any:
+                       extra_navigation_options: list[dict | str] | list[Choice] = None) -> Any:
     import questionary as q
 
     if batch_data and not enable_pages:
@@ -25,17 +23,19 @@ def questionary_select(question_to_ask: str,
         if enable_pages or enable_all != '' or enable_exit != '' or extra_navigation_options:
             input_list.append(q.Separator())
         if enable_pages:
-            input_list.append({"name": "Next ->", "value": "__next__"})
-            input_list.append({"name": "Previous <-", "value": "__prev__"})
+            input_list.append(Choice("Next ->", value = "__next__", shortcut_key='w'))
+            input_list.append(Choice("Previous <-", value= "__prev__", shortcut_key='s'))
         if enable_all != '':
-            input_list.append({"name": enable_all, "value": "__all__"})
+            input_list.append(Choice(enable_all, value= "__all__", shortcut_key='a'))
         if enable_exit != '':
-            input_list.append({"name": enable_exit, "value": "__exit__"})
+            input_list.append(Choice(enable_exit, value= "__exit__", shortcut_key='e'))
         if extra_navigation_options:
             for option in extra_navigation_options:
                 input_list.append(option)
 
-    if enable_pages:
+    if enable_pages and batch_data:
+        from itertools import batched
+
         _offset = 0
 
         while True:
