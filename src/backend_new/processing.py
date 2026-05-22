@@ -1,3 +1,6 @@
+from typing import Any
+
+
 class VocalSeparation:
     def __init__(self) -> None:
         """
@@ -17,6 +20,7 @@ class VocalSeparation:
         self._output_dir = f'{self._base_dir / ".temp"}'
         self._model_file_dir = f'{self._base_dir / "models/audioseparator"}'
 
+        # TODO add normal models for more stuff yesyes
         self._separator_objects = {"vocal_full": Separator(output_dir=str(self._output_dir),
                                                            model_file_dir=str(self._model_file_dir),
                                                            ensemble_preset='vocal_full'),
@@ -30,9 +34,12 @@ class VocalSeparation:
                                                            model_file_dir=str(self._model_file_dir),
                                                            ensemble_preset='instrumental_low_resource')
                                    }
+    @property
+    def separator_objects(self) -> list[str]:
+        return list(self._separator_objects)
 
     def _init_model(self, model_name: str = "vocal_full") -> None:
-        _model = self._separator_objects.get(model_name)
+        _model = self._separator_objects.get(model_name, None)
 
         if _model is None:
             raise Exception(f"Model {model_name} not found")
@@ -53,6 +60,7 @@ class VocalSeparation:
         def rename_file(file_path: Path, name: str) -> None:
             file_path.rename(f"{str(self._output_dir)}/{_win_audio_path.stem}_{name}.wav")
 
+        # different models output differently, if flipped recheck this
         match model:
             case "vocal_full":
                 rename_file(_output_files[0], "inst")
@@ -66,3 +74,57 @@ class VocalSeparation:
             case "instrumental_low_resource":
                 rename_file(_output_files[0], "vocal")
                 rename_file(_output_files[1], "inst")
+
+
+class JPSplitTagger:
+    japanese_pos_translation = {
+        "oov": "out of vocabulary",
+        "補助記号": "auxiliary sign / punctuation",
+        "名詞": "noun",
+        "空白": "whitespace",
+        "助詞": "particle",
+        "接尾辞": "suffix",
+        "動詞": "verb",
+        "連体詞": "adnominal / pre-noun adjectival",
+        "助動詞": "auxiliary verb",
+        "形容詞": "i-adjective / adjective",
+        "感動詞": "interjection",
+        "接頭辞": "prefix",
+        "記号": "symbol",
+        "接続詞": "conjunction",
+        "副詞": "adverb",
+        "代名詞": "pronoun",
+        "形状詞": "na-adjective / adjectival noun",
+        "web誤脱": "web typo / omission / error",
+        "URL": "URL",
+        "英単語": "English word",
+        "漢文": "Kanbun / classical Chinese text",
+        "未知語": "unknown word",
+        "言いよどみ": "filler / hesitation word",
+        "ローマ字文": "Romanized text / Romaji sentence"
+    }
+
+    def __init__(self) -> None:
+        pass
+
+    # TODO do nagisa for main analyzer
+    # TODO maybe use SudachiPy or fugashi for backup?
+    # TODO add fall back when lyrics are romanized
+
+    def tag(self, text: str) -> dict[str, Any]:
+        import nagisa
+
+        _data = nagisa.tagging(text)
+        _en_pos = [self.japanese_pos_translation[pos] for pos in _data.postags]
+
+        return {"words": _data.words,
+                "pos": _data.postags,
+                "en_pos": _en_pos,
+                "text": _data.text}
+
+# import nagisa
+# print(nagisa.tagger.postags)
+#
+jp = JPSplitTagger()
+data = jp.tag("姿形の見えない魔物どこへでも連れて行くよ街を見下ろして")
+print(data)

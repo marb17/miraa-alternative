@@ -298,13 +298,13 @@ class Analyzer:
                 return False
 
         def _genius_pull() -> bool:
-            from lyrics import Lyrics
+            from geniusextractor import GeniusExtractor
 
             if _song_data.get("genius_data", None) is not None:
                 self._logger.debug(f"Genius data already present, skipping")
                 return True
             else:
-                _genius_data = Lyrics(self._env_data["GENIUS_ACCESS_TOKEN"]).return_metadata(
+                _genius_data = GeniusExtractor(self._env_data["GENIUS_ACCESS_TOKEN"]).return_metadata(
                     title=_song_data["pre_processing"]["raw_metadata"]["name"],
                     artist=_song_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
                 )
@@ -312,6 +312,7 @@ class Analyzer:
                 return False
 
         def _vocal_sep() -> bool:
+            # TODO add vocal sep model chooser
             if _song_data.get("vocal_separation", {}).get("separated", False) is True:
                 # TODO add vocal sep audio file check
 
@@ -335,7 +336,7 @@ class Analyzer:
         _choice_list = [Choice("Download song",
                                value="download_song",
                                checked=_skip_options['download_song'],
-                               disabled="Song already downloaded" if _song_data["pre_processing"]["downloaded"] else None),
+                               disabled="Song already downloaded" if _song_data.get("pre_processing", {}).get("downloaded") else None),
                         Choice("Get Genius metadata",
                                value="genius_metadata",
                                checked=_skip_options['genius_metadata'],

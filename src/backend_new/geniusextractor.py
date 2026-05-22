@@ -1,6 +1,7 @@
+import lyricsgenius
 from lyricsgenius.types import Song
 
-class Lyrics:
+class GeniusExtractor:
     def __init__(self, access_token: str | None = '') -> None:
         if access_token == '' or access_token is None:
             raise Exception('Access token is required')

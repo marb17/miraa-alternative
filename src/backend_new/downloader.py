@@ -111,7 +111,7 @@ class Downloader:
                                "value": song}
                               for song in _song_list['tracks']['items']]
 
-            _user_song_choice = questionary_select("Please choose the song:", choose_data=_song_list_ask, enable_pages=True, extra_navigation_options=[{"name": "Retry", "value": "__retry__"}])
+            _user_song_choice = questionary_select("Please choose the song: (prefer JP titles)", choose_data=_song_list_ask, enable_pages=True, extra_navigation_options=[{"name": "Retry", "value": "__retry__"}])
 
             if _user_song_choice == '__next__':
                 _offset += 5
@@ -168,7 +168,7 @@ class Downloader:
         else:
             from helper_funcs import questionary_select
             _choices = [{"name": f"{song['title']} | {song['channel']} | {song['id']}", "value": index} for index, song in enumerate(_formatted_results)]
-            _user_song_choice = questionary_select("Please choose the song:", choose_data=_choices)
+            _user_song_choice = questionary_select("Please choose the song: (prefer JP titles)", choose_data=_choices)
             return _formatted_results[int(_user_song_choice)]["id"]
 
     def download_youtube_video(self, url: str = '', sleep_time_if_fail: float = 5, retry_count: int = 5) -> None:
