@@ -278,6 +278,7 @@ class Analyzer:
         # region all processes, returns True if already done
         def _download() -> bool:
             if _song_data.get("pre_processing", {}).get("downloaded", False):
+                # checks if the audio file is present in the .temp dir, if not handle appropriately
                 if _song_data["pre_processing"].get("youtube_id", None) not in [file.stem for file in self._temp_dir.iterdir() if file.suffix == ".wav"]:
                     self._logger.warning("Data file says audio has been downloaded, but it isn't present in .temp directory")
                     self._logger.warning("Please do not rename, convert or alter files in .temp to prevent further errors")
@@ -312,6 +313,8 @@ class Analyzer:
 
         def _vocal_sep() -> bool:
             if _song_data.get("vocal_separation", {}).get("separated", False) is True:
+                # TODO add vocal sep audio file check
+
                 self._logger.debug(f"Vocal separation already done, skipping")
                 return True
             else:
@@ -328,6 +331,7 @@ class Analyzer:
         # skip processes
         _skip_options = self._config_json.get("skip_processes")
 
+        # choice list for skip processes, update when adding new processes
         _choice_list = [Choice("Download song",
                                value="download_song",
                                checked=_skip_options['download_song'],
@@ -358,7 +362,7 @@ class Analyzer:
 
         self._update_json_config()
 
-        # main loop
+        # main loop for processes
         while True:
             if not self._config_json["skip_processes"]["download_song"]:
                 _download()
