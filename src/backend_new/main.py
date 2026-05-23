@@ -404,10 +404,9 @@ class Analyzer:
                 return False
         # endregion
 
-        # skip processes
+        # region choice list for skip processes, update when adding new processes
         _skip_options = self._config_json.get("skip_processes")
 
-        # choice list for skip processes, update when adding new processes
         _choice_list = [Choice("Download song",
                                value="download_song",
                                checked=_skip_options['download_song'],
@@ -437,8 +436,9 @@ class Analyzer:
             write_json_file(self._config_file, _skip_options, ["skip_processes"])
 
         self._update_json_config()
+        # endregion
 
-        # main loop for processes
+        # region main loop for processes
         while True:
             if not self._config_json["skip_processes"]["download_song"]:
                 _download()
@@ -457,6 +457,7 @@ class Analyzer:
                 _vocal_sep()
 
             break
+        # endregion
 
 
 def main() -> None:

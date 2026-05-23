@@ -1,6 +1,6 @@
 from typing import Any
 
-
+# region vocal sep
 class VocalSeparation:
     def __init__(self) -> None:
         """
@@ -74,7 +74,21 @@ class VocalSeparation:
             case "instrumental_low_resource":
                 rename_file(_output_files[0], "vocal")
                 rename_file(_output_files[1], "inst")
+# endregion
 
+# region japanese morphological analyzer
+def _tag_data(text_data: str, translation_dict: dict[str, str] = None) -> dict[str, Any] | None:
+    import nagisa
+    if text_data is None or text_data == "":
+        return None
+    if translation_dict is None:
+        raise ValueError("Please put a translation dict in kwargs")
+    _data = nagisa.tagging(text_data)
+    _en_pos = [translation_dict[pos] for pos in _data.postags]
+    return {"words": _data.words,
+            "pos": _data.postags,
+            "en_pos": _en_pos,
+            "text": _data.text}
 
 class JPSplitTagger:
     japanese_pos_translation = {
@@ -107,32 +121,27 @@ class JPSplitTagger:
     def __init__(self) -> None:
         pass
 
-    # TODO do nagisa for main analyzer
     # TODO maybe use SudachiPy or fugashi for backup?
     # TODO add fallback when lyrics are romanized
 
-    def tag(self, text: str, split_newline: bool = True) -> dict[str, Any] | list[dict[str, Any]]:
+    def tag(self, text: str, split_newline: bool = True) -> dict[str, Any] | list[dict[str, Any] | None] | None:
         """
         Tags a string into their parts (including pos)
         :param text: String to process
         :param split_newline: Whether to split the text into lines
         :return: A dict containing the words, their parts, and the text itself
         """
-        import nagisa
+        from functools import partial
 
-        # TODO add the split thing
+        if split_newline:
+            from concurrent.futures import ProcessPoolExecutor
+            _split_text = text.split("\n")
 
-        _data = nagisa.tagging(text)
-        _en_pos = [self.japanese_pos_translation[pos] for pos in _data.postags]
+            _fixed_tagger = partial(_tag_data, translation_dict=self.japanese_pos_translation)
 
-        return {"words": _data.words,
-                "pos": _data.postags,
-                "en_pos": _en_pos,
-                "text": _data.text}
+            with ProcessPoolExecutor(max_workers=10) as executor:
+                results = list(executor.map(_fixed_tagger, _split_text))
 
-# import nagisa
-# print(nagisa.tagger.postags)
-#
-jp = JPSplitTagger()
-data = jp.tag("\u306e\u300cJET\u300d\u6b4c\u8a5e]\n\n[Intro]\nTaking off, taking off\n\u59ff")
-print(data)
+            return results
+        else:
+            return _tag_data(text, self.japanese_pos_translation)
