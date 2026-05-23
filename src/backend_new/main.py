@@ -20,7 +20,8 @@ class Analyzer:
         "skip_processes": {
             "download_song": False,
             "genius_metadata": False,
-            "vocal_separation": False
+            "vocal_separation": False,
+            "split_and_tag": False
         }
     }
 
@@ -402,6 +403,24 @@ class Analyzer:
                 del _vs
                 gc.collect()
                 return False
+
+        def _lyrics_tag() -> bool:
+            if _song_data.get("split_and_tag", {}):
+                self._logger.debug(f"Lyrics already tagged, skipping")
+                return True
+            else:
+                from processing import JPSplitTagger
+                from helper_funcs import write_json_file
+
+                self._logger.debug(f"Lyrics not tagged, tagging it now.")
+
+                jp_analyzer = JPSplitTagger()
+
+                _lyrics = _song_data["genius_data"]["lyrics"]
+                _data = jp_analyzer.tag(_lyrics)
+                write_json_file(_user_song_choice, _data, ["split_and_tag"])
+                return False
+
         # endregion
 
         # region choice list for skip processes, update when adding new processes
@@ -418,7 +437,12 @@ class Analyzer:
                         Choice("Separate audio into stems",
                                value="vocal_separation",
                                checked=_skip_options['vocal_separation'],
-                               disabled="Stems already separated" if _song_data.get("vocal_separation", {}).get("separated") else None)]
+                               disabled="Stems already separated" if _song_data.get("vocal_separation", {}).get("separated") else None),
+                        Choice("Split and tag lyrics (morphological analysis)",
+                               value="split_tag",
+                               checked=_skip_options['split_and_tag'],
+                               disabled="Lyrics already split and tagged" if _song_data.get("split_and_tag", None) else None)
+                        ]
 
         _skip_processes = questionary_checkbox("Please choose what options to skip", choice_data=_choice_list)
         if _skip_processes != [k for k in _skip_options if _skip_options[k]]:
@@ -440,13 +464,18 @@ class Analyzer:
 
         # region main loop for processes
         while True:
-            if not self._config_json["skip_processes"]["download_song"]:
+            # download
+            if not _skip_options["download_song"]:
                 _download()
             update_song_data()
-            if not self._config_json["skip_processes"]["genius_metadata"]:
+
+            # genius metadata
+            if not _skip_options["genius_metadata"]:
                 _genius_pull()
             update_song_data()
-            if not self._config_json["skip_processes"]["vocal_separation"]:
+
+            # vocal separation
+            if not _skip_options["vocal_separation"]:
                 if not _song_data["pre_processing"].get("downloaded", False):
                     self._logger.info("Audio cannot be separated as it hasn't been downloaded")
                     if confirm("Would you like to download first?").ask():
@@ -455,6 +484,16 @@ class Analyzer:
                     else:
                         break
                 _vocal_sep()
+
+            if not _skip_options["split_and_tag"]:
+                if _song_data.get("genius_data", None) is None:
+                    self._logger.info("Genius metadata not present")
+                    if confirm("Would you like to pull it now?").ask():
+                        _genius_pull()
+                        continue
+                    else:
+                        break
+                _lyrics_tag()
 
             break
         # endregion

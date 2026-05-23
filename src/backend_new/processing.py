@@ -128,7 +128,7 @@ class JPSplitTagger:
         """
         Tags a string into their parts (including pos)
         :param text: String to process
-        :param split_newline: Whether to split the text into lines
+        :param split_newline: Whether to split the text into lines or not
         :return: A dict containing the words, their parts, and the text itself
         """
         from functools import partial
