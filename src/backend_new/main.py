@@ -1,9 +1,10 @@
 from pathlib import Path
 
-class Analyzer:
-    class DataMismatchError(Exception):
-        pass
+from backend_new.logger import Logger
 
+
+class Analyzer:
+    # region default config
     DEFAULT_CONFIG = {
         "version": "1.0.0",
         "spotify_downloader": {
@@ -26,6 +27,7 @@ class Analyzer:
     DEFAULT_ENV_VARS = [
         "SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET", "YOUTUBE_COOKIE_PATH", "GENIUS_ACCESS_TOKEN"
     ]
+    # endregion
 
     def __init__(self) -> None:
         """Initialize the analyzer."""
@@ -37,6 +39,22 @@ class Analyzer:
         self._setup_config_file()
 
         self._dl = None
+
+    # region error messages
+    class DataMismatchError(Exception):
+        def __init__(self, logger: Logger, message: str = 'Files do not match the data in .temp directory') -> None:
+            self.logger = logger
+            self.message = message
+
+            self.data_mismatch_error()
+
+            super().__init__(self.message)
+
+        def data_mismatch_error(self):
+            self.logger.warning(self.message)
+            self.logger.warning("Please do not rename, convert or alter files in .temp to prevent further errors")
+            self.logger.warning("Please clear all files in .temp directory to ensure proper functionality")
+    # endregion
 
     # region Helper Functions
     def _setup_main_directories(self) -> None:
@@ -72,6 +90,9 @@ class Analyzer:
         self._logger.info(f"miraa-alternative Version: {self._config_json['version']}")
 
     def _update_json_config(self) -> None:
+        """
+        Updates the config file with the new values.
+        """
         from helper_funcs import read_json_file
         self._config_json = read_json_file(self._config_file)
 
@@ -97,17 +118,30 @@ class Analyzer:
 
     @staticmethod
     def _str_to_base58(string: str) -> str:
+        """
+        Encodes a string to Base58
+        :param string: Input string to encode
+        :return: Encoded string in Base58 format
+        """
         import base58
         return base58.b58encode(string.encode('utf-8')).decode('utf-8')
 
     @staticmethod
     def _base58_to_str(string: str) -> str:
+        """
+        Decodes a Base58-encoded string to normal text
+        :param string: Base58-encoded string to decode
+        :return: Normal text string
+        """
         import base58
         return base58.b58decode(string).decode('utf-8')
     # endregion
 
     # region preprocessing
     def _init_downloader(self) -> None:
+        """
+        Initializes the downloader for spotify and YouTube
+        """
         if self._dl is None:
             import downloader
             import questionary as q
@@ -258,12 +292,25 @@ class Analyzer:
     # endregion
 
     def process_song(self) -> None:
+        """
+        Processes a song, allows the user to choose which song to process
+        """
+        # region import statements
         from helper_funcs import questionary_select, questionary_checkbox, write_json_file, read_json_file
         from questionary import Choice, confirm
         import gc
+        # endregion
+
+        # region helper functions
+        def update_song_data() -> None:
+            """Updates the chosen song's data in the _song_data variable."""
+            nonlocal _song_data
+            _song_data = read_json_file(_user_song_choice)
+        # endregion
 
         self._init_downloader()
 
+        # region asks user which song to process
         while True:
             _all_files = [file for file in self._temp_dir.iterdir() if file.suffix == ".json"]
             _all_files_stem = [file.stem for file in _all_files]
@@ -282,13 +329,14 @@ class Analyzer:
                 break
 
         _song_data = read_json_file(_user_song_choice)
-
-        def update_song_data() -> None:
-            nonlocal _song_data
-            _song_data = read_json_file(_user_song_choice)
+        # endregion
 
         # region all processes, returns True if already done
         def _download() -> bool:
+            """
+            Downloads the song, checks if the audio file is present in the .temp dir, if not handle appropriately
+            :return: True if already downloaded, False if not
+            """
             if _song_data.get("pre_processing", {}).get("downloaded", False):
                 # checks if the audio file is present in the .temp dir, if not handle appropriately
                 if _song_data["pre_processing"].get("youtube_id", None) not in [file.stem for file in self._temp_dir.iterdir() if file.suffix == ".wav"]:
@@ -300,16 +348,21 @@ class Analyzer:
                         update_song_data()
                         _download()
                     else:
-                        raise self.DataMismatchError
+                        raise self.DataMismatchError(self._logger, "Data file says audio has been downloaded, but it isn't present in .temp directory")
                 self._logger.debug(f"Song already downloaded, skipping")
                 return True
             else:
                 self._logger.debug(f"Song not downloaded, downloading it now.")
                 self.download_song(_user_song_choice)
                 write_json_file(_user_song_choice, True, ["pre_processing", "downloaded"])
+                self._logger.debug(f"Song downloaded.")
                 return False
 
         def _genius_pull() -> bool:
+            """
+            Pulls Genius metadata for the song
+            :return: True if already done, False if not
+            """
             from geniusextractor import GeniusExtractor
 
             if _song_data.get("genius_data", None) is not None:
@@ -322,12 +375,20 @@ class Analyzer:
                     artist=_song_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
                 )
                 write_json_file(_user_song_choice, _genius_data, ["genius_data"])
+                self._logger.debug(f"Genius data pulled.")
                 return False
 
         def _vocal_sep() -> bool:
+            """
+            Separates the audio into its stems
+            :return: True if already done, False if not
+            """
             # TODO add vocal sep model chooser
             if _song_data.get("vocal_separation", {}).get("separated", False) is True:
-                # TODO add vocal sep audio file check
+                if _song_data.get("vocal_separation", {}).get("vocal_file", None) not in [file.stem for file in self._temp_dir.iterdir() if file.suffix == ".wav"]:
+                    raise self.DataMismatchError(self._logger, "Data file says audio has been separated, but it isn't present in .temp directory")
+                if _song_data.get("vocal_separation", {}).get("inst_file", None) not in [file.stem for file in self._temp_dir.iterdir() if file.suffix == ".wav"]:
+                    raise self.DataMismatchError(self._logger, "Data file says audio has been separated, but it isn't present in .temp directory")
 
                 self._logger.debug(f"Vocal separation already done, skipping")
                 return True
@@ -335,8 +396,9 @@ class Analyzer:
                 from processing import VocalSeparation
                 _vs = VocalSeparation()
                 _vs.separate_vocal(f"../.temp/{_song_data["pre_processing"]["youtube_id"]}.wav")
-                write_json_file(_user_song_choice, True, ["vocal_separation", "separated"])
-
+                write_json_file(_user_song_choice, {"separated": True,
+                                                    "vocal_file": f"{_song_data["pre_processing"]["youtube_id"]}_vocal",
+                                                    "inst_file": f"{_song_data["pre_processing"]["youtube_id"]}_inst"}, ["vocal_separation"])
                 del _vs
                 gc.collect()
                 return False

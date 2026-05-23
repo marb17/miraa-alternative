@@ -10,9 +10,22 @@ class GeniusExtractor:
         self._genius = Genius(access_token)
 
     def _search_song(self, title: str, artist: str) -> Song | None:
+        """
+        Searches for a song on genius using title and artist
+        :param title:
+        :param artist:
+        :return:
+        """
         return self._genius.search_song(title=title, artist=artist, get_full_info=True)
 
     def return_metadata(self, song: Song | None = None, title: str = '', artist: str = '') -> dict | None:
+        """
+        Returns the metadata of a song from genius, either choose Song or title and artist
+        :param song: A song object to extract
+        :param title: Title of the song
+        :param artist: Artist of the song
+        :return:
+        """
         from helper_funcs import questionary_select
         from questionary import Choice
 
