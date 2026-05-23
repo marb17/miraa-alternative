@@ -109,10 +109,18 @@ class JPSplitTagger:
 
     # TODO do nagisa for main analyzer
     # TODO maybe use SudachiPy or fugashi for backup?
-    # TODO add fall back when lyrics are romanized
+    # TODO add fallback when lyrics are romanized
 
-    def tag(self, text: str) -> dict[str, Any]:
+    def tag(self, text: str, split_newline: bool = True) -> dict[str, Any] | list[dict[str, Any]]:
+        """
+        Tags a string into their parts (including pos)
+        :param text: String to process
+        :param split_newline: Whether to split the text into lines
+        :return: A dict containing the words, their parts, and the text itself
+        """
         import nagisa
+
+        # TODO add the split thing
 
         _data = nagisa.tagging(text)
         _en_pos = [self.japanese_pos_translation[pos] for pos in _data.postags]
@@ -126,5 +134,5 @@ class JPSplitTagger:
 # print(nagisa.tagger.postags)
 #
 jp = JPSplitTagger()
-data = jp.tag("姿形の見えない魔物どこへでも連れて行くよ街を見下ろして")
+data = jp.tag("\u306e\u300cJET\u300d\u6b4c\u8a5e]\n\n[Intro]\nTaking off, taking off\n\u59ff")
 print(data)
