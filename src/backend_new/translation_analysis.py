@@ -4,36 +4,30 @@ from accelerate import Accelerator
 class Translator:
     def __init__(self) -> None:
         # TODO ask use to choose what model
+        self._llm = None
+        # model save loc
+        import os
+        from pathlib import Path
+        self._script_dir = Path(__file__).resolve().parent
+        self._base_dir = self._script_dir.parents[0]
+        self._model_dir = Path(self._base_dir / "models/hugging_face")
+        os.environ["HF_HOME"] = str(self._model_dir)
+
         from transformers import AutoTokenizer
-
-        self._model_id = "shisa-ai/shisa-v2.1-qwen3-8b"
-        self._tokenizer = AutoTokenizer.from_pretrained(self._model_id)
-
-    # TODO donno if works
-    def _init_model(self) -> None:
-        import torch
-        from transformers import AutoModelForCausalLM, BitsAndBytesConfig
-
-        # TODO allow user to change quantization config
-        self._quantization_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_compute_dtype=torch.float16
-        )
-
-        self._model = AutoModelForCausalLM.from_pretrained(
-            self._model_id,
-            quantization_config=quantization_config,
-            device_map="auto"
-        )
+        self._model_id = str(self._model_dir / "shisa-v2.1-qwen3-8b-awq")
 
     # region batched inference
     # TODO trying out batched, maybe add a feature where it monitors GPU usage and changes batch size
-    def _batched_init_model(self) -> None:
+    def init_model(self) -> None:
         from vllm import LLM
 
-        _llm = LLM(model = self._model_id)
-        _llm.apply_model(lambda model: print((type(self._model_id))))
+        self._llm = LLM(model = self._model_id,
+                   quantization="awq",
+                   dtype="float16",
+                   enforce_eager=True,
+                   gpu_memory_utilization=0.85,
+                   max_model_len=2048)
 
-
-llm_model = Translator()
-llm_model._batched_init_model()
+if __name__ == "__main__":
+    llm_model = Translator()
+    llm_model.init_model()
