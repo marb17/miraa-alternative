@@ -40,11 +40,14 @@ class LLMModel:
 
         return [response.text for response in self._pipe(prompts)]
 
+class Translator:
+    def __init__(self) -> None:
+        self._model = LLMModel()
 
+    ...
 
 if __name__ == "__main__":
     llm_model = LLMModel()
-    llm_model2 = LLMModel()
 
     # data = llm_model.batch_inference(["what is your name?", "what languages do you support?"])
     #
