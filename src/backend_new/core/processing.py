@@ -14,8 +14,11 @@ class VocalSeparation:
         from audio_separator.separator import Separator
         from pathlib import Path
 
-        self._script_dir = Path(__file__).resolve().parent
-        self._base_dir = self._script_dir.parents[0]
+        current_dir = Path(__file__).resolve().parent
+        while current_dir.name != "src" and current_dir != current_dir.parent:
+            current_dir = current_dir.parent
+        self._src_dir = current_dir
+        self._base_dir = self._src_dir.parent
 
         self._output_dir = f'{self._base_dir / ".temp"}'
         self._model_file_dir = f'{self._base_dir / "models/audioseparator"}'

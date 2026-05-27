@@ -23,7 +23,6 @@ quant_config = {
     "version": "GEMM",
 }
 
-
 def main():
     print(f"Loading tokenizer for {model_id}...")
     tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)

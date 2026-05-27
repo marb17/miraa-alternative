@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from backend_new.logger import Logger
+from backend_new.utils.logger import Logger
 
 
 class Analyzer:
@@ -32,7 +32,7 @@ class Analyzer:
 
     def __init__(self) -> None:
         """Initialize the analyzer."""
-        import logger
+        from backend_new.utils import logger
         self._logger = logger.Logger()
 
         self._setup_main_directories()
@@ -62,8 +62,10 @@ class Analyzer:
         """Sets up the main directories for the analyzer."""
         from pathlib import Path
 
-        self._script_dir = Path(__file__).resolve().parent
-        self._base_dir = self._script_dir.parents[0]
+        current_dir = Path(__file__).resolve().parent
+        while current_dir.name != "src" and current_dir != current_dir.parent:
+            current_dir = current_dir.parent
+        self._base_dir = current_dir
 
         folder = ["data", "config", "models", ".temp"]
         for path in folder:
@@ -94,7 +96,7 @@ class Analyzer:
         """
         Updates the config file with the new values.
         """
-        from helper_funcs import read_json_file
+        from backend_new.utils.helper_funcs import read_json_file
         self._config_json = read_json_file(self._config_file)
 
     def _load_env_file(self) -> None:
@@ -116,26 +118,6 @@ class Analyzer:
 
         load_dotenv()
         self._env_data = dict([(var, os.getenv(var))for var in self.DEFAULT_ENV_VARS])
-
-    @staticmethod
-    def _str_to_base58(string: str) -> str:
-        """
-        Encodes a string to Base58
-        :param string: Input string to encode
-        :return: Encoded string in Base58 format
-        """
-        import base58
-        return base58.b58encode(string.encode('utf-8')).decode('utf-8')
-
-    @staticmethod
-    def _base58_to_str(string: str) -> str:
-        """
-        Decodes a Base58-encoded string to normal text
-        :param string: Base58-encoded string to decode
-        :return: Normal text string
-        """
-        import base58
-        return base58.b58decode(string).decode('utf-8')
     # endregion
 
     # region preprocessing
@@ -144,11 +126,11 @@ class Analyzer:
         Initializes the downloader for spotify and YouTube
         """
         if self._dl is None:
-            import downloader
+            from backend_new.extractors import downloader
             import questionary as q
             import json
             from dotenv import set_key
-            from helper_funcs import read_json_file, write_json_file
+            from backend_new.utils.helper_funcs import read_json_file, write_json_file
 
             if self._config_json["youtube_downloader"]["use_cookies"]:
                 if self._env_data["YOUTUBE_COOKIE_PATH"] == '' or self._env_data["YOUTUBE_COOKIE_PATH"] is None:
@@ -194,7 +176,7 @@ class Analyzer:
         :param json_file: A path to a JSON file containing metadata, optional
         """
         from pathlib import Path
-        from helper_funcs import questionary_select, write_json_file, read_json_file
+        from backend_new.utils.helper_funcs import questionary_select, write_json_file, read_json_file
         import asyncio
 
         def get_youtube_id_from_json(file_path: Path) -> str | None:
@@ -297,7 +279,7 @@ class Analyzer:
         Processes a song, allows the user to choose which song to process
         """
         # region import statements
-        from helper_funcs import questionary_select, questionary_checkbox, write_json_file, read_json_file
+        from backend_new.utils.helper_funcs import questionary_select, questionary_checkbox, write_json_file, read_json_file
         from questionary import Choice, confirm
         import gc
         # endregion
@@ -364,7 +346,7 @@ class Analyzer:
             Pulls Genius metadata for the song
             :return: True if already done, False if not
             """
-            from geniusextractor import GeniusExtractor
+            from backend_new.extractors.geniusextractor import GeniusExtractor
 
             if _song_data.get("genius_data", None) is not None:
                 self._logger.debug(f"Genius data already present, skipping")
@@ -410,7 +392,7 @@ class Analyzer:
                 return True
             else:
                 from processing import JPSplitTagger
-                from helper_funcs import write_json_file
+                from backend_new.utils.helper_funcs import write_json_file
 
                 self._logger.debug(f"Lyrics not tagged, tagging it now.")
 

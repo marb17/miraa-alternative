@@ -122,3 +122,23 @@ def write_json_file(file_path: Path, data: Any, keys: list[str] = None) -> None:
 
     file_path.write_text(json.dumps(_data, indent=4))
 # endregion
+
+# region base 58 conv
+def str_to_base58(string: str) -> str:
+    """
+    Encodes a string to Base58
+    :param string: Input string to encode
+    :return: Encoded string in Base58 format
+    """
+    import base58
+    return base58.b58encode(string.encode('utf-8')).decode('utf-8')
+
+def base58_to_str(string: str) -> str:
+    """
+    Decodes a Base58-encoded string to normal text
+    :param string: Base58-encoded string to decode
+    :return: Normal text string
+    """
+    import base58
+    return base58.b58decode(string).decode('utf-8')
+# endregion

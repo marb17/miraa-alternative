@@ -14,8 +14,11 @@ class Downloader:
         if spotify_client_id is None or spotify_client_secret is None:
             raise Exception('Spotify client id and secret are required')
 
-        self._script_dir = Path(__file__).resolve().parent
-        self._base_dir = self._script_dir.parents[0]
+        current_dir = Path(__file__).resolve().parent
+        while current_dir.name != "src" and current_dir != current_dir.parent:
+            current_dir = current_dir.parent
+        self._src_dir = current_dir
+        self._base_dir = self._src_dir.parent
 
         self._spotify_client_id = spotify_client_id
         self._spotify_client_secret = spotify_client_secret
