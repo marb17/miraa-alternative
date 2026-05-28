@@ -278,6 +278,12 @@ class Translator:
 
         results = []
         # remap all unprocessed, remove special whitespace and strips
+        def clean_unicode(input_string: str) -> str:
+            input_string = re.sub(r"[\u2005\u200a\u205f\u2014]", " ", input_string)
+            input_string = re.sub(r"\u2019", "'", input_string)
+
+            return input_string
+
         for idx, data in enumerate(data):
             if idx in mapping_index:
                 response = responses[idx]
@@ -286,10 +292,10 @@ class Translator:
                 formatted_response = re.sub(
                     r"^\*?\*?Translation:\*?\*?\s*", "", formatted_response, flags=re.IGNORECASE
                 )
-                formatted_response = re.sub(r"[\u2005\u200a\u205f]", " ", formatted_response)
+                formatted_response = clean_unicode(formatted_response)
                 results.append(formatted_response)
             else:
-                formatted_response = re.sub(r"[\u2005\u200a\u205f]", " ", data)
+                formatted_response = clean_unicode(data)
                 formatted_response = formatted_response.strip()
                 results.append(formatted_response)
 

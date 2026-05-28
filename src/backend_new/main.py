@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from accelerate.commands.config.config import description
+
 from backend_new.utils.logger import Logger
 
 
@@ -21,7 +23,8 @@ class Analyzer:
             "download_song": False,
             "genius_metadata": False,
             "vocal_separation": False,
-            "split_and_tag": False
+            "split_and_tag": False,
+            "translate_lyrics" : False
         }
     }
 
@@ -40,6 +43,7 @@ class Analyzer:
         self._setup_config_file()
 
         self._dl = None
+        self._translator = None
 
     # region error messages
     class DataMismatchError(Exception):
@@ -376,7 +380,7 @@ class Analyzer:
                 self._logger.debug(f"Vocal separation already done, skipping")
                 return True
             else:
-                from processing import VocalSeparation
+                from backend_new.core.processing import VocalSeparation
                 _vs = VocalSeparation()
                 _vs.separate_vocal(f"../.temp/{_song_data["pre_processing"]["youtube_id"]}.wav")
                 write_json_file(_user_song_choice, {"separated": True,
@@ -391,7 +395,7 @@ class Analyzer:
                 self._logger.debug(f"Lyrics already tagged, skipping")
                 return True
             else:
-                from processing import JPSplitTagger
+                from backend_new.core.processing import JPSplitTagger
                 from backend_new.utils.helper_funcs import write_json_file
 
                 self._logger.debug(f"Lyrics not tagged, tagging it now.")
@@ -402,6 +406,28 @@ class Analyzer:
                 _data = jp_analyzer.tag(_lyrics)
                 write_json_file(_user_song_choice, _data, ["split_and_tag"])
                 return False
+
+        def _translate_lyrics() -> bool:
+            if _song_data.get("translated_lyrics", {}):
+                self._logger.debug(f"Lyrics already translated, skipping")
+                return True
+            else:
+                from backend_new.core.translation_analysis import Translator
+                from backend_new.utils.helper_funcs import write_json_file
+
+                self._logger.debug(f"Lyrics not translated, translating it now.")
+
+                if self._translator is None:
+                    self._translator = Translator()
+
+                _lyrics = _song_data["genius_data"]["lyrics"]
+                _data = self._translator.translate_lyrics(_lyrics)
+
+                write_json_file(_user_song_choice, _data, ["translated_lyrics"])
+
+                return False
+
+
 
         # endregion
 
@@ -420,10 +446,16 @@ class Analyzer:
                                value="vocal_separation",
                                checked=_skip_options['vocal_separation'],
                                disabled="Stems already separated" if _song_data.get("vocal_separation", {}).get("separated") else None),
-                        Choice("Split and tag lyrics (morphological analysis)",
+                        Choice("Split and tag lyrics",
                                value="split_tag",
+                               description="(morphological analysis)",
                                checked=_skip_options['split_and_tag'],
-                               disabled="Lyrics already split and tagged" if _song_data.get("split_and_tag", None) else None)
+                               disabled="Lyrics already split and tagged" if _song_data.get("split_and_tag", None) else None),
+                        Choice("Translate lyrics to english",
+                               value="translate_lyrics",
+                               description="(LLM inference)",
+                               checked=_skip_options['translate_lyrics'],
+                               disabled="Lyrics already translated" if _song_data.get("translated_lyrics",None) else None)
                         ]
 
         _skip_processes = questionary_checkbox("Please choose what options to skip", choice_data=_choice_list)
@@ -467,6 +499,7 @@ class Analyzer:
                         break
                 _vocal_sep()
 
+            # split and tag
             if not _skip_options["split_and_tag"]:
                 if _song_data.get("genius_data", None) is None:
                     self._logger.info("Genius metadata not present")
@@ -476,6 +509,17 @@ class Analyzer:
                     else:
                         break
                 _lyrics_tag()
+
+            # translate lyrics
+            if not _skip_options["translate_lyrics"]:
+                if _song_data.get("genius_data", None) is None:
+                    self._logger.info("Genius metadata not present")
+                    if confirm("Would you like to pull it now?").ask():
+                        _genius_pull()
+                        continue
+                    else:
+                        break
+                _translate_lyrics()
 
             break
         # endregion
