@@ -14,11 +14,13 @@ class VocalSeparation:
         from audio_separator.separator import Separator
         from pathlib import Path
 
+        from backend_new.utils import logger
+        self._logger = logger.Logger()
+
         current_dir = Path(__file__).resolve().parent
         while current_dir.name != "src" and current_dir != current_dir.parent:
             current_dir = current_dir.parent
-        self._src_dir = current_dir
-        self._base_dir = self._src_dir.parent
+        self._base_dir = current_dir
 
         self._output_dir = f'{self._base_dir / ".temp"}'
         self._model_file_dir = f'{self._base_dir / "models/audioseparator"}'
@@ -51,12 +53,15 @@ class VocalSeparation:
 
     def separate_vocal(self, audio_path: str, model: str = "vocal_full") -> None:
         from pathlib import Path
+        import time
 
         self._init_model(model)
+
         _win_audio_path = Path(audio_path)
 
+        now = time.time()
         _output_files = self._separator_objects[model].separate(audio_path)
-        print(_output_files)
+        self._logger.info(f"Took {(time.time() - now):.2f} seconds to separate stems")
 
         _output_files = [Path(f) for f in _output_files]
 

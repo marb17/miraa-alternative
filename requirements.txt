@@ -8,3 +8,4 @@ spotipy>=2.26.0
 lyricsgenius>=3.12.1
 nagisa>=0.2.12
 lmdeploy>=0.13.0
+audio-separator[gpu]>=0.44.2

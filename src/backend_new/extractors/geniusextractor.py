@@ -26,7 +26,7 @@ class GeniusExtractor:
         :param artist: Artist of the song
         :return:
         """
-        from helper_funcs import questionary_select
+        from backend_new.utils.helper_funcs import questionary_select
         from questionary import Choice
 
         if song is not None and (title != '' or artist != ''):

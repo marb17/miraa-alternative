@@ -1,7 +1,4 @@
 from pathlib import Path
-
-from accelerate.commands.config.config import description
-
 from backend_new.utils.logger import Logger
 
 
@@ -309,6 +306,9 @@ class Analyzer:
 
             _user_song_choice = questionary_select("Please choose the song:",
                                                    choose_data=_song_choice_list,
+                                                   enable_pages=True,
+                                                   batch_data=True,
+                                                   batch_size=10,
                                                    extra_navigation_options=[Choice("Download New", value="__new__", shortcut_key="n")])
             if _user_song_choice == "__new__":
                 self.query_song_spotify()
@@ -426,7 +426,6 @@ class Analyzer:
                 write_json_file(_user_song_choice, _data, ["translated_lyrics"])
 
                 return False
-
 
 
         # endregion

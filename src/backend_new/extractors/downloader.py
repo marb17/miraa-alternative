@@ -11,14 +11,16 @@ class Downloader:
         """
         from pathlib import Path
 
+        from backend_new.utils import logger
+        self._logger = logger.Logger()
+
         if spotify_client_id is None or spotify_client_secret is None:
             raise Exception('Spotify client id and secret are required')
 
         current_dir = Path(__file__).resolve().parent
         while current_dir.name != "src" and current_dir != current_dir.parent:
             current_dir = current_dir.parent
-        self._src_dir = current_dir
-        self._base_dir = self._src_dir.parent
+        self._base_dir = current_dir
 
         self._spotify_client_id = spotify_client_id
         self._spotify_client_secret = spotify_client_secret
@@ -87,7 +89,7 @@ class Downloader:
         :return: A dict of the song metadata (spotify)
         """
         import questionary as q
-        from helper_funcs import questionary_select
+        from backend_new.utils.helper_funcs import questionary_select
 
         _query = ''
 
@@ -207,7 +209,7 @@ class Downloader:
         if choose_top_result:
             return _formatted_results[0]["id"]
         else:
-            from helper_funcs import questionary_select
+            from backend_new.utils.helper_funcs import questionary_select
             _choices = [{"name": f"{song['title']} | {song['channel']} | {format_to_minutes_and_seconds(song['duration'])} | {song['view_count']} | {song['id']}", "value": index} for index, song in enumerate(_formatted_results)]
             _user_song_choice = questionary_select(f"Please choose the song: (prefer JP titles)", choose_data=_choices)
             return _formatted_results[int(_user_song_choice)]["id"]
@@ -221,7 +223,9 @@ class Downloader:
         """
         import yt_dlp
         from yt_dlp.utils import DownloadError, ExtractorError
-        from time import sleep
+        from time import sleep, time
+
+        now = time()
 
         if url == '':
             raise Exception('YouTube URL is required')
@@ -252,3 +256,4 @@ class Downloader:
                     break
             except (DownloadError, ExtractorError):
                 sleep(sleep_time_if_fail)
+        self._logger.debug(f"Finished downloading video in {(time() - now):.2f} seconds")
