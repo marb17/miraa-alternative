@@ -1,11 +1,16 @@
+# HELPER LIBRARIES
 from lyricsgenius.types import Song
+from lyricsgenius import Genius
+
+from backend_new.utils.helper_funcs import questionary_select
+
+# PYPI PACKAGE
+from questionary import Choice
 
 class GeniusExtractor:
     def __init__(self, access_token: str | None = '') -> None:
         if access_token == '' or access_token is None:
             raise Exception('Access token is required')
-
-        from lyricsgenius import Genius
 
         self._genius = Genius(access_token)
 
@@ -26,9 +31,6 @@ class GeniusExtractor:
         :param artist: Artist of the song
         :return:
         """
-        from backend_new.utils.helper_funcs import questionary_select
-        from questionary import Choice
-
         if song is not None and (title != '' or artist != ''):
             raise Exception('Song and title/artist are mutually exclusive')
         if song is None and (title == '' or artist == ''):
@@ -36,6 +38,7 @@ class GeniusExtractor:
         if song is None and (title == '' or artist == ''):
             raise Exception('Title/artist is required')
 
+        # TODO pls fix this shitty match case system so ass smh
         if song is not None:
             data = song
         elif title != '' and artist != '':

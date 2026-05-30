@@ -1,27 +1,24 @@
+# STANDARD LIBRARY
+import os
+import re
+import gc
+import time
+from itertools import batched
+from math import ceil
+from pathlib import Path
+
+# HELPER LIBRARIES
+from backend_new.utils.helper_funcs import read_json_file
+
+
 class LLMModel:
-    _instance = None
-
-    def __new__(cls, *args, **kwargs):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
-
-        return cls._instance
-
     def __init__(self) -> None:
-        if getattr(self, "_initialized", False):
-            return
-
         from backend_new.utils import logger
         self._logger = logger.Logger()
 
         self._pipe = None
 
         # model save loc
-        import os
-        from pathlib import Path
-        from backend_new.utils.helper_funcs import read_json_file
-
         current_dir = Path(__file__).resolve().parent
         while current_dir.name != "src" and current_dir != current_dir.parent:
             current_dir = current_dir.parent
@@ -88,9 +85,7 @@ class LLMModel:
 
     def _close(self) -> None:
         self._pipe = None
-        LLMModel._instance = None
 
-        import gc
         import torch
         gc.collect()
         torch.cuda.empty_cache()
@@ -125,7 +120,6 @@ class LLMModel:
         """
         if self._pipe is None:
             from lmdeploy import pipeline
-            import time
 
             self._logger.debug(f"Initializing model: {self._model_id}")
 
@@ -163,11 +157,7 @@ class LLMModel:
         :param estimated_output_cost: Estimated how many tokens are used for each output
         :return: A list of all the responses
         """
-        from itertools import batched
-        from math import ceil
         import torch
-        import gc
-        import time
 
         if self._pipe is None:
             self.init_model()
@@ -224,10 +214,9 @@ class Translator:
         :param use_context: Whether to use context for the prompts
         :return: Translated lyrics in list form
         """
-        import time
         now = time.time()
         # region japanese character check
-        import re
+
         # This checks for:
         # - Hiragana: \u3040-\u309f
         # - Katakana: \u30a0-\u30ff

@@ -1,5 +1,24 @@
-from typing import Any
+# STANDARD LIBRARIES
+import time
+import gc
+import shutil
 from pathlib import Path
+from typing import Any
+from functools import partial
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+
+# HELPER LIBRARIES
+from backend_new.utils import logger
+from backend_new.utils.helper_funcs import read_json_file
+
+# PYPI LIBRARIES
+from audio_separator.separator import Separator
+
+from sudachipy.morpheme import Morpheme
+from sudachipy import dictionary, tokenizer
+
+import nagisa
+
 
 # region vocal sep
 class VocalSeparation:
@@ -11,11 +30,6 @@ class VocalSeparation:
         instrumental_full: A model best for getting a clear instrumental stem, not ideal vocals
         instrumental_low_resource: A good low-resource model, decent quality for both stems but with some slight bleeding
         """
-
-        from audio_separator.separator import Separator
-        from pathlib import Path
-
-        from backend_new.utils import logger
         self._logger = logger.Logger()
 
         current_dir = Path(__file__).resolve().parent
@@ -62,7 +76,7 @@ class VocalSeparation:
                     separator_instance.__dict__.clear()
         # clean up
         separator_objects = None
-        import gc
+
         gc.collect()
         import torch
         if torch.cuda.is_available():
@@ -85,7 +99,6 @@ class VocalSeparation:
 
         self._selected_model = None
 
-        import gc
         gc.collect()
 
         import torch
@@ -101,9 +114,6 @@ class VocalSeparation:
         self._selected_model.load_model()
 
     def separate_vocal(self, audio_path: str) -> None:
-        from pathlib import Path
-        import time
-
         self._init_model()
 
         win_audio_path = Path(audio_path)
@@ -136,8 +146,6 @@ class VocalSeparation:
 # region dictionaries
 class JPDictionary:
     def __init__(self) -> None:
-        from pathlib import Path
-
         from backend_new.utils import logger
         self._logger = logger.Logger()
 
@@ -156,8 +164,6 @@ class JPDictionary:
         self._read_all_available_dicts()
 
     def _extract_zip_files(self):
-        import shutil
-
         all_zip_files = [file for file in self._dict_dir.iterdir() if file.suffix == ".zip"]
         all_zip_files_stem = [file.stem for file in all_zip_files]
 
@@ -168,9 +174,12 @@ class JPDictionary:
                 dir_path.mkdir(parents=True, exist_ok=True)
 
                 self._logger.debug(f"Extracting: {file_path}")
-                shutil.unpack_archive(file_path, dir_path)
-                self._logger.debug(f"Completed extracting: {file_path}, deleting old .zip files")
-                file_path.unlink()
+                try:
+                    shutil.unpack_archive(file_path, dir_path)
+                    self._logger.debug(f"Completed extracting: {file_path}, deleting old .zip files")
+                    file_path.unlink()
+                except:
+                    raise Exception("File unsuccessfully extracted, please re-run and check for any unintended changes in 'dict' directory")
             self._logger.debug("All .zip files extracted successfully")
         else:
             self._logger.debug("No new .zip files detected, skipping")
@@ -180,8 +189,6 @@ class JPDictionary:
         self._available_dicts = all_dicts
 
     def _read_single_dict(self, dict_path: Path) -> dict:
-        from backend_new.utils.helper_funcs import read_json_file
-
         all_term_bank_files = list(dict_path.rglob("term_bank_*.json"))
 
         #! temporary test, have to learn the format of the data
@@ -198,9 +205,6 @@ class JPDictionary:
 # endregion
 
 # region japanese morphological analyzer
-import nagisa
-from sudachipy.morpheme import Morpheme
-
 class TaggedData:
     def __init__(self, words: list[str], pos: list[str], en_pos: list[str], text: str):
         self._words = words
@@ -304,11 +308,7 @@ class JPAnalyzer:
     }
 
     def __init__(self) -> None:
-        from functools import partial
-        from sudachipy import dictionary
-
         self._fixed_tagger = partial(tag_data, translation_dict=self.japanese_pos_translation)
-
         self._tokenizer_obj = dictionary.Dictionary(dict="full").create()
 
     # TODO use SudachiPy for dict look up
@@ -320,8 +320,6 @@ class JPAnalyzer:
         :param data: data to process
         :return: A dict containing the words, their parts, and the text itself
         """
-        from concurrent.futures import ProcessPoolExecutor
-
         with ProcessPoolExecutor(max_workers=20) as executor:
             results = list(executor.map(self._fixed_tagger, data))
 
@@ -338,10 +336,6 @@ class JPAnalyzer:
                 return None
 
             return [tokenizer_object.tokenize(word, split_mode)[0] for word in str_data]
-
-        from concurrent.futures import ThreadPoolExecutor
-        from functools import partial
-        from sudachipy import tokenizer
 
         mode = tokenizer.Tokenizer.SplitMode.C
         fixed_morpheme_pull = partial(morpheme_pull, tokenizer_object=self._tokenizer_obj, split_mode=mode)

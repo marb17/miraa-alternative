@@ -1,6 +1,14 @@
 from typing import Any
 from pathlib import Path
 from questionary import Choice
+import questionary as q
+from itertools import batched
+import json
+import base58
+
+# LOGGER
+from backend_new.utils.logger import Logger
+logger = Logger()
 
 # region questionary
 def questionary_select(question_to_ask: str,
@@ -25,7 +33,6 @@ def questionary_select(question_to_ask: str,
     :param extra_navigation_options: Extra navigation options to add to the end of the list
     :return: The selected option
     """
-    import questionary as q
 
     if batch_data and not enable_pages:
         raise Exception("Cannot batch data without enabling pages")
@@ -47,8 +54,6 @@ def questionary_select(question_to_ask: str,
                 input_list.append(option)
 
     if enable_pages and batch_data:
-        from itertools import batched
-
         offset = 0
 
         while True:
@@ -85,8 +90,6 @@ def questionary_checkbox(question_to_ask: str,
     :param choice_data: a list of dicts or Choice objects
     :return: The selected options
     """
-    import questionary as q
-
     return q.checkbox(question_to_ask, choices=choice_data).ask()
 # endregion
 
@@ -97,18 +100,22 @@ def read_json_file(file_path: Path) -> dict:
     :param file_path: File path to the JSON file
     :return: A dict containing the JSON data
     """
-    import json
-    return json.loads(file_path.read_text(encoding="utf-8"))
+    if not file_path.exists():
+        logger.warning(f"File {file_path} does not exist")
+        return {}
 
-def write_json_file(file_path: Path, data: Any, keys: list[str] = None) -> None:
+    try:
+        return json.loads(file_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise json.JSONDecodeError(f"The provided JSON file is not a valid JSON file or is corrupted, please remove / repair this file. {file_path}", e.doc, e.pos)
+
+def write_json_file(file_path: Path, payload: Any, keys: list[str] = None) -> None:
     """
     Writes data to a JSON file in a directory
     :param file_path: File path to the JSON file
-    :param data: Data to write
+    :param payload: Data to write
     :param keys: A list of keys to navigate the JSON file
     """
-    import json
-
     data = read_json_file(file_path)
 
     current_level = data
@@ -118,7 +125,7 @@ def write_json_file(file_path: Path, data: Any, keys: list[str] = None) -> None:
         current_level = current_level[key]
 
     if keys:
-        current_level[keys[-1]] = data
+        current_level[keys[-1]] = payload
 
     file_path.write_text(json.dumps(data, indent=4))
 # endregion
@@ -130,7 +137,6 @@ def str_to_base58(string: str) -> str:
     :param string: Input string to encode
     :return: Encoded string in Base58 format
     """
-    import base58
     return base58.b58encode(string.encode('utf-8')).decode('utf-8')
 
 def base58_to_str(string: str) -> str:
@@ -139,6 +145,5 @@ def base58_to_str(string: str) -> str:
     :param string: Base58-encoded string to decode
     :return: Normal text string
     """
-    import base58
     return base58.b58decode(string).decode('utf-8')
 # endregion

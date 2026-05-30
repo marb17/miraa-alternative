@@ -1,8 +1,8 @@
+import logging, coloredlogs
+
 class Logger:
     def __init__(self):
-        import logging, coloredlogs
-
-        self._logger = logging.getLogger("backend")
+        self._logger = logging.getLogger(__name__)
 
         coloredlogs.install(logger=self._logger,
                             level="DEBUG")

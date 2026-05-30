@@ -1,3 +1,20 @@
+# STANDARD LIBRARY
+from pathlib import Path
+from time import sleep, time
+
+# HELPER LIBRARIES
+from backend_new.utils.helper_funcs import questionary_select
+
+# PYPI LIBRARIES
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials
+
+import questionary as q
+
+import yt_dlp
+from yt_dlp.utils import DownloadError, ExtractorError
+
+
 class Downloader:
     def __init__(self, spotify_client_id: str,
                  spotify_client_secret: str,
@@ -9,7 +26,6 @@ class Downloader:
         :param spotify_client_secret:
         :param youtube_cookie_path: Path to the YouTube cookie file, not recommended to use. Cookies require extra authentication and are not guaranteed to work
         """
-        from pathlib import Path
 
         from backend_new.utils import logger
         self._logger = logger.Logger()
@@ -33,9 +49,6 @@ class Downloader:
         """
         Initializes the spotipy client
         """
-        import spotipy
-        from spotipy.oauth2 import SpotifyClientCredentials
-
         auth_manager = SpotifyClientCredentials(client_id=self._spotify_client_id,
                                                 client_secret=self._spotify_client_secret)
 
@@ -88,9 +101,6 @@ class Downloader:
         :param limit: How many songs to show at a time
         :return: A dict of the song metadata (spotify)
         """
-        import questionary as q
-        from backend_new.utils.helper_funcs import questionary_select
-
         query = ''
 
         def _ask_for_query() -> None:
@@ -172,7 +182,6 @@ class Downloader:
         :param choose_top_result: Will always return the first result without asking the user
         :return: YouTube video id
         """
-        import yt_dlp
 
         limit = 1 if choose_top_result else limit
         search_query = f"ytsearch{limit}:{query}"
@@ -209,7 +218,6 @@ class Downloader:
         if choose_top_result:
             return formatted_results[0]["id"]
         else:
-            from backend_new.utils.helper_funcs import questionary_select
             choices = [{"name": f"{song['title']} | {song['channel']} | {format_to_minutes_and_seconds(song['duration'])} | {song['view_count']} | {song['id']}", "value": index} for index, song in enumerate(formatted_results)]
             user_song_choice = questionary_select(f"Please choose the song: (prefer JP titles)", choose_data=choices)
             return formatted_results[int(user_song_choice)]["id"]
@@ -221,10 +229,6 @@ class Downloader:
         :param sleep_time_if_fail: How long to wait before retrying to download the video if a fail occurs
         :param url: A url to the video ID
         """
-        import yt_dlp
-        from yt_dlp.utils import DownloadError, ExtractorError
-        from time import sleep, time
-
         now = time()
 
         if url == '':

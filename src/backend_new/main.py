@@ -1,9 +1,36 @@
+# STANDARD LIBRARIES
+import json
+import os
+import asyncio
+import gc
+
+from attr import dataclass
+from dotenv import load_dotenv, set_key
 from pathlib import Path
+
+# HELPER LIBRARIES
+from backend_new.utils import logger
 from backend_new.utils.logger import Logger
+from backend_new.utils.helper_funcs import read_json_file, write_json_file, questionary_select, questionary_checkbox
+
+from backend_new.extractors import downloader
+from backend_new.extractors.geniusextractor import GeniusExtractor
+
+from backend_new.core.processing import VocalSeparation, JPAnalyzer
+from backend_new.core.translation_analysis import Translator
+
+# PYPI LIBRARIES
+from questionary import Choice, confirm, path
 
 
 class Analyzer:
     # region default config
+    @dataclass
+    class SongContext:
+        json_song_data: dict
+        json_file_path: Path
+
+
     DEFAULT_CONFIG = {
         "version": "1.0.0",
         "spotify_downloader": {
@@ -76,7 +103,6 @@ class Analyzer:
 
     def __init__(self) -> None:
         """Initialize the analyzer."""
-        from backend_new.utils import logger
         self._logger = logger.Logger()
 
         self._setup_main_directories()
@@ -105,8 +131,6 @@ class Analyzer:
     # region Helper Functions
     def _setup_main_directories(self) -> None:
         """Sets up the main directories for the analyzer."""
-        from pathlib import Path
-
         current_dir = Path(__file__).resolve().parent
         while current_dir.name != "src" and current_dir != current_dir.parent:
             current_dir = current_dir.parent
@@ -125,8 +149,6 @@ class Analyzer:
 
     def _setup_config_file(self) -> None:
         """Sets up the config file for the analyzer. Writes default values if it doesn't exist."""
-        import json
-
         if not self._config_file.exists():
             config_json = json.dumps(self.DEFAULT_CONFIG, indent=4)
             self._config_file.write_text(config_json)
@@ -143,7 +165,6 @@ class Analyzer:
         """
         Updates the config file with the new values.
         """
-        from backend_new.utils.helper_funcs import read_json_file
         self._config_json = read_json_file(self._config_file)
 
     def _load_env_file(self) -> None:
@@ -152,9 +173,6 @@ class Analyzer:
         Creates a new .env file if it doesn't exist.
         DOES NOT check if the file is filled
         """
-        import os
-        from dotenv import load_dotenv
-
         if self._env_file.exists():
             load_dotenv(dotenv_path=self._env_file)
             self._logger.debug("Loaded .env file.")
@@ -182,17 +200,11 @@ class Analyzer:
         Initializes the downloader for spotify and YouTube
         """
         if self._dl is None:
-            from backend_new.extractors import downloader
-            import questionary as q
-            import json
-            from dotenv import set_key
-            from backend_new.utils.helper_funcs import read_json_file, write_json_file
-
             if self._config_json["youtube_downloader"]["use_cookies"]:
                 if self._env_data["YOUTUBE_COOKIE_PATH"] == '' or self._env_data["YOUTUBE_COOKIE_PATH"] is None:
-                    use_cookies = q.confirm("Do you want to use cookies?").ask()
+                    use_cookies = confirm("Do you want to use cookies?").ask()
                     if use_cookies:
-                        cookie_path = q.path("Please enter the path to your cookies file (Netscape .txt file): ").ask()
+                        cookie_path = path("Please enter the path to your cookies file (Netscape .txt file): ").ask()
                         self._env_data["YOUTUBE_COOKIE_PATH"] = cookie_path
                         set_key(self._env_file, "YOUTUBE_COOKIE_PATH", cookie_path, quote_mode="never")
                     else:
@@ -212,8 +224,6 @@ class Analyzer:
         """
         query a song from spotify and save it to a JSON file with all data needed
         """
-        import json
-
         self._init_downloader()
 
         data = self._dl.cli_search_song()
@@ -225,21 +235,19 @@ class Analyzer:
         file_path.write_text(json_data)
         self._logger.info(f"Saved song data: {view_name} -> {file_path}")
 
+    #! TODO MOVE ALL OF THIS TO WORKFLOW.PY
     def download_song(self, json_file: Path) -> None:
         """
         Downloads a song from YouTube using metadata present in .temp
         When no files are present, it will query spotify
         :param json_file: A path to a JSON file containing metadata, optional
         """
-        from pathlib import Path
-        from backend_new.utils.helper_funcs import questionary_select, write_json_file, read_json_file
-        import asyncio
-
         def get_youtube_id_from_json(file_path: Path) -> str | None:
             if file_path.suffix == ".json":
                 return str(read_json_file(file_path)["pre_processing"]["youtube_id"])
             return None
 
+        # TODO might just move to ThreadPoolExecutor cuz async is just not fit for this since main is synchronous
         async def _download(file_path: Path | str | None) -> None:
             if file_path is None:
                 raise Exception("No file path provided")
@@ -250,6 +258,7 @@ class Analyzer:
 
         break_off = False
 
+        # TODO might just move to ThreadPoolExecutor cuz async is just not fit for this since main is synchronous
         if json_file is None:
             while True:
                 if break_off:
@@ -330,21 +339,113 @@ class Analyzer:
                 asyncio.run(_download(target_id))
     # endregion
 
+    # region all processes, returns True if already done
+    def _download(self, song_context_data: SongContext) -> bool:
+        """
+        Downloads the song, checks if the audio file is present in the .temp dir, if not handle appropriately
+        :return: True if already downloaded, False if not
+        """
+        if song_context_data.json_song_data.get("pre_processing", {}).get("downloaded", False):
+            # checks if the audio file is present in the .temp dir, if not handle appropriately
+            if song_context_data.json_song_data["pre_processing"].get("youtube_id", None) not in [file.stem for file in self._temp_dir.iterdir() if file.suffix == ".wav"]:
+                self._logger.warning("Data file says audio has been downloaded, but it isn't present in .temp directory")
+                self._logger.warning("Please do not rename, convert or alter files in .temp to prevent further errors")
+                self._logger.warning("Please clear all files in .temp directory to ensure proper functionality")
+                raise self.DataMismatchError(self._logger, "Data file says audio has been downloaded, but it isn't present in .temp directory")
+            self._logger.debug(f"Song already downloaded, skipping")
+            return True
+        else:
+            self._logger.debug(f"Song not downloaded, downloading it now.")
+            self.download_song(song_context_data.json_file_path)
+            write_json_file(song_context_data.json_file_path, True, ["pre_processing", "downloaded"])
+            self._logger.debug(f"Song downloaded.")
+            return False
+
+    def _genius_pull(self, song_context_data: SongContext) -> bool:
+        """
+        Pulls Genius metadata for the song
+        :return: True if already done, False if not
+        """
+        if song_context_data.json_song_data.get("genius_data", None) is not None:
+            self._logger.debug(f"Genius data already present, skipping")
+            return True
+        else:
+            self._logger.debug(f"Genius data not present, pulling it now.")
+            genius_data = GeniusExtractor(self._env_data["GENIUS_ACCESS_TOKEN"]).return_metadata(
+                title=song_context_data.json_song_data["pre_processing"]["raw_metadata"]["name"],
+                artist=song_context_data.json_song_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
+            )
+            write_json_file(song_context_data.json_file_path, genius_data, ["genius_data"])
+            self._logger.debug(f"Genius data pulled.")
+            return False
+
+    def _vocal_sep(self, song_context_data: SongContext) -> bool:
+        """
+        Separates the audio into its stems
+        :return: True if already done, False if not
+        """
+        # TODO add vocal sep model chooser
+        if song_context_data.json_song_data.get("vocal_separation", {}).get("separated", False) is True:
+            if song_context_data.json_song_data.get("vocal_separation", {}).get("vocal_file", None) not in [file.stem for file in self._temp_dir.iterdir() if file.suffix == ".wav"]:
+                raise self.DataMismatchError(self._logger, "Data file says audio has been separated, but it isn't present in .temp directory")
+            if song_context_data.json_song_data.get("vocal_separation", {}).get("inst_file", None) not in [file.stem for file in self._temp_dir.iterdir() if file.suffix == ".wav"]:
+                raise self.DataMismatchError(self._logger, "Data file says audio has been separated, but it isn't present in .temp directory")
+
+            self._logger.debug(f"Vocal separation already done, skipping")
+            return True
+        else:
+            with VocalSeparation() as vs:
+                vs.separate_vocal(f"../.temp/{song_context_data.json_song_data["pre_processing"]["youtube_id"]}.wav")
+                write_json_file(song_context_data.json_file_path, {"separated": True,
+                                                   "vocal_file": f"{song_context_data.json_song_data["pre_processing"]["youtube_id"]}_vocal",
+                                                   "inst_file": f"{song_context_data.json_song_data["pre_processing"]["youtube_id"]}_inst"}, ["vocal_separation"])
+
+            return False
+
+    # TODO requires rework as processing is changing
+    def _lyrics_tag(self, song_context_data: SongContext) -> bool:
+        if song_context_data.json_song_data.get("split_and_tag", {}):
+            self._logger.debug(f"Lyrics already tagged, skipping")
+            return True
+        else:
+            self._logger.debug(f"Lyrics not tagged, tagging it now.")
+
+            jp_analyzer = JPAnalyzer()
+
+            lyrics = song_context_data.json_song_data["genius_data"]["lyrics"]
+            #! UNABLE TO BE USED FOR NOW
+            data = jp_analyzer.tag(lyrics)
+            write_json_file(song_context_data.json_file_path, data, ["split_and_tag"])
+            return False
+
+    def _translate_lyrics(self, song_context_data: SongContext) -> bool:
+        if song_context_data.json_song_data.get("translated_lyrics", {}):
+            self._logger.debug(f"Lyrics already translated, skipping")
+            return True
+        else:
+            self._logger.debug(f"Lyrics not translated, translating it now.")
+
+            if self._translator is None:
+                self._translator = Translator()
+
+            lyrics = song_context_data.json_song_data["genius_data"]["lyrics"]
+            data = self._translator.translate_lyrics(lyrics)
+
+            write_json_file(song_context_data.json_file_path, data, ["translated_lyrics"])
+
+            return False
+
+    # endregion
+
     def process_song(self) -> None:
         """
         Processes a song, allows the user to choose which song to process
         """
-        # region import statements
-        from backend_new.utils.helper_funcs import questionary_select, questionary_checkbox, write_json_file, read_json_file
-        from questionary import Choice, confirm
-        import gc
-        # endregion
-
         # region helper functions
         def update_song_data() -> None:
             """Updates the chosen song's data in the song_data variable."""
-            nonlocal song_data
-            song_data = read_json_file(user_song_choice)
+            nonlocal song_context
+            song_context.json_song_data = read_json_file(song_context.json_file_path)
         # endregion
 
         self._init_downloader()
@@ -371,118 +472,7 @@ class Analyzer:
                 break
 
         song_data = read_json_file(user_song_choice)
-        # endregion
-
-        # region all processes, returns True if already done
-        def _download() -> bool:
-            """
-            Downloads the song, checks if the audio file is present in the .temp dir, if not handle appropriately
-            :return: True if already downloaded, False if not
-            """
-            if song_data.get("pre_processing", {}).get("downloaded", False):
-                # checks if the audio file is present in the .temp dir, if not handle appropriately
-                if song_data["pre_processing"].get("youtube_id", None) not in [file.stem for file in self._temp_dir.iterdir() if file.suffix == ".wav"]:
-                    self._logger.warning("Data file says audio has been downloaded, but it isn't present in .temp directory")
-                    self._logger.warning("Please do not rename, convert or alter files in .temp to prevent further errors")
-                    self._logger.warning("Please clear all files in .temp directory to ensure proper functionality")
-                    if confirm("Do you want to retry?").ask():
-                        write_json_file(user_song_choice, False, ["pre_processing", "downloaded"])
-                        update_song_data()
-                        _download()
-                    else:
-                        raise self.DataMismatchError(self._logger, "Data file says audio has been downloaded, but it isn't present in .temp directory")
-                self._logger.debug(f"Song already downloaded, skipping")
-                return True
-            else:
-                self._logger.debug(f"Song not downloaded, downloading it now.")
-                self.download_song(user_song_choice)
-                write_json_file(user_song_choice, True, ["pre_processing", "downloaded"])
-                self._logger.debug(f"Song downloaded.")
-                return False
-
-        def _genius_pull() -> bool:
-            """
-            Pulls Genius metadata for the song
-            :return: True if already done, False if not
-            """
-            from backend_new.extractors.geniusextractor import GeniusExtractor
-
-            if song_data.get("genius_data", None) is not None:
-                self._logger.debug(f"Genius data already present, skipping")
-                return True
-            else:
-                self._logger.debug(f"Genius data not present, pulling it now.")
-                genius_data = GeniusExtractor(self._env_data["GENIUS_ACCESS_TOKEN"]).return_metadata(
-                    title=song_data["pre_processing"]["raw_metadata"]["name"],
-                    artist=song_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
-                )
-                write_json_file(user_song_choice, genius_data, ["genius_data"])
-                self._logger.debug(f"Genius data pulled.")
-                return False
-
-        def _vocal_sep() -> bool:
-            """
-            Separates the audio into its stems
-            :return: True if already done, False if not
-            """
-            # TODO add vocal sep model chooser
-            if song_data.get("vocal_separation", {}).get("separated", False) is True:
-                if song_data.get("vocal_separation", {}).get("vocal_file", None) not in [file.stem for file in self._temp_dir.iterdir() if file.suffix == ".wav"]:
-                    raise self.DataMismatchError(self._logger, "Data file says audio has been separated, but it isn't present in .temp directory")
-                if song_data.get("vocal_separation", {}).get("inst_file", None) not in [file.stem for file in self._temp_dir.iterdir() if file.suffix == ".wav"]:
-                    raise self.DataMismatchError(self._logger, "Data file says audio has been separated, but it isn't present in .temp directory")
-
-                self._logger.debug(f"Vocal separation already done, skipping")
-                return True
-            else:
-                from backend_new.core.processing import VocalSeparation
-
-                with VocalSeparation() as vs:
-                    vs.separate_vocal(f"../.temp/{song_data["pre_processing"]["youtube_id"]}.wav")
-                    write_json_file(user_song_choice, {"separated": True,
-                                                        "vocal_file": f"{song_data["pre_processing"]["youtube_id"]}_vocal",
-                                                        "inst_file": f"{song_data["pre_processing"]["youtube_id"]}_inst"}, ["vocal_separation"])
-
-                return False
-
-        def _lyrics_tag() -> bool:
-            if song_data.get("split_and_tag", {}):
-                self._logger.debug(f"Lyrics already tagged, skipping")
-                return True
-            else:
-                from backend_new.core.processing import JPAnalyzer
-                from backend_new.utils.helper_funcs import write_json_file
-
-                self._logger.debug(f"Lyrics not tagged, tagging it now.")
-
-                jp_analyzer = JPAnalyzer()
-
-                lyrics = song_data["genius_data"]["lyrics"]
-                data = jp_analyzer.tag(lyrics)
-                write_json_file(user_song_choice, data, ["split_and_tag"])
-                return False
-
-        def _translate_lyrics() -> bool:
-            if song_data.get("translated_lyrics", {}):
-                self._logger.debug(f"Lyrics already translated, skipping")
-                return True
-            else:
-                from backend_new.core.translation_analysis import Translator
-                from backend_new.utils.helper_funcs import write_json_file
-
-                self._logger.debug(f"Lyrics not translated, translating it now.")
-
-                if self._translator is None:
-                    self._translator = Translator()
-
-                lyrics = song_data["genius_data"]["lyrics"]
-                data = self._translator.translate_lyrics(lyrics)
-
-                write_json_file(user_song_choice, data, ["translated_lyrics"])
-
-                return False
-
-
+        song_context = self.SongContext(song_data, user_song_choice)
         # endregion
 
         # region choice list for skip processes, update when adding new processes
@@ -491,25 +481,25 @@ class Analyzer:
         choice_list = [Choice("Download song",
                                value="download_song",
                                checked=skip_options['download_song'],
-                               disabled="Song already downloaded" if song_data.get("pre_processing", {}).get("downloaded") else None),
+                               disabled="Song already downloaded" if song_context.json_song_data.get("pre_processing", {}).get("downloaded") else None),
                         Choice("Get Genius metadata",
                                value="genius_metadata",
                                checked=skip_options['genius_metadata'],
-                               disabled="Data already gathered" if song_data.get("genius_data") else None),
+                               disabled="Data already gathered" if song_context.json_song_data.get("genius_data") else None),
                         Choice("Separate audio into stems",
                                value="vocal_separation",
                                checked=skip_options['vocal_separation'],
-                               disabled="Stems already separated" if song_data.get("vocal_separation", {}).get("separated") else None),
+                               disabled="Stems already separated" if song_context.json_song_data.get("vocal_separation", {}).get("separated") else None),
                         Choice("Split and tag lyrics",
                                value="split_tag",
                                description="(morphological analysis)",
                                checked=skip_options['split_and_tag'],
-                               disabled="Lyrics already split and tagged" if song_data.get("split_and_tag", None) else None),
+                               disabled="Lyrics already split and tagged" if song_context.json_song_data.get("split_and_tag", None) else None),
                         Choice("Translate lyrics to english",
                                value="translate_lyrics",
                                description="(LLM inference)",
                                checked=skip_options['translate_lyrics'],
-                               disabled="Lyrics already translated" if song_data.get("translated_lyrics",None) else None)
+                               disabled="Lyrics already translated" if song_context.json_song_data.get("translated_lyrics",None) else None)
                         ]
 
         skip_processes = questionary_checkbox("Please choose what options to skip", choice_data=choice_list)
@@ -531,51 +521,48 @@ class Analyzer:
         # endregion
 
         # region main loop for processes
-        while True:
-            # download
-            if not skip_options["download_song"]:
-                _download()
-            update_song_data()
+        # download
+        if not skip_options["download_song"]:
+            self._download(song_context)
+        update_song_data()
 
-            # genius metadata
-            if not skip_options["genius_metadata"]:
-                _genius_pull()
-            update_song_data()
+        # genius metadata
+        if not skip_options["genius_metadata"]:
+            self._genius_pull(song_context)
+        update_song_data()
 
-            # vocal separation
-            if not skip_options["vocal_separation"]:
-                if not song_data["pre_processing"].get("downloaded", False):
-                    self._logger.info("Audio cannot be separated as it hasn't been downloaded")
-                    if confirm("Would you like to download first?").ask():
-                        _download()
-                        continue
-                    else:
-                        break
-                _vocal_sep()
+        # vocal separation
+        if not skip_options["vocal_separation"]:
+            if not song_context.json_song_data["pre_processing"].get("downloaded", False):
+                self._logger.info("Audio cannot be separated as it hasn't been downloaded")
+                if confirm("Would you like to download first?").ask():
+                    self._download(song_context)
+                else:
+                    self._logger.warning("Audio is not present, skipping vocal separation")
+            if song_context.json_song_data["pre_processing"].get("downloaded", False):
+                self._vocal_sep(song_context)
 
-            # split and tag
-            if not skip_options["split_and_tag"]:
-                if song_data.get("genius_data", None) is None:
-                    self._logger.info("Genius metadata not present")
-                    if confirm("Would you like to pull it now?").ask():
-                        _genius_pull()
-                        continue
-                    else:
-                        break
-                _lyrics_tag()
+        # split and tag
+        if not skip_options["split_and_tag"]:
+            if song_context.json_song_data.get("genius_data", None) is None:
+                self._logger.info("Genius metadata not present")
+                if confirm("Would you like to pull it now?").ask():
+                    self._genius_pull(song_context)
+                else:
+                    self._logger.warning("Genius data not present, skipping split and tag")
+            if song_context.json_song_data.get("genius_data", None) is not None:
+                self._lyrics_tag(song_context)
 
-            # translate lyrics
-            if not skip_options["translate_lyrics"]:
-                if song_data.get("genius_data", None) is None:
-                    self._logger.info("Genius metadata not present")
-                    if confirm("Would you like to pull it now?").ask():
-                        _genius_pull()
-                        continue
-                    else:
-                        break
-                _translate_lyrics()
-
-            break
+        # translate lyrics
+        if not skip_options["translate_lyrics"]:
+            if song_context.json_song_data.get("genius_data", None) is None:
+                self._logger.info("Genius metadata not present")
+                if confirm("Would you like to pull it now?").ask():
+                    self._genius_pull(song_context)
+                else:
+                    self._logger.warning("Genius data not present, skipping translation of lyrics")
+            if song_context.json_song_data.get("genius_data", None) is not None:
+                self._translate_lyrics(song_context)
         # endregion
 
 
