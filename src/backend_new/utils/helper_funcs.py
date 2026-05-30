@@ -98,7 +98,7 @@ def read_json_file(file_path: Path) -> dict:
     :return: A dict containing the JSON data
     """
     import json
-    return json.loads(file_path.read_text())
+    return json.loads(file_path.read_text(encoding="utf-8"))
 
 def write_json_file(file_path: Path, data: Any, keys: list[str] = None) -> None:
     """

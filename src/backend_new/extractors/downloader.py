@@ -1,8 +1,8 @@
 class Downloader:
-    def __init__(self, spotify_client_id: str = None,
-                 spotify_client_secret: str = None,
-                 youtube_cookie_path: str = None,
-                 cli_output_format: dict[str, bool] = None) -> None:
+    def __init__(self, spotify_client_id: str,
+                 spotify_client_secret: str,
+                 youtube_cookie_path: str | None = None,
+                 cli_output_format: dict[str, bool] | None = None) -> None:
         """
         Initializes the downloader
         :param spotify_client_id:

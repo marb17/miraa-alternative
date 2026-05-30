@@ -33,7 +33,7 @@ class LLMModel:
         self._model_id = str(self._model_dir / "shisa-v2.1-qwen3-8b-awq")
         os.environ["HF_HOME"] = str(self._model_dir)
 
-        self._free_vram = None
+        self._free_vram: float = 0
         self._initialized = True
 
         # model parameters

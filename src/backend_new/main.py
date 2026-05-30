@@ -22,12 +22,56 @@ class Analyzer:
             "vocal_separation": False,
             "split_and_tag": False,
             "translate_lyrics" : False
+        },
+        "jp_dicts": {
+            "always_ask": False,
+            "dicts_to_use": {}
         }
     }
 
     DEFAULT_ENV_VARS = [
         "SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET", "YOUTUBE_COOKIE_PATH", "GENIUS_ACCESS_TOKEN"
     ]
+
+    DEFAULT_DICTS_MESSAGE = """# Please download these recommended dictionaries:
+
+- [JA-EN] **jitendex-yomitan**
+  - This is the main structural dictionary, providing most of the comprehensive English definitions
+- [JA-JA Names] **JMnedict**
+  - Contains real-world words
+    - Names
+    - Places
+    - Pop-Culture Titles
+    - etc.
+- [JA-JA Encyclopedia] **PixivLight**
+  - Contains more modern / slang vocabularies
+  - Catches internet memes
+  - Vocaloid tracking terms
+  - Modern abbreviations
+  - Comtemporary subculture jargon
+- [JA-JA Onomatopoeia] **擬音語・擬態語辞典**
+  - Contains mimetic and sound-effect words (onomatopoeia)
+    - e.g. gira-gira
+- [JA-JA Yoji] **四字熟語の百科事典**
+  - Dedicated to four-character idiomatic compounds
+  - Often appears in dramatic or poetic song hooks
+- [JA-JA] **ことわざ・慣用句の百科事典**
+  - Handles traditional proverbs and idiomatic expressions
+  - Can possibly provide symbolic meaning behind a phrase instead of a literal translation
+- [JA-JA] **大辞林 第四版**
+  - One of the best modern dictionaries for breaking down:
+    - Compound verbs
+    - Subtle semantic shifts
+    - Artistic nuances
+    - etc.
+            
+# Sources:
+- https://github.com/MarvNC/yomitan-dictionaries
+
+# How to install
+- To install these dictionaries, please download the dictionaries and place them in the "dicts" directory
+- The app will automatically extract the .zip files if not yet done and automatically detect each dictionary each run
+    """
     # endregion
 
     def __init__(self) -> None:
@@ -68,7 +112,7 @@ class Analyzer:
             current_dir = current_dir.parent
         self._base_dir = current_dir
 
-        folder = ["data", "config", "models", ".temp"]
+        folder = ["data", "config", "models", ".temp", "dicts"]
         for path in folder:
             Path(self._base_dir / path).mkdir(parents=True, exist_ok=True)
         self._logger.debug("Main Directories created.")
@@ -76,6 +120,8 @@ class Analyzer:
         self._temp_dir = Path(self._base_dir / ".temp")
         self._config_file = Path(self._base_dir / "config/config.json")
         self._env_file = Path(self._base_dir / "config/.env")
+
+        self._create_misc_files()
 
     def _setup_config_file(self) -> None:
         """Sets up the config file for the analyzer. Writes default values if it doesn't exist."""
@@ -119,6 +165,15 @@ class Analyzer:
 
         load_dotenv()
         self._env_data = dict([(var, os.getenv(var))for var in self.DEFAULT_ENV_VARS])
+
+    def _create_misc_files(self) -> None:
+        # dicts directory
+        dicts_dir = Path(self._base_dir / "dicts")
+        dicts_file = dicts_dir / "readme.md"
+        if not dicts_file.exists():
+            dicts_file.write_text(self.DEFAULT_DICTS_MESSAGE, encoding="utf-8")
+        else:
+            pass
     # endregion
 
     # region preprocessing
@@ -170,7 +225,7 @@ class Analyzer:
         file_path.write_text(json_data)
         self._logger.info(f"Saved song data: {view_name} -> {file_path}")
 
-    def download_song(self, json_file: Path = None) -> None:
+    def download_song(self, json_file: Path) -> None:
         """
         Downloads a song from YouTube using metadata present in .temp
         When no files are present, it will query spotify
@@ -381,13 +436,13 @@ class Analyzer:
                 return True
             else:
                 from backend_new.core.processing import VocalSeparation
-                vs = VocalSeparation()
-                vs.separate_vocal(f"../.temp/{song_data["pre_processing"]["youtube_id"]}.wav")
-                write_json_file(user_song_choice, {"separated": True,
-                                                    "vocal_file": f"{song_data["pre_processing"]["youtube_id"]}_vocal",
-                                                    "inst_file": f"{song_data["pre_processing"]["youtube_id"]}_inst"}, ["vocal_separation"])
-                del vs
-                gc.collect()
+
+                with VocalSeparation() as vs:
+                    vs.separate_vocal(f"../.temp/{song_data["pre_processing"]["youtube_id"]}.wav")
+                    write_json_file(user_song_choice, {"separated": True,
+                                                        "vocal_file": f"{song_data["pre_processing"]["youtube_id"]}_vocal",
+                                                        "inst_file": f"{song_data["pre_processing"]["youtube_id"]}_inst"}, ["vocal_separation"])
+
                 return False
 
         def _lyrics_tag() -> bool:
