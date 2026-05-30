@@ -2,7 +2,7 @@ from typing import Any
 
 # region vocal sep
 class VocalSeparation:
-    def __init__(self) -> None:
+    def __init__(self, model_name: str = "vocal_full") -> None:
         """
         Separator object:
         vocal_full: A rawer vocal stem with noise artifacts but the most clear articulation
@@ -26,7 +26,7 @@ class VocalSeparation:
         self._model_file_dir = f'{self._base_dir / "models/audioseparator"}'
 
         # TODO add normal models for more stuff yesyes
-        self._separator_objects = {"vocal_full": Separator(output_dir=str(self._output_dir),
+        separator_objects = {"vocal_full": Separator(output_dir=str(self._output_dir),
                                                            model_file_dir=str(self._model_file_dir),
                                                            ensemble_preset='vocal_full'),
                                    "vocal_clean": Separator(output_dir=str(self._output_dir),
@@ -39,66 +39,178 @@ class VocalSeparation:
                                                            model_file_dir=str(self._model_file_dir),
                                                            ensemble_preset='instrumental_low_resource')
                                    }
-    @property
-    def separator_objects(self) -> list[str]:
-        return list(self._separator_objects)
 
-    def _init_model(self, model_name: str = "vocal_full") -> None:
-        _model = self._separator_objects.get(model_name, None)
+        # select model and list available models
+        self._available_models = [key for key in separator_objects]
+        self._model_name = model_name
 
-        if _model is None:
+        # check if model available
+        model = separator_objects.get(model_name, None)
+        if model is None:
             raise Exception(f"Model {model_name} not found")
         else:
-            self._separator_objects[model_name].load_model()
+            self._selected_model = separator_objects[model_name]
 
-    def separate_vocal(self, audio_path: str, model: str = "vocal_full") -> None:
+        # delete not used separator objects
+        for model_key, separator_instance in separator_objects.items():
+            if separator_instance is not None:
+                if hasattr(separator_instance, 'model_data'):
+                    separator_instance.model_data = None
+
+                if hasattr(separator_instance, '__dict__'):
+                    separator_instance.__dict__.clear()
+        # clean up
+        separator_objects = None
+        import gc
+        gc.collect()
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
+
+    def __del__(self) -> None:
+        self._close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._close()
+        return False
+
+    def _close(self) -> None:
+        if hasattr(self._selected_model, 'model_data'):
+            self._selected_model.model_data = None
+
+        self._selected_model = None
+
+        import gc
+        gc.collect()
+
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
+
+    @property
+    def separator_objects(self) -> list[str]:
+        return self._available_models
+
+    def _init_model(self) -> None:
+        self._selected_model.load_model()
+
+    def separate_vocal(self, audio_path: str) -> None:
         from pathlib import Path
         import time
 
-        self._init_model(model)
+        self._init_model()
 
-        _win_audio_path = Path(audio_path)
+        win_audio_path = Path(audio_path)
 
         now = time.time()
-        _output_files = self._separator_objects[model].separate(audio_path)
+        output_files = self._selected_model.separate(audio_path)
         self._logger.info(f"Took {(time.time() - now):.2f} seconds to separate stems")
 
-        _output_files = [Path(f) for f in _output_files]
+        output_files = [Path(f) for f in output_files]
 
         def rename_file(file_path: Path, name: str) -> None:
-            file_path.rename(f"{str(self._output_dir)}/{_win_audio_path.stem}_{name}.wav")
+            file_path.rename(f"{str(self._output_dir)}/{win_audio_path.stem}_{name}.wav")
 
         # different models output differently, if flipped recheck this
-        match model:
+        match self._model_name:
             case "vocal_full":
-                rename_file(_output_files[0], "inst")
-                rename_file(_output_files[1], "vocal")
+                rename_file(output_files[0], "inst")
+                rename_file(output_files[1], "vocal")
             case "vocal_clean":
-                rename_file(_output_files[0], "inst")
-                rename_file(_output_files[1], "vocal")
+                rename_file(output_files[0], "inst")
+                rename_file(output_files[1], "vocal")
             case "instrumental_full":
-                rename_file(_output_files[0], "vocal")
-                rename_file(_output_files[1], "inst")
+                rename_file(output_files[0], "vocal")
+                rename_file(output_files[1], "inst")
             case "instrumental_low_resource":
-                rename_file(_output_files[0], "vocal")
-                rename_file(_output_files[1], "inst")
+                rename_file(output_files[0], "vocal")
+                rename_file(output_files[1], "inst")
 # endregion
 
 # region japanese morphological analyzer
-def _tag_data(text_data: str, translation_dict: dict[str, str] = None) -> dict[str, Any] | None:
-    import nagisa
+import nagisa
+from sudachipy.morpheme import Morpheme
+
+class TaggedData:
+    def __init__(self, words: list[str], pos: list[str], en_pos: list[str], text: str):
+        self._words = words
+        self._pos = pos
+        self._en_pos = en_pos
+        self._text = text
+
+        self._data_dict = {"words": words,
+                           "pos": pos,
+                           "en_pos": en_pos,
+                           "text": text}
+
+    def __str__(self) -> str:
+        return " | ".join(self.words)
+
+    @property
+    def data(self) -> dict[str, Any]: return self._data_dict
+    @property
+    def words(self) -> list[str]: return self._words
+    @property
+    def pos(self) -> list[str]: return self._pos
+    @property
+    def en_pos(self) -> list[str]: return self._en_pos
+    @property
+    def text(self) -> str: return self._text
+
+
+class MorphemeData:
+    def __init__(self, morpheme: Morpheme) -> None:
+        self._surface = morpheme.surface()
+        self._dictionary_form = morpheme.dictionary_form()
+        self._normalized_form = morpheme.normalized_form()
+        self._reading = morpheme.reading_form()
+        self._pos = morpheme.part_of_speech()
+
+        self._data_dict = {
+            "surface": self._surface,
+            "dictionary_form": self._dictionary_form,
+            "normalized_form": self._normalized_form,
+            "reading": self._reading,
+            "pos": self._pos
+        }
+
+    def __str__(self) -> str:
+        return self.dictionary_form
+
+    def __repr__(self) -> str:
+        return "'" + self.dictionary_form + "'"
+
+    @property
+    def data(self) -> dict[str, Any]: return self._data_dict
+    @property
+    def surface(self) -> str: return self._surface
+    @property
+    def dictionary_form(self) -> str: return self._dictionary_form
+    @property
+    def normalized_form(self) -> str: return self._normalized_form
+    @property
+    def reading(self) -> str: return self._reading
+    @property
+    def pos(self) -> tuple[str, ...]: return self._pos
+
+
+def tag_data(text_data: str, translation_dict: dict[str, Any] = None) -> TaggedData | None:
     if text_data is None or text_data == "":
         return None
     if translation_dict is None:
-        raise ValueError("Please put a translation dict in kwargs")
-    _data = nagisa.tagging(text_data)
-    _en_pos = [translation_dict[pos] for pos in _data.postags]
-    return {"words": _data.words,
-            "pos": _data.postags,
-            "en_pos": _en_pos,
-            "text": _data.text}
+        raise Exception("Please fill out japanese_pos_translation")
 
-class JPSplitTagger:
+    data = nagisa.tagging(text_data)
+    en_pos = [translation_dict[pos] for pos in data.postags]
+    return TaggedData(data.words, data.postags, en_pos, data.text)
+
+
+class JPAnalyzer:
     japanese_pos_translation = {
         "oov": "out of vocabulary",
         "補助記号": "auxiliary sign / punctuation",
@@ -127,29 +239,83 @@ class JPSplitTagger:
     }
 
     def __init__(self) -> None:
-        pass
+        from functools import partial
+        from sudachipy import dictionary
 
-    # TODO maybe use SudachiPy or fugashi for backup?
+        self._fixed_tagger = partial(tag_data, translation_dict=self.japanese_pos_translation)
+
+        self._tokenizer_obj = dictionary.Dictionary(dict="full").create()
+
+    # TODO use SudachiPy for dict look up
     # TODO add fallback when lyrics are romanized
 
-    def tag(self, text: str, split_newline: bool = True) -> dict[str, Any] | list[dict[str, Any] | None] | None:
+    def _tag(self, data: list[str]) -> list[TaggedData | None]:
         """
         Tags a string into their parts (including pos)
-        :param text: String to process
-        :param split_newline: Whether to split the text into lines or not
+        :param data: data to process
         :return: A dict containing the words, their parts, and the text itself
         """
+        from concurrent.futures import ProcessPoolExecutor
+
+        with ProcessPoolExecutor(max_workers=20) as executor:
+            results = list(executor.map(self._fixed_tagger, data))
+
+        return results
+
+    def _morpheme(self, data: list[TaggedData | None]) -> list[list[MorphemeData] | None]:
+        """
+        Gets dictionary data from tagged data
+        :param data:
+        :return:
+        """
+        def morpheme_pull(str_data: list[str] | None, tokenizer_object, split_mode) -> list[Morpheme] | None:
+            if str_data is None:
+                return None
+
+            return [tokenizer_object.tokenize(word, split_mode)[0] for word in str_data]
+
+        from concurrent.futures import ThreadPoolExecutor
         from functools import partial
+        from sudachipy import tokenizer
 
+        mode = tokenizer.Tokenizer.SplitMode.C
+        fixed_morpheme_pull = partial(morpheme_pull, tokenizer_object=self._tokenizer_obj, split_mode=mode)
+
+        formatted_data = []
+        for d in data:
+            if d is None:
+                formatted_data.append(None)
+            else:
+                formatted_data.append(d.words)
+
+        with ThreadPoolExecutor(max_workers=15) as executor:
+            results = list(executor.map(fixed_morpheme_pull, formatted_data))
+
+        final_results = []
+        for res in results:
+            if res is None:
+                final_results.append(None)
+                continue
+
+            final_results.append([MorphemeData(word) for word in res])
+
+        return final_results
+
+    def process(self, text: str, split_newline: bool = True) -> dict[str, Any] | list[dict[str, Any] | None] | None:
         if split_newline:
-            from concurrent.futures import ProcessPoolExecutor
-            _split_text = text.split("\n")
-
-            _fixed_tagger = partial(_tag_data, translation_dict=self.japanese_pos_translation)
-
-            with ProcessPoolExecutor(max_workers=10) as executor:
-                results = list(executor.map(_fixed_tagger, _split_text))
-
-            return results
+            data_list = text.split("\n")
         else:
-            return _tag_data(text, self.japanese_pos_translation)
+            data_list = [text]
+
+        tag_data = self._tag(data_list)
+        morpheme_data = self._morpheme(tag_data)
+
+        # TODO add -/jamdict/- use yomitan dict
+
+# endregion
+
+if __name__ == "__main__":
+    analyzer = JPAnalyzer()
+    lyric = "[7!!(\u30bb\u30d6\u30f3\u30a6\u30c3\u30d7\u30b9)\u300c\u30aa\u30ec\u30f3\u30b8\u300d\u6b4c\u8a5e]\n\n[Verse 1]\n\u5c0f\u3055\u306a\u80a9\u3092\n\u4e26\u3079\u3066\u6b69\u3044\u305f\n\u4f55\u3067\u3082\u306a\u3044\u4e8b\u3067\u7b11\u3044\u5408\u3044\n\u540c\u3058\u5922\u3092\u898b\u3064\u3081\u3066\u3044\u305f\n\u8033\u3092\u6f84\u307e\u305b\u3070\n\u4eca\u3067\u3082\u805e\u3053\u3048\u308b\n\u541b\u306e\u58f0 \u30aa\u30ec\u30f3\u30b8\u8272\u306b\n\u67d3\u307e\u308b\u8857\u306e\u4e2d\n\n[Pre-Chorus]\n\u541b\u304c\u3044\u306a\u3044\u3068\u672c\u5f53\u306b\u9000\u5c48\u3060\u306d\n\u5bc2\u3057\u3044\u3068\u8a00\u3048\u3070\u7b11\u308f\u308c\u3066\u3057\u307e\u3046\u3051\u3069\n\u6b8b\u3055\u308c\u305f\u3082\u306e \u4f55\u5ea6\u3082\u78ba\u304b\u3081\u308b\u3088\n\u6d88\u3048\u308b\u3053\u3068\u306a\u304f\u8f1d\u3044\u3066\u3044\u308b\n\n[Chorus]\n\u96e8\u4e0a\u304c\u308a\u306e\u7a7a\u306e\u3088\u3046\u306a\n\u5fc3\u304c\u6674\u308c\u308b\u3088\u3046\u306a\n\u541b\u306e\u7b11\u9854\u3092\u61b6\u3048\u3066\u3044\u308b\n\u601d\u3044\u51fa\u3057\u3066\u7b11\u9854\u306b\u306a\u308b\n\u304d\u3063\u3068\u4e8c\u4eba\u306f\u3042\u306e\u65e5\u306e\u307e\u307e\n\u7121\u90aa\u6c17\u306a\u5b50\u4f9b\u306e\u307e\u307e\n\u5de1\u308b\u5b63\u7bc0\u3092\u99c6\u3051\u629c\u3051\u3066\u3044\u304f\n\u305d\u308c\u305e\u308c\u306e\u660e\u65e5\u3092\u898b\u3066\n\n[Verse 2]\n\u4e00\u4eba\u306b\u306a\u308c\u3070\n\u4e0d\u5b89\u306b\u306a\u308b\u3068\n\u7720\u308a\u305f\u304f\u306a\u3044\u591c\u306f\n\u8a71\u3057\u7d9a\u3051\u3066\u3044\u305f\n\n[Pre-Chorus]\n\u541b\u306f\u3053\u308c\u304b\u3089\u4f55\u3092\u898b\u3066\u3044\u304f\u3093\u3060\u308d\u3046\n\u79c1\u306f\u3053\u3053\u3067\u4f55\u3092\u898b\u3066\u3044\u304f\u306e\u3060\u308d\u3046\n\u6c88\u3080\u5915\u713c\u3051 \u30aa\u30ec\u30f3\u30b8\u306b\u67d3\u307e\u308b\u8857\u306b\n\u305d\u3063\u3068\u6d99\u3092\u9810\u3051\u3066\u307f\u308b\n\n[Chorus]\n\u4f55\u5104\u3082\u306e\u5149\u306e\u4e2d\n\u751f\u307e\u308c\u305f\u4e00\u3064\u306e\u611b\n\u5909\u308f\u3089\u306a\u304f\u3066\u3082\u5909\u308f\u3063\u3066\u3057\u307e\u3063\u3066\u3082\n\u541b\u306f\u541b\u3060\u3088 \u5fc3\u914d\u7121\u3044\u3088\n\u3044\u3064\u304b\u4e8c\u4eba\u304c\u5927\u4eba\u306b\u306a\u3063\u3066\n\u7d20\u6575\u306a\u4eba\u306b\u51fa\u4f1a\u3063\u3066\n\u304b\u3051\u304c\u3048\u306e\u306a\u3044\u5bb6\u65cf\u3092\u9023\u308c\u3066\n\u3053\u306e\u5834\u6240\u3067\u9022\u3048\u308b\u3068\u3044\u3044\u306a\n\n[Instrumental Break]\n\n[Chorus]\n\u96e8\u4e0a\u304c\u308a\u306e\u7a7a\u306e\u3088\u3046\u306a\n\u5fc3\u304c\u6674\u308c\u308b\u3088\u3046\u306a\n\u541b\u306e\u7b11\u9854\u3092\u61b6\u3048\u3066\u3044\u308b\n\u601d\u3044\u51fa\u3057\u3066\u7b11\u9854\u306b\u306a\u308b\n\u4f55\u5104\u3082\u306e\u5149\u306e\u4e2d\n\u751f\u307e\u308c\u305f\u4e00\u3064\u306e\u611b\n\u5de1\u308b\u5b63\u7bc0\u3092\u99c6\u3051\u629c\u3051\u3066\u3044\u304f\n\u305d\u308c\u305e\u308c\u306e\u660e\u65e5\u3092\u898b\u3066\n\n[Outro]\n\u305d\u308c\u305e\u308c\u306e\u5922\u3092\u9078\u3093\u3067"
+
+    analyzer.process(lyric)

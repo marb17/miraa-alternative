@@ -395,12 +395,12 @@ class Analyzer:
                 self._logger.debug(f"Lyrics already tagged, skipping")
                 return True
             else:
-                from backend_new.core.processing import JPSplitTagger
+                from backend_new.core.processing import JPAnalyzer
                 from backend_new.utils.helper_funcs import write_json_file
 
                 self._logger.debug(f"Lyrics not tagged, tagging it now.")
 
-                jp_analyzer = JPSplitTagger()
+                jp_analyzer = JPAnalyzer()
 
                 _lyrics = _song_data["genius_data"]["lyrics"]
                 _data = jp_analyzer.tag(_lyrics)

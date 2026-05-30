@@ -15,7 +15,6 @@ class LLMModel:
         from backend_new.utils import logger
         self._logger = logger.Logger()
 
-        self._llm = None
         self._pipe = None
 
         # model save loc
@@ -75,6 +74,27 @@ class LLMModel:
         """
         self._gb_per_token = (model_data["hidden_size"] * model_data["num_hidden_layers"] * 2) / (1024 ** 3)
 
+    def __del__(self) -> None:
+        self._close()
+
+    def __enter__(self):
+        if self._pipe is None:
+            self.init_model()
+        return self
+
+    def __exit__(self):
+        self._close()
+        return False
+
+    def _close(self) -> None:
+        self._pipe = None
+        LLMModel._instance = None
+
+        import gc
+        import torch
+        gc.collect()
+        torch.cuda.empty_cache()
+
     # region batched inference
     def _calculate_prompt_cost(self, prompt: list[str], estimated_output_token_cost: int) -> float:
         """
@@ -103,30 +123,34 @@ class LLMModel:
         """
         Starts the model up, ready to be used
         """
-        from lmdeploy import pipeline
-        import time
+        if self._pipe is None:
+            from lmdeploy import pipeline
+            import time
 
-        self._logger.debug(f"Initializing model: {self._model_id}")
+            self._logger.debug(f"Initializing model: {self._model_id}")
 
-        now = time.time()
-        self._pipe = pipeline(self._model_id)
-        self._logger.debug(f"Loaded model in {(time.time() - now):.2f} seconds")
+            now = time.time()
 
-        # get available VRAM
-        import torch
-        if not torch.cuda.is_available():
-            raise RuntimeError("CUDA is not available on this system.")
+            self._pipe = pipeline(self._model_id)
+            self._logger.debug(f"Loaded model in {(time.time() - now):.2f} seconds")
 
-        device = torch.cuda.current_device()
+            # get available VRAM
+            import torch
+            if not torch.cuda.is_available():
+                raise RuntimeError("CUDA is not available on this system.")
 
-        total_mem = torch.cuda.get_device_properties(device).total_memory
+            device = torch.cuda.current_device()
 
-        allocated_mem = torch.cuda.memory_allocated(device)
-        reserved_mem = torch.cuda.memory_reserved(device)
+            total_mem = torch.cuda.get_device_properties(device).total_memory
 
-        free_mem_bytes = total_mem - (allocated_mem + reserved_mem)
-        self._free_vram = free_mem_bytes / (1024 ** 3)
-        self._logger.debug(f"Available VRAM: {self._free_vram}")
+            allocated_mem = torch.cuda.memory_allocated(device)
+            reserved_mem = torch.cuda.memory_reserved(device)
+
+            free_mem_bytes = total_mem - (allocated_mem + reserved_mem)
+            self._free_vram = free_mem_bytes / (1024 ** 3)
+            self._logger.debug(f"Available VRAM: {self._free_vram}")
+        else:
+            self._logger.debug("Model already initialized, skipping")
 
     def batch_inference(self, prompts: list[str], batch_size: int = -1, estimated_output_cost: int = 2048) -> list[str]:
         """
@@ -190,8 +214,6 @@ class LLMModel:
 
 class Translator:
     def __init__(self) -> None:
-        self._model = LLMModel()
-
         from backend_new.utils import logger
         self._logger = logger.Logger()
 
@@ -307,7 +329,8 @@ class Translator:
             mapping_index.append((idx, "do"))
             processed_lyrics[text] = idx
 
-        responses = dict(zip([idx for idx, exp in mapping_index if exp == "do"], self._model.batch_inference(prompts, estimated_output_cost=50)))
+        with LLMModel() as llm:
+            responses = dict(zip([idx for idx, exp in mapping_index if exp == "do"], llm.batch_inference(prompts, estimated_output_cost=50)))
 
         results = []
         # remap all unprocessed, remove special whitespace and strips
@@ -351,7 +374,6 @@ class Translator:
         return results
 
 if __name__ == "__main__":
-    llm_model = LLMModel()
     translator = Translator()
 #
 #     print(translator.translate_text(["姿形の見えない魔物",
