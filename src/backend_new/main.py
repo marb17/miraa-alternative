@@ -135,11 +135,11 @@ class Analyzer:
 
             if self._config_json["youtube_downloader"]["use_cookies"]:
                 if self._env_data["YOUTUBE_COOKIE_PATH"] == '' or self._env_data["YOUTUBE_COOKIE_PATH"] is None:
-                    _use_cookies = q.confirm("Do you want to use cookies?").ask()
-                    if _use_cookies:
-                        _cookie_path = q.path("Please enter the path to your cookies file (Netscape .txt file): ").ask()
-                        self._env_data["YOUTUBE_COOKIE_PATH"] = _cookie_path
-                        set_key(self._env_file, "YOUTUBE_COOKIE_PATH", _cookie_path, quote_mode="never")
+                    use_cookies = q.confirm("Do you want to use cookies?").ask()
+                    if use_cookies:
+                        cookie_path = q.path("Please enter the path to your cookies file (Netscape .txt file): ").ask()
+                        self._env_data["YOUTUBE_COOKIE_PATH"] = cookie_path
+                        set_key(self._env_file, "YOUTUBE_COOKIE_PATH", cookie_path, quote_mode="never")
                     else:
                         read_json_file(self._config_file)
                         write_json_file(self._config_file, False, ["youtube_downloader", "use_cookies"])
@@ -161,14 +161,14 @@ class Analyzer:
 
         self._init_downloader()
 
-        _data = self._dl.cli_search_song()
-        _view_name = self._dl.get_title_artist(metadata=_data)
-        _youtube_id = self._dl.youtube_query(query=_view_name)
-        _json_data = json.dumps({"pre_processing": {"youtube_id": _youtube_id, "view_name": _view_name, "raw_metadata": _data}}, indent=4)
-        _file_path = self._temp_dir / f"{_view_name}.json"
+        data = self._dl.cli_search_song()
+        view_name = self._dl.get_title_artist(metadata=data)
+        youtube_id = self._dl.youtube_query(query=view_name)
+        json_data = json.dumps({"pre_processing": {"youtube_id": youtube_id, "view_name": view_name, "raw_metadata": data}}, indent=4)
+        file_path = self._temp_dir / f"{view_name}.json"
 
-        _file_path.write_text(_json_data)
-        self._logger.info(f"Saved song data: {_view_name} -> {_file_path}")
+        file_path.write_text(json_data)
+        self._logger.info(f"Saved song data: {view_name} -> {file_path}")
 
     def download_song(self, json_file: Path = None) -> None:
         """
@@ -193,53 +193,53 @@ class Analyzer:
             if type(file_path) is Path:
                 await asyncio.to_thread(self._dl.download_youtube_video, url=get_youtube_id_from_json(file_path))
 
-        _break_off = False
+        break_off = False
 
         if json_file is None:
             while True:
-                if _break_off:
+                if break_off:
                     break
 
-                _all_files = list(self._temp_dir.iterdir())
-                _all_files_stem = [file.stem for file in _all_files]
-                _available_json_files = [file for file in _all_files if file.suffix == ".json" and get_youtube_id_from_json(file) not in _all_files_stem]
+                all_files = list(self._temp_dir.iterdir())
+                all_files_stem = [file.stem for file in all_files]
+                available_json_files = [file for file in all_files if file.suffix == ".json" and get_youtube_id_from_json(file) not in all_files_stem]
 
                 # if songs are available, ask user which one to download or download the only one present
-                if _available_json_files:
+                if available_json_files:
                     # if only one song is available, download it
-                    if len(_available_json_files) == 1:
-                        target_id = get_youtube_id_from_json(_available_json_files[0])
+                    if len(available_json_files) == 1:
+                        target_id = get_youtube_id_from_json(available_json_files[0])
                         try:
                             loop = asyncio.get_running_loop()
                             loop.create_task(_download(target_id))
                         except RuntimeError:
                             asyncio.run(_download(target_id))
                     # if multiple songs are available, ask user which one to download
-                    elif len(_available_json_files) > 1:
-                        _offset = 0
+                    elif len(available_json_files) > 1:
+                        offset = 0
 
                         while True:
-                            _all_files = list(self._temp_dir.iterdir())
-                            _all_files_stem = [file.stem for file in _all_files]
-                            _available_json_files = [file for file in _all_files
+                            all_files = list(self._temp_dir.iterdir())
+                            all_files_stem = [file.stem for file in all_files]
+                            available_json_files = [file for file in all_files
                                                      if file.suffix == ".json" and
-                                                     get_youtube_id_from_json(file) not in _all_files_stem]
+                                                     get_youtube_id_from_json(file) not in all_files_stem]
 
-                            _file_list = [{"name": file.stem, "value": file} for file in _available_json_files]
+                            file_list = [{"name": file.stem, "value": file} for file in available_json_files]
 
-                            _user_choice = questionary_select("Please choose the song:",
-                                                              choose_data=_file_list,
+                            user_choice = questionary_select("Please choose the song:",
+                                                              choose_data=file_list,
                                                               enable_pages=True,
                                                               enable_all="Download All",
                                                               enable_exit="Exit",
                                                               batch_data=True)
 
-                            if _user_choice == "__all__":
-                                _target_ids = [get_youtube_id_from_json(file) for file in _available_json_files]
-                                _tasks = [_download(y_id) for y_id in _target_ids]
+                            if user_choice == "__all__":
+                                target_ids = [get_youtube_id_from_json(file) for file in available_json_files]
+                                tasks = [_download(y_id) for y_id in target_ids]
 
                                 async def run_batch():
-                                    await asyncio.gather(*_tasks)
+                                    await asyncio.gather(*tasks)
 
                                 try:
                                     loop = asyncio.get_running_loop()
@@ -247,16 +247,16 @@ class Analyzer:
                                 except RuntimeError:
                                     asyncio.run(run_batch())
 
-                                for file in _available_json_files:
+                                for file in available_json_files:
                                     write_json_file(file, True, ["pre_processing", "downloaded"])
-                                _break_off = True
+                                break_off = True
                                 break
                             else:
-                                _file_data = read_json_file(_user_choice)
-                                _tasks = [_download(_file_data["pre_processing"]["youtube_id"])]
+                                file_data = read_json_file(user_choice)
+                                tasks = [_download(file_data["pre_processing"]["youtube_id"])]
 
                                 async def run_batch():
-                                    await asyncio.gather(*_tasks)
+                                    await asyncio.gather(*tasks)
 
                                 try:
                                     loop = asyncio.get_running_loop()
@@ -287,35 +287,35 @@ class Analyzer:
 
         # region helper functions
         def update_song_data() -> None:
-            """Updates the chosen song's data in the _song_data variable."""
-            nonlocal _song_data
-            _song_data = read_json_file(_user_song_choice)
+            """Updates the chosen song's data in the song_data variable."""
+            nonlocal song_data
+            song_data = read_json_file(user_song_choice)
         # endregion
 
         self._init_downloader()
 
         # region asks user which song to process
         while True:
-            _all_files = [file for file in self._temp_dir.iterdir() if file.suffix == ".json"]
-            _all_files_stem = [file.stem for file in _all_files]
+            all_files = [file for file in self._temp_dir.iterdir() if file.suffix == ".json"]
+            all_files_stem = [file.stem for file in all_files]
 
-            _song_choice_list = [{"name": file.stem, "value": file} for file in _all_files]
+            song_choice_list = [{"name": file.stem, "value": file} for file in all_files]
 
-            if not _song_choice_list:
-                _song_choice_list.append(Choice(title="No songs available, please download a song first", disabled=True))
+            if not song_choice_list:
+                song_choice_list.append(Choice(title="No songs available, please download a song first", disabled=True))
 
-            _user_song_choice = questionary_select("Please choose the song:",
-                                                   choose_data=_song_choice_list,
+            user_song_choice = questionary_select("Please choose the song:",
+                                                   choose_data=song_choice_list,
                                                    enable_pages=True,
                                                    batch_data=True,
                                                    batch_size=10,
                                                    extra_navigation_options=[Choice("Download New", value="__new__", shortcut_key="n")])
-            if _user_song_choice == "__new__":
+            if user_song_choice == "__new__":
                 self.query_song_spotify()
             else:
                 break
 
-        _song_data = read_json_file(_user_song_choice)
+        song_data = read_json_file(user_song_choice)
         # endregion
 
         # region all processes, returns True if already done
@@ -324,14 +324,14 @@ class Analyzer:
             Downloads the song, checks if the audio file is present in the .temp dir, if not handle appropriately
             :return: True if already downloaded, False if not
             """
-            if _song_data.get("pre_processing", {}).get("downloaded", False):
+            if song_data.get("pre_processing", {}).get("downloaded", False):
                 # checks if the audio file is present in the .temp dir, if not handle appropriately
-                if _song_data["pre_processing"].get("youtube_id", None) not in [file.stem for file in self._temp_dir.iterdir() if file.suffix == ".wav"]:
+                if song_data["pre_processing"].get("youtube_id", None) not in [file.stem for file in self._temp_dir.iterdir() if file.suffix == ".wav"]:
                     self._logger.warning("Data file says audio has been downloaded, but it isn't present in .temp directory")
                     self._logger.warning("Please do not rename, convert or alter files in .temp to prevent further errors")
                     self._logger.warning("Please clear all files in .temp directory to ensure proper functionality")
                     if confirm("Do you want to retry?").ask():
-                        write_json_file(_user_song_choice, False, ["pre_processing", "downloaded"])
+                        write_json_file(user_song_choice, False, ["pre_processing", "downloaded"])
                         update_song_data()
                         _download()
                     else:
@@ -340,8 +340,8 @@ class Analyzer:
                 return True
             else:
                 self._logger.debug(f"Song not downloaded, downloading it now.")
-                self.download_song(_user_song_choice)
-                write_json_file(_user_song_choice, True, ["pre_processing", "downloaded"])
+                self.download_song(user_song_choice)
+                write_json_file(user_song_choice, True, ["pre_processing", "downloaded"])
                 self._logger.debug(f"Song downloaded.")
                 return False
 
@@ -352,16 +352,16 @@ class Analyzer:
             """
             from backend_new.extractors.geniusextractor import GeniusExtractor
 
-            if _song_data.get("genius_data", None) is not None:
+            if song_data.get("genius_data", None) is not None:
                 self._logger.debug(f"Genius data already present, skipping")
                 return True
             else:
                 self._logger.debug(f"Genius data not present, pulling it now.")
-                _genius_data = GeniusExtractor(self._env_data["GENIUS_ACCESS_TOKEN"]).return_metadata(
-                    title=_song_data["pre_processing"]["raw_metadata"]["name"],
-                    artist=_song_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
+                genius_data = GeniusExtractor(self._env_data["GENIUS_ACCESS_TOKEN"]).return_metadata(
+                    title=song_data["pre_processing"]["raw_metadata"]["name"],
+                    artist=song_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
                 )
-                write_json_file(_user_song_choice, _genius_data, ["genius_data"])
+                write_json_file(user_song_choice, genius_data, ["genius_data"])
                 self._logger.debug(f"Genius data pulled.")
                 return False
 
@@ -371,27 +371,27 @@ class Analyzer:
             :return: True if already done, False if not
             """
             # TODO add vocal sep model chooser
-            if _song_data.get("vocal_separation", {}).get("separated", False) is True:
-                if _song_data.get("vocal_separation", {}).get("vocal_file", None) not in [file.stem for file in self._temp_dir.iterdir() if file.suffix == ".wav"]:
+            if song_data.get("vocal_separation", {}).get("separated", False) is True:
+                if song_data.get("vocal_separation", {}).get("vocal_file", None) not in [file.stem for file in self._temp_dir.iterdir() if file.suffix == ".wav"]:
                     raise self.DataMismatchError(self._logger, "Data file says audio has been separated, but it isn't present in .temp directory")
-                if _song_data.get("vocal_separation", {}).get("inst_file", None) not in [file.stem for file in self._temp_dir.iterdir() if file.suffix == ".wav"]:
+                if song_data.get("vocal_separation", {}).get("inst_file", None) not in [file.stem for file in self._temp_dir.iterdir() if file.suffix == ".wav"]:
                     raise self.DataMismatchError(self._logger, "Data file says audio has been separated, but it isn't present in .temp directory")
 
                 self._logger.debug(f"Vocal separation already done, skipping")
                 return True
             else:
                 from backend_new.core.processing import VocalSeparation
-                _vs = VocalSeparation()
-                _vs.separate_vocal(f"../.temp/{_song_data["pre_processing"]["youtube_id"]}.wav")
-                write_json_file(_user_song_choice, {"separated": True,
-                                                    "vocal_file": f"{_song_data["pre_processing"]["youtube_id"]}_vocal",
-                                                    "inst_file": f"{_song_data["pre_processing"]["youtube_id"]}_inst"}, ["vocal_separation"])
-                del _vs
+                vs = VocalSeparation()
+                vs.separate_vocal(f"../.temp/{song_data["pre_processing"]["youtube_id"]}.wav")
+                write_json_file(user_song_choice, {"separated": True,
+                                                    "vocal_file": f"{song_data["pre_processing"]["youtube_id"]}_vocal",
+                                                    "inst_file": f"{song_data["pre_processing"]["youtube_id"]}_inst"}, ["vocal_separation"])
+                del vs
                 gc.collect()
                 return False
 
         def _lyrics_tag() -> bool:
-            if _song_data.get("split_and_tag", {}):
+            if song_data.get("split_and_tag", {}):
                 self._logger.debug(f"Lyrics already tagged, skipping")
                 return True
             else:
@@ -402,13 +402,13 @@ class Analyzer:
 
                 jp_analyzer = JPAnalyzer()
 
-                _lyrics = _song_data["genius_data"]["lyrics"]
-                _data = jp_analyzer.tag(_lyrics)
-                write_json_file(_user_song_choice, _data, ["split_and_tag"])
+                lyrics = song_data["genius_data"]["lyrics"]
+                data = jp_analyzer.tag(lyrics)
+                write_json_file(user_song_choice, data, ["split_and_tag"])
                 return False
 
         def _translate_lyrics() -> bool:
-            if _song_data.get("translated_lyrics", {}):
+            if song_data.get("translated_lyrics", {}):
                 self._logger.debug(f"Lyrics already translated, skipping")
                 return True
             else:
@@ -420,10 +420,10 @@ class Analyzer:
                 if self._translator is None:
                     self._translator = Translator()
 
-                _lyrics = _song_data["genius_data"]["lyrics"]
-                _data = self._translator.translate_lyrics(_lyrics)
+                lyrics = song_data["genius_data"]["lyrics"]
+                data = self._translator.translate_lyrics(lyrics)
 
-                write_json_file(_user_song_choice, _data, ["translated_lyrics"])
+                write_json_file(user_song_choice, data, ["translated_lyrics"])
 
                 return False
 
@@ -431,46 +431,46 @@ class Analyzer:
         # endregion
 
         # region choice list for skip processes, update when adding new processes
-        _skip_options = self._config_json.get("skip_processes")
+        skip_options = self._config_json.get("skip_processes")
 
-        _choice_list = [Choice("Download song",
+        choice_list = [Choice("Download song",
                                value="download_song",
-                               checked=_skip_options['download_song'],
-                               disabled="Song already downloaded" if _song_data.get("pre_processing", {}).get("downloaded") else None),
+                               checked=skip_options['download_song'],
+                               disabled="Song already downloaded" if song_data.get("pre_processing", {}).get("downloaded") else None),
                         Choice("Get Genius metadata",
                                value="genius_metadata",
-                               checked=_skip_options['genius_metadata'],
-                               disabled="Data already gathered" if _song_data.get("genius_data") else None),
+                               checked=skip_options['genius_metadata'],
+                               disabled="Data already gathered" if song_data.get("genius_data") else None),
                         Choice("Separate audio into stems",
                                value="vocal_separation",
-                               checked=_skip_options['vocal_separation'],
-                               disabled="Stems already separated" if _song_data.get("vocal_separation", {}).get("separated") else None),
+                               checked=skip_options['vocal_separation'],
+                               disabled="Stems already separated" if song_data.get("vocal_separation", {}).get("separated") else None),
                         Choice("Split and tag lyrics",
                                value="split_tag",
                                description="(morphological analysis)",
-                               checked=_skip_options['split_and_tag'],
-                               disabled="Lyrics already split and tagged" if _song_data.get("split_and_tag", None) else None),
+                               checked=skip_options['split_and_tag'],
+                               disabled="Lyrics already split and tagged" if song_data.get("split_and_tag", None) else None),
                         Choice("Translate lyrics to english",
                                value="translate_lyrics",
                                description="(LLM inference)",
-                               checked=_skip_options['translate_lyrics'],
-                               disabled="Lyrics already translated" if _song_data.get("translated_lyrics",None) else None)
+                               checked=skip_options['translate_lyrics'],
+                               disabled="Lyrics already translated" if song_data.get("translated_lyrics",None) else None)
                         ]
 
-        _skip_processes = questionary_checkbox("Please choose what options to skip", choice_data=_choice_list)
-        if _skip_processes != [k for k in _skip_options if _skip_options[k]]:
-            _write_skip_to_json = confirm("Do you want to set this to default?").ask()
+        skip_processes = questionary_checkbox("Please choose what options to skip", choice_data=choice_list)
+        if skip_processes != [k for k in skip_options if skip_options[k]]:
+            write_skip_to_json = confirm("Do you want to set this to default?").ask()
         else:
-            _write_skip_to_json = False
+            write_skip_to_json = False
 
-        for key in _skip_options:
-            if key in _skip_processes:
-                _skip_options[key] = True
+        for key in skip_options:
+            if key in skip_processes:
+                skip_options[key] = True
             else:
-                _skip_options[key] = False
+                skip_options[key] = False
 
-        if _write_skip_to_json:
-            write_json_file(self._config_file, _skip_options, ["skip_processes"])
+        if write_skip_to_json:
+            write_json_file(self._config_file, skip_options, ["skip_processes"])
 
         self._update_json_config()
         # endregion
@@ -478,18 +478,18 @@ class Analyzer:
         # region main loop for processes
         while True:
             # download
-            if not _skip_options["download_song"]:
+            if not skip_options["download_song"]:
                 _download()
             update_song_data()
 
             # genius metadata
-            if not _skip_options["genius_metadata"]:
+            if not skip_options["genius_metadata"]:
                 _genius_pull()
             update_song_data()
 
             # vocal separation
-            if not _skip_options["vocal_separation"]:
-                if not _song_data["pre_processing"].get("downloaded", False):
+            if not skip_options["vocal_separation"]:
+                if not song_data["pre_processing"].get("downloaded", False):
                     self._logger.info("Audio cannot be separated as it hasn't been downloaded")
                     if confirm("Would you like to download first?").ask():
                         _download()
@@ -499,8 +499,8 @@ class Analyzer:
                 _vocal_sep()
 
             # split and tag
-            if not _skip_options["split_and_tag"]:
-                if _song_data.get("genius_data", None) is None:
+            if not skip_options["split_and_tag"]:
+                if song_data.get("genius_data", None) is None:
                     self._logger.info("Genius metadata not present")
                     if confirm("Would you like to pull it now?").ask():
                         _genius_pull()
@@ -510,8 +510,8 @@ class Analyzer:
                 _lyrics_tag()
 
             # translate lyrics
-            if not _skip_options["translate_lyrics"]:
-                if _song_data.get("genius_data", None) is None:
+            if not skip_options["translate_lyrics"]:
+                if song_data.get("genius_data", None) is None:
                     self._logger.info("Genius metadata not present")
                     if confirm("Would you like to pull it now?").ask():
                         _genius_pull()

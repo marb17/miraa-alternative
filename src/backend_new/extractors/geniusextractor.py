@@ -37,47 +37,47 @@ class GeniusExtractor:
             raise Exception('Title/artist is required')
 
         if song is not None:
-            _data = song
+            data = song
         elif title != '' and artist != '':
-            _counter = 0
-            _data = None
+            counter = 0
+            data = None
             while True:
-                match _counter:
-                    case 0: _data = self._search_song(title=title, artist=artist)
+                match counter:
+                    case 0: data = self._search_song(title=title, artist=artist)
                     case 1:
-                        _page = 1
+                        page = 1
 
                         while True:
                             try:
-                                _all_data = self._genius.search_songs(title, per_page=5, page=_page)
+                                all_data = self._genius.search_songs(title, per_page=5, page=page)
                             except Exception:
-                                _page = _page - 1 if _page > 1 else 1
+                                page = page - 1 if page > 1 else 1
                                 continue
 
-                            _choose_data = [Choice(f"{song['result']['title']} | {song['result']['primary_artist']['name']} | {song.get("result", {}).get("release_date_components", {}).get('year', 'Unknown') if song.get("result", {}).get("release_date_components", {}) is not None else "Unknown"}",
-                                                   value=song['result']['id']) for song in _all_data['hits']]
-                            _user_choice = questionary_select("Please choose the song: (automatic search failed)", choose_data=_choose_data, enable_pages=True)
+                            choose_data = [Choice(f"{song['result']['title']} | {song['result']['primary_artist']['name']} | {song.get("result", {}).get("release_date_components", {}).get('year', 'Unknown') if song.get("result", {}).get("release_date_components", {}) is not None else "Unknown"}",
+                                                   value=song['result']['id']) for song in all_data['hits']]
+                            user_choice = questionary_select("Please choose the song: (automatic search failed)", choose_data=choose_data, enable_pages=True)
 
-                            if _user_choice == "__next__":
-                                _page += 1
-                            elif _user_choice == "__prev__":
-                                if _page == 1:
+                            if user_choice == "__next__":
+                                page += 1
+                            elif user_choice == "__prev__":
+                                if page == 1:
                                     pass
                                 else:
-                                    _page -= 1
+                                    page -= 1
                             else:
-                                return self._genius.search_song(song_id=_user_choice).to_dict()
+                                return self._genius.search_song(song_id=user_choice).to_dict()
                     case 2: break
 
-                if _data is None:
-                    _counter += 1
+                if data is None:
+                    counter += 1
                     continue
 
                 break
         else:
             return None
 
-        if _data is None:
+        if data is None:
             return None
 
-        return _data.to_dict()
+        return data.to_dict()

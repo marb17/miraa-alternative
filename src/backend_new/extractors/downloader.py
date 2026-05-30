@@ -91,26 +91,26 @@ class Downloader:
         import questionary as q
         from backend_new.utils.helper_funcs import questionary_select
 
-        _query = ''
+        query = ''
 
         def _ask_for_query() -> None:
-            nonlocal _query
+            nonlocal query
 
             if query != '':
-                _query = query
+                query = query
             else:
                 if questionary_select("Please choose query type", choose_data=["Plain query", "Search by track and artist"]) == "Search by track and artist":
 
-                    _user_query = q.form(
-                        _user_title=q.text("Enter title of song: ").ask(),
-                        _user_artist = q.text("Enter artist of song (optional): ").ask()
+                    user_query = q.form(
+                        user_title=q.text("Enter title of song: ").ask(),
+                        user_artist = q.text("Enter artist of song (optional): ").ask()
                     ).ask()
 
-                    _query = f"track:{_user_query['_user_title']}"
-                    if _user_query['_user_artist'] != '':
-                        _query += f" artist:{_user_query['_user_artist']}"
+                    query = f"track:{user_query['user_title']}"
+                    if user_query['user_artist'] != '':
+                        query += f" artist:{user_query['user_artist']}"
                 else:
-                    _query = q.text("Enter the query to search: ").ask()
+                    query = q.text("Enter the query to search: ").ask()
 
         _ask_for_query()
 
@@ -132,37 +132,37 @@ class Downloader:
             else:
                 return str(self._extract_title_artist(song_data))
 
-        _offset = 0
+        offset = 0
         while True:
-            _song_list = self._sp.search(q=_query, limit=limit, offset=_offset)
+            song_list = self._sp.search(q=query, limit=limit, offset=offset)
             if self._cli_output_format is not None:
-                _song_list_ask = [{"name": format_name(song, duration=self._cli_output_format.get('duration', False),
+                song_list_ask = [{"name": format_name(song, duration=self._cli_output_format.get('duration', False),
                                                        album=self._cli_output_format.get('album', False),
                                                        popularity=self._cli_output_format.get('popularity', False)),
                                    "value": song}
-                                  for song in _song_list['tracks']['items']]
+                                  for song in song_list['tracks']['items']]
             else:
-                _song_list_ask = [{"name": format_name(song), "value": song}
-                                  for song in _song_list['tracks']['items']]
+                song_list_ask = [{"name": format_name(song), "value": song}
+                                  for song in song_list['tracks']['items']]
 
-            _user_song_choice = questionary_select("Please choose the song: (prefer JP titles)",
-                                                   choose_data=_song_list_ask,
+            user_song_choice = questionary_select("Please choose the song: (prefer JP titles)",
+                                                   choose_data=song_list_ask,
                                                    enable_pages=True,
                                                    extra_navigation_options=[q.Choice("Retry", value='__retry__', shortcut_key='r')])
 
-            if _user_song_choice == '__next__':
-                _offset += 5
-            elif _user_song_choice == '__prev__':
-                if _offset < 5:
+            if user_song_choice == '__next__':
+                offset += 5
+            elif user_song_choice == '__prev__':
+                if offset < 5:
                     pass
                 else:
-                    _offset -= 5
-            elif _user_song_choice == '__retry__':
+                    offset -= 5
+            elif user_song_choice == '__retry__':
                 _ask_for_query()
             else:
                 break
 
-        return _user_song_choice
+        return user_song_choice
 
     def youtube_query(self, query: str = '', limit: int = 10, choose_top_result: bool = False) -> str:
         """
@@ -174,8 +174,8 @@ class Downloader:
         """
         import yt_dlp
 
-        _limit = 1 if choose_top_result else limit
-        search_query = f"ytsearch{_limit}:{query}"
+        limit = 1 if choose_top_result else limit
+        search_query = f"ytsearch{limit}:{query}"
 
         ydl_opts = {'quiet': True,
                     'no_warnings': True,
@@ -186,15 +186,15 @@ class Downloader:
             ydl_opts['compat_opts'] = ['no-external-interpreter']
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            _info = ydl.extract_info(search_query, download=False)
-            _info = ydl.sanitize_info(_info)
-            if _info is None:
+            info = ydl.extract_info(search_query, download=False)
+            info = ydl.sanitize_info(info)
+            if info is None:
                 raise Exception("No results found")
-            _results = _info.get("entries", [])
+            results = info.get("entries", [])
 
-            _formatted_results = []
-            for track in _results:
-                _formatted_results.append({
+            formatted_results = []
+            for track in results:
+                formatted_results.append({
                     "id": track.get("id"),
                     "title": track.get("title"),
                     "channel": track.get("uploader"),
@@ -207,12 +207,12 @@ class Downloader:
             return f"{minutes:02d}:{seconds:02d}"
 
         if choose_top_result:
-            return _formatted_results[0]["id"]
+            return formatted_results[0]["id"]
         else:
             from backend_new.utils.helper_funcs import questionary_select
-            _choices = [{"name": f"{song['title']} | {song['channel']} | {format_to_minutes_and_seconds(song['duration'])} | {song['view_count']} | {song['id']}", "value": index} for index, song in enumerate(_formatted_results)]
-            _user_song_choice = questionary_select(f"Please choose the song: (prefer JP titles)", choose_data=_choices)
-            return _formatted_results[int(_user_song_choice)]["id"]
+            choices = [{"name": f"{song['title']} | {song['channel']} | {format_to_minutes_and_seconds(song['duration'])} | {song['view_count']} | {song['id']}", "value": index} for index, song in enumerate(formatted_results)]
+            user_song_choice = questionary_select(f"Please choose the song: (prefer JP titles)", choose_data=choices)
+            return formatted_results[int(user_song_choice)]["id"]
 
     def download_youtube_video(self, url: str = '', sleep_time_if_fail: float = 5, retry_count: int = 5) -> None:
         """
@@ -244,11 +244,11 @@ class Downloader:
             ydl_opts['remote_components'] = ['ejs:github']
             ydl_opts['compat_opts'] = ['no-external-interpreter']
 
-        _counter = 0
+        counter = 0
         while True:
-            if _counter >= retry_count:
+            if counter >= retry_count:
                 raise Exception("Failed to download video")
-            _counter += 1
+            counter += 1
 
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:

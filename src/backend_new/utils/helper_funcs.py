@@ -30,7 +30,7 @@ def questionary_select(question_to_ask: str,
     if batch_data and not enable_pages:
         raise Exception("Cannot batch data without enabling pages")
 
-    _choose_data = [option for option in choose_data]
+    choose_data = [option for option in choose_data]
 
     def _add_navigation_buttons(input_list: list[dict | str]):
         if enable_pages or enable_all != '' or enable_exit != '' or extra_navigation_options:
@@ -49,33 +49,33 @@ def questionary_select(question_to_ask: str,
     if enable_pages and batch_data:
         from itertools import batched
 
-        _offset = 0
+        offset = 0
 
         while True:
-            _batched_choose_data = list(batched(choose_data, batch_size))
-            _selected_batched_choose_data = list(_batched_choose_data[_offset])
-            _add_navigation_buttons(_selected_batched_choose_data)
+            batched_choose_data = list(batched(choose_data, batch_size))
+            selected_batched_choose_data = list(batched_choose_data[offset])
+            _add_navigation_buttons(selected_batched_choose_data)
 
-            _user_choice = q.select(question_to_ask, choices=_selected_batched_choose_data, use_shortcuts=use_shortcuts).ask()
-            if _user_choice == "__next__":
-                if _offset + 1 >= len(_batched_choose_data):
+            user_choice = q.select(question_to_ask, choices=selected_batched_choose_data, use_shortcuts=use_shortcuts).ask()
+            if user_choice == "__next__":
+                if offset + 1 >= len(batched_choose_data):
                     pass
                 else:
-                    _offset += 1
-            elif _user_choice == "__prev__":
-                if _offset > 0:
-                    _offset -= 1
-            elif _user_choice == "__all__":
+                    offset += 1
+            elif user_choice == "__prev__":
+                if offset > 0:
+                    offset -= 1
+            elif user_choice == "__all__":
                 break
-            elif _user_choice == "__exit__":
+            elif user_choice == "__exit__":
                 break
             else:
                 break
     else:
-        _add_navigation_buttons(_choose_data)
-        _user_choice = q.select(question_to_ask, choices=_choose_data, use_shortcuts=use_shortcuts).ask()
+        _add_navigation_buttons(choose_data)
+        user_choice = q.select(question_to_ask, choices=choose_data, use_shortcuts=use_shortcuts).ask()
 
-    return _user_choice
+    return user_choice
 
 def questionary_checkbox(question_to_ask: str,
                          choice_data : list[dict | str] | list[Choice]) -> Any:
@@ -109,18 +109,18 @@ def write_json_file(file_path: Path, data: Any, keys: list[str] = None) -> None:
     """
     import json
 
-    _data = read_json_file(file_path)
+    data = read_json_file(file_path)
 
-    _current_level = _data
+    current_level = data
     for key in keys[:-1]:
-        if key not in _current_level or not isinstance(_current_level[key], dict):
-            _current_level[key] = {}
-        _current_level = _current_level[key]
+        if key not in current_level or not isinstance(current_level[key], dict):
+            current_level[key] = {}
+        current_level = current_level[key]
 
     if keys:
-        _current_level[keys[-1]] = data
+        current_level[keys[-1]] = data
 
-    file_path.write_text(json.dumps(_data, indent=4))
+    file_path.write_text(json.dumps(data, indent=4))
 # endregion
 
 # region base 58 conv
