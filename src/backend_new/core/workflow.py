@@ -1,21 +1,13 @@
 # STANDARD LIBRARIES
-import json
-import os
-import asyncio
-import gc
 from concurrent.futures.thread import ThreadPoolExecutor
 
 # PYPI LIBRARIES
-from questionary import confirm, path
-
-from enum import Enum, auto
-from dotenv import load_dotenv, set_key
 from pathlib import Path
 
 # HELPER LIBRARIES
-from backend_new.utils.helper_funcs import read_json_file, write_json_file, questionary_select, questionary_checkbox
+from backend_new.utils.helper_funcs import read_json_file, write_json_file, questionary_select, load_env_file
 
-from backend_new.extractors import downloader
+from backend_new.extractors.downloader import Downloader
 from backend_new.extractors.geniusextractor import GeniusExtractor
 
 from backend_new.core.processing import VocalSeparation, JPAnalyzer
@@ -28,40 +20,13 @@ from backend_new.utils.logger import Logger
 logger = Logger()
 
 class WorkflowManager:
-    def __init__(self, env_keys: dict[str, str] = None):
-        if env_keys is None:
-            raise ValueError("Please provide the env_keys")
+    def __init__(self):
+        self._env_data = load_env_file()
 
-        self._dl = None
         self._translator = None
 
-    #! TODO move quesitonary to main
-    def _init_downloader(self) -> None:
-        """
-        Initializes the downloader for spotify and YouTube
-        """
-        if self._dl is None:
-            if self._config_json["youtube_downloader"]["use_cookies"]:
-                if self._env_data["YOUTUBE_COOKIE_PATH"] == '' or self._env_data["YOUTUBE_COOKIE_PATH"] is None:
-                    use_cookies = confirm("Do you want to use cookies?").ask()
-                    if use_cookies:
-                        cookie_path = path("Please enter the path to your cookies file (Netscape .txt file): ").ask()
-                        self._env_data["YOUTUBE_COOKIE_PATH"] = cookie_path
-                        set_key(self._env_file, "YOUTUBE_COOKIE_PATH", cookie_path, quote_mode="never")
-                    else:
-                        read_json_file(self._config_file)
-                        write_json_file(self._config_file, False, ["youtube_downloader", "use_cookies"])
-                        set_key(self._env_file, "YOUTUBE_COOKIE_PATH", '', quote_mode="never")
-            else:
-                if self._env_data["YOUTUBE_COOKIE_PATH"] != '':
-                    set_key(self._env_file, "YOUTUBE_COOKIE_PATH", '', quote_mode="never")
-
-            self._dl = downloader.Downloader(spotify_client_id=self._env_data["SPOTIFY_CLIENT_ID"],
-                                             spotify_client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"],
-                                             youtube_cookie_path=self._env_data["YOUTUBE_COOKIE_PATH"],
-                                             cli_output_format=self._config_json["spotify_downloader"]["output_format"])
-
-    def download_song(self, json_file: Path) -> None:
+    @staticmethod
+    def download_song(json_file: Path) -> None:
         """
         Downloads a song from YouTube using metadata present in .temp
         When no files are present, it will query spotify
@@ -75,10 +40,11 @@ class WorkflowManager:
         def _download(file_path: Path | str | None) -> None:
             if file_path is None:
                 raise Exception("No file path provided")
-            if type(file_path) is str:
-                asyncio.to_thread(self._dl.download_youtube_video, url=file_path)
-            if type(file_path) is Path:
-                asyncio.to_thread(self._dl.download_youtube_video, url=get_youtube_id_from_json(file_path))
+            with Downloader() as downloader:
+                if type(file_path) is str:
+                    downloader.download_youtube_video, url=file_path
+                if type(file_path) is Path:
+                    downloader.download_youtube_video, url=get_youtube_id_from_json(file_path)
 
         break_off = False
 
@@ -101,8 +67,6 @@ class WorkflowManager:
                         _download(target_id)
                     # if multiple songs are available, ask user which one to download
                     elif len(available_json_files) > 1:
-                        offset = 0
-
                         while True:
                             all_files = list(TEMP_DIR.iterdir())
                             all_files_stem = [file.stem for file in all_files]
@@ -135,14 +99,11 @@ class WorkflowManager:
 
                 # if no songs are available, query spotify
                 else:
-                    self.query_song_spotify()
+                    with Downloader() as down:
+                        down.query_song_spotify()
         else:
             target_id = get_youtube_id_from_json(json_file)
-            try:
-                loop = asyncio.get_running_loop()
-                loop.create_task(_download(target_id))
-            except RuntimeError:
-                asyncio.run(_download(target_id))
+            _download(target_id)
 
     # region all processes, returns True if already done
     def _download(self, song_context_data: SongContext) -> bool:
@@ -183,15 +144,17 @@ class WorkflowManager:
             return True
         else:
             logger.debug(f"Genius data not present, pulling it now.")
-            genius_data = GeniusExtractor(self._env_data["GENIUS_ACCESS_TOKEN"]).return_metadata(
-                title=song_context_data.json_song_data["pre_processing"]["raw_metadata"]["name"],
-                artist=song_context_data.json_song_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
-            )
+            with GeniusExtractor(self._env_data["GENIUS_ACCESS_TOKEN"]) as genius:
+                genius_data = genius.return_metadata(
+                    title=song_context_data.json_song_data["pre_processing"]["raw_metadata"]["name"],
+                    artist=song_context_data.json_song_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
+                )
             write_json_file(song_context_data.json_file_path, genius_data, ["genius_data"])
             logger.debug(f"Genius data pulled.")
             return False
 
-    def _vocal_sep(self, song_context_data: SongContext) -> bool:
+    @staticmethod
+    def _vocal_sep(song_context_data: SongContext) -> bool:
         """
         Separates the audio into its stems
         :return: True if already done, False if not
@@ -225,7 +188,8 @@ class WorkflowManager:
             return False
 
     # TODO requires rework as processing is changing
-    def _lyrics_tag(self, song_context_data: SongContext) -> bool:
+    @staticmethod
+    def _lyrics_tag(song_context_data: SongContext) -> bool:
         if song_context_data.json_song_data.get("split_and_tag", {}):
             logger.debug(f"Lyrics already tagged, skipping")
             return True
@@ -240,6 +204,7 @@ class WorkflowManager:
             write_json_file(song_context_data.json_file_path, data, ["split_and_tag"])
             return False
 
+    #! TODO change self._translator to use with Translator
     def _translate_lyrics(self, song_context_data: SongContext) -> bool:
         if song_context_data.json_song_data.get("translated_lyrics", {}):
             logger.debug(f"Lyrics already translated, skipping")

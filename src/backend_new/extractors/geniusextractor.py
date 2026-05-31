@@ -14,6 +14,13 @@ class GeniusExtractor:
 
         self._genius = Genius(access_token)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._genius = None
+        return False
+
     def _search_song(self, title: str, artist: str) -> Song | None:
         """
         Searches for a song on genius using title and artist

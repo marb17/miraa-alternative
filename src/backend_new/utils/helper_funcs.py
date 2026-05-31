@@ -3,8 +3,13 @@ from pathlib import Path
 from questionary import Choice
 import questionary as q
 from itertools import batched
+from dotenv import load_dotenv
 import json
 import base58
+import os
+
+# CONSTANTS
+from backend_new.utils.constants import ENV_FILE, CONFIG_FILE, DEFAULT_ENV_VARS
 
 # LOGGER
 from backend_new.utils.logger import Logger
@@ -146,4 +151,24 @@ def base58_to_str(string: str) -> str:
     :return: Normal text string
     """
     return base58.b58decode(string).decode('utf-8')
+# endregion
+
+# region file system setup
+def load_env_file() -> dict[Any, str | None]:
+    """
+    Loads the environment variables from the .env file.
+    Creates a new .env file if it doesn't exist.
+    DOES NOT check if the file is filled
+    """
+    if ENV_FILE.exists():
+        load_dotenv(dotenv_path=ENV_FILE)
+        logger.debug("Loaded .env file.")
+    else:
+        logger.critical("No .env file found. Creating empty .env file. Do NOT reorder the variables")
+        ENV_FILE.write_text("\n".join([f"{var}=" for var in DEFAULT_ENV_VARS]))
+        raise FileNotFoundError(".env file not found, creating one. Please add your credentials to the .env file.")
+
+    load_dotenv()
+    return dict([(var, os.getenv(var))for var in DEFAULT_ENV_VARS])
+
 # endregion

@@ -10,7 +10,9 @@ from pathlib import Path
 # HELPER LIBRARIES
 from backend_new.utils import logger
 from backend_new.utils.logger import Logger
-from backend_new.utils.helper_funcs import read_json_file, write_json_file, questionary_select, questionary_checkbox
+from backend_new.utils.helper_funcs import (read_json_file, write_json_file,
+                                            questionary_select, questionary_checkbox,
+                                            load_env_file, update_json_config)
 
 from backend_new.extractors import downloader
 from backend_new.extractors.geniusextractor import GeniusExtractor
@@ -23,86 +25,17 @@ from backend_new.utils.constants import SongContext, DataMismatchError
 # PYPI LIBRARIES
 from questionary import Choice, confirm, path
 
+# CONSTANTS
+from backend_new.utils.constants import DEFAULT_CONFIG, DEFAULT_DICTS_MESSAGE
+
 
 class Analyzer:
-    # region default config
-
-    DEFAULT_CONFIG = {
-        "version": "1.0.0",
-        "spotify_downloader": {
-            "output_format": {
-                "duration": True,
-                "album": True,
-                "popularity": True
-            }
-        },
-        "youtube_downloader": {
-            "use_cookies": False
-        },
-        "skip_processes": {
-            "download_song": False,
-            "genius_metadata": False,
-            "vocal_separation": False,
-            "split_and_tag": False,
-            "translate_lyrics" : False
-        },
-        "jp_dicts": {
-            "always_ask": False,
-            "dicts_to_use": {}
-        }
-    }
-
-    DEFAULT_ENV_VARS = [
-        "SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET", "YOUTUBE_COOKIE_PATH", "GENIUS_ACCESS_TOKEN"
-    ]
-
-    DEFAULT_DICTS_MESSAGE = """# Please download these recommended dictionaries:
-
-- [JA-EN] **jitendex-yomitan**
-  - This is the main structural dictionary, providing most of the comprehensive English definitions
-- [JA-JA Names] **JMnedict**
-  - Contains real-world words
-    - Names
-    - Places
-    - Pop-Culture Titles
-    - etc.
-- [JA-JA Encyclopedia] **PixivLight**
-  - Contains more modern / slang vocabularies
-  - Catches internet memes
-  - Vocaloid tracking terms
-  - Modern abbreviations
-  - Comtemporary subculture jargon
-- [JA-JA Onomatopoeia] **擬音語・擬態語辞典**
-  - Contains mimetic and sound-effect words (onomatopoeia)
-    - e.g. gira-gira
-- [JA-JA Yoji] **四字熟語の百科事典**
-  - Dedicated to four-character idiomatic compounds
-  - Often appears in dramatic or poetic song hooks
-- [JA-JA] **ことわざ・慣用句の百科事典**
-  - Handles traditional proverbs and idiomatic expressions
-  - Can possibly provide symbolic meaning behind a phrase instead of a literal translation
-- [JA-JA] **大辞林 第四版**
-  - One of the best modern dictionaries for breaking down:
-    - Compound verbs
-    - Subtle semantic shifts
-    - Artistic nuances
-    - etc.
-            
-# Sources:
-- https://github.com/MarvNC/yomitan-dictionaries
-
-# How to install
-- To install these dictionaries, please download the dictionaries and place them in the "dicts" directory
-- The app will automatically extract the .zip files if not yet done and automatically detect each dictionary each run
-    """
-    # endregion
-
     def __init__(self) -> None:
         """Initialize the analyzer."""
         self._logger = logger.Logger()
 
         self._setup_main_directories()
-        self._load_env_file()
+        self._env_data = load_env_file()
         self._setup_config_file()
 
         self._dl = None
@@ -131,7 +64,7 @@ class Analyzer:
     def _setup_config_file(self) -> None:
         """Sets up the config file for the analyzer. Writes default values if it doesn't exist."""
         if not self._config_file.exists():
-            config_json = json.dumps(self.DEFAULT_CONFIG, indent=4)
+            config_json = json.dumps(DEFAULT_CONFIG, indent=4)
             self._config_file.write_text(config_json)
             self._logger.debug("Created config file and set default values.")
         else:
@@ -142,57 +75,36 @@ class Analyzer:
 
         self._logger.info(f"miraa-alternative Version: {self._config_json['version']}")
 
-    def _update_json_config(self) -> None:
-        """
-        Updates the config file with the new values.
-        """
-        self._config_json = read_json_file(self._config_file)
-
-    def _load_env_file(self) -> None:
-        """
-        Loads the environment variables from the .env file.
-        Creates a new .env file if it doesn't exist.
-        DOES NOT check if the file is filled
-        """
-        if self._env_file.exists():
-            load_dotenv(dotenv_path=self._env_file)
-            self._logger.debug("Loaded .env file.")
-        else:
-            self._logger.critical("No .env file found. Creating empty .env file. Do NOT reorder the variables")
-            self._env_file.write_text("\n".join([f"{var}=" for var in self.DEFAULT_ENV_VARS]))
-            raise FileNotFoundError(".env file not found, creating one. Please add your credentials to the .env file.")
-
-        load_dotenv()
-        self._env_data = dict([(var, os.getenv(var))for var in self.DEFAULT_ENV_VARS])
-
     def _create_misc_files(self) -> None:
         # dicts directory
         dicts_dir = Path(self._base_dir / "dicts")
         dicts_file = dicts_dir / "readme.md"
         if not dicts_file.exists():
-            dicts_file.write_text(self.DEFAULT_DICTS_MESSAGE, encoding="utf-8")
+            dicts_file.write_text(DEFAULT_DICTS_MESSAGE, encoding="utf-8")
         else:
             pass
     # endregion
 
-    # region preprocessing
-    def query_song_spotify(self) -> None:
-        """
-        query a song from spotify and save it to a JSON file with all data needed
-        """
-        self._init_downloader()
+    # region pre-process checking
+    def _check_downloader(self) -> None:
+        if self._config_json["youtube_downloader"]["use_cookies"]:
+            if self._env_data["YOUTUBE_COOKIE_PATH"] == '' or self._env_data["YOUTUBE_COOKIE_PATH"] is None:
+                use_cookies = confirm("Do you want to use cookies?").ask()
+                if use_cookies:
+                    cookie_path = path("Please enter the path to your cookies file (Netscape .txt file): ").ask()
+                    self._env_data["YOUTUBE_COOKIE_PATH"] = cookie_path
+                    set_key(self._env_file, "YOUTUBE_COOKIE_PATH", cookie_path, quote_mode="never")
+                else:
+                    read_json_file(self._config_file)
+                    write_json_file(self._config_file, False, ["youtube_downloader", "use_cookies"])
+                    set_key(self._env_file, "YOUTUBE_COOKIE_PATH", '', quote_mode="never")
+        else:
+            if self._env_data["YOUTUBE_COOKIE_PATH"] != '':
+                set_key(self._env_file, "YOUTUBE_COOKIE_PATH", '', quote_mode="never")
 
-        data = self._dl.cli_search_song()
-        view_name = self._dl.get_title_artist(metadata=data)
-        youtube_id = self._dl.youtube_query(query=view_name)
-        json_data = json.dumps({"pre_processing": {"youtube_id": youtube_id, "view_name": view_name, "raw_metadata": data}}, indent=4)
-        file_path = self._temp_dir / f"{view_name}.json"
-
-        file_path.write_text(json_data)
-        self._logger.info(f"Saved song data: {view_name} -> {file_path}")
-
+    def _pre_check_settings(self) -> None:
+        ...
     # endregion
-
     def process_song(self) -> None:
         """
         Processes a song, allows the user to choose which song to process
@@ -203,8 +115,6 @@ class Analyzer:
             nonlocal song_context
             song_context.json_song_data = read_json_file(song_context.json_file_path)
         # endregion
-
-        self._init_downloader()
 
         # region asks user which song to process
         while True:
