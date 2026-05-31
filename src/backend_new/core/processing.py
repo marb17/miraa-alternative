@@ -8,20 +8,27 @@ from functools import partial
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 # HELPER LIBRARIES
-from backend_new.utils import logger
 from backend_new.utils.helper_funcs import read_json_file
 
 # PYPI LIBRARIES
-from audio_separator.separator import Separator
-
 from sudachipy.morpheme import Morpheme
 from sudachipy import dictionary, tokenizer
 
 import nagisa
 
+from backend_new.utils.logger import Logger
+logger = Logger(__name__)
 
 # region vocal sep
 class VocalSeparation:
+    # TODO add normal models for more stuff yesyes
+    PRESETS = {
+        "vocal_full": ("vocal_full", "ensemble"),
+        "vocal_clean": ("vocal_clean", "ensemble"),
+        "instrumental_full": ("instrumental_full", "ensemble"),
+        "instrumental_low_resource": ("instrumental_low_resource", "ensemble"),
+    }
+
     def __init__(self, model_name: str = "vocal_full") -> None:
         """
         Separator object:
@@ -30,7 +37,7 @@ class VocalSeparation:
         instrumental_full: A model best for getting a clear instrumental stem, not ideal vocals
         instrumental_low_resource: A good low-resource model, decent quality for both stems but with some slight bleeding
         """
-        self._logger = logger.Logger()
+        from audio_separator.separator import Separator
 
         current_dir = Path(__file__).resolve().parent
         while current_dir.name != "src" and current_dir != current_dir.parent:
@@ -40,48 +47,21 @@ class VocalSeparation:
         self._output_dir = f'{self._base_dir / ".temp"}'
         self._model_file_dir = f'{self._base_dir / "models/audioseparator"}'
 
-        # TODO add normal models for more stuff yesyes
-        separator_objects = {"vocal_full": Separator(output_dir=str(self._output_dir),
-                                                           model_file_dir=str(self._model_file_dir),
-                                                           ensemble_preset='vocal_full'),
-                                   "vocal_clean": Separator(output_dir=str(self._output_dir),
-                                                           model_file_dir=str(self._model_file_dir),
-                                                           ensemble_preset='vocal_clean'),
-                                   "instrumental_full": Separator(output_dir=str(self._output_dir),
-                                                           model_file_dir=str(self._model_file_dir),
-                                                           ensemble_preset='instrumental_full'),
-                                   "instrumental_low_resource": Separator(output_dir=str(self._output_dir),
-                                                           model_file_dir=str(self._model_file_dir),
-                                                           ensemble_preset='instrumental_low_resource')
-                                   }
-
         # select model and list available models
-        self._available_models = [key for key in separator_objects]
+        self._available_models = [key for key in self.PRESETS]
         self._model_name = model_name
 
         # check if model available
-        model = separator_objects.get(model_name, None)
+        model = self.PRESETS.get(model_name, None)
         if model is None:
-            raise Exception(f"Model {model_name} not found")
+            raise Exception(f"Model {model_name} not found, choose from: {self._available_models}")
         else:
-            self._selected_model = separator_objects[model_name]
+            self._selected_model = None
 
-        # delete not used separator objects
-        for model_key, separator_instance in separator_objects.items():
-            if separator_instance is not None:
-                if hasattr(separator_instance, 'model_data'):
-                    separator_instance.model_data = None
-
-                if hasattr(separator_instance, '__dict__'):
-                    separator_instance.__dict__.clear()
-        # clean up
-        separator_objects = None
-
-        gc.collect()
-        import torch
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            torch.cuda.ipc_collect()
+            if self.PRESETS[self._model_name][1] == "ensemble":
+                self._selected_model = Separator(output_dir=str(self._output_dir),
+                                                 model_file_dir=str(self._model_file_dir),
+                                                 ensemble_preset=self._model_name)
 
     def __del__(self) -> None:
         self._close()
@@ -111,6 +91,8 @@ class VocalSeparation:
         return self._available_models
 
     def _init_model(self) -> None:
+        if self._selected_model is None:
+            raise ValueError(f"Model wrapper for {self._model_name} did not initialize properly")
         self._selected_model.load_model()
 
     def separate_vocal(self, audio_path: str) -> None:
@@ -120,7 +102,7 @@ class VocalSeparation:
 
         now = time.time()
         output_files = self._selected_model.separate(audio_path)
-        self._logger.info(f"Took {(time.time() - now):.2f} seconds to separate stems")
+        logger.info(f"Took {(time.time() - now):.2f} seconds to separate stems")
 
         output_files = [Path(f) for f in output_files]
 
@@ -147,7 +129,7 @@ class VocalSeparation:
 class JPDictionary:
     def __init__(self) -> None:
         from backend_new.utils import logger
-        self._logger = logger.Logger()
+        logger = logger.Logger()
 
         current_dir = Path(__file__).resolve().parent
         while current_dir.name != "src" and current_dir != current_dir.parent:
@@ -168,21 +150,21 @@ class JPDictionary:
         all_zip_files_stem = [file.stem for file in all_zip_files]
 
         if all_zip_files:
-            self._logger.debug("New .zip files detected, extracting now")
+            logger.debug("New .zip files detected, extracting now")
             for file_path, stem_name in zip(all_zip_files, all_zip_files_stem):
                 dir_path = self._dict_dir / f"{stem_name}"
                 dir_path.mkdir(parents=True, exist_ok=True)
 
-                self._logger.debug(f"Extracting: {file_path}")
+                logger.debug(f"Extracting: {file_path}")
                 try:
                     shutil.unpack_archive(file_path, dir_path)
-                    self._logger.debug(f"Completed extracting: {file_path}, deleting old .zip files")
+                    logger.debug(f"Completed extracting: {file_path}, deleting old .zip files")
                     file_path.unlink()
                 except:
                     raise Exception("File unsuccessfully extracted, please re-run and check for any unintended changes in 'dict' directory")
-            self._logger.debug("All .zip files extracted successfully")
+            logger.debug("All .zip files extracted successfully")
         else:
-            self._logger.debug("No new .zip files detected, skipping")
+            logger.debug("No new .zip files detected, skipping")
 
     def _read_all_available_dicts(self) -> None:
         all_dicts = [path for path in self._dict_dir.iterdir() if path.is_dir()]

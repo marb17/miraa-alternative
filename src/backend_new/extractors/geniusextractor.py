@@ -7,6 +7,9 @@ from backend_new.utils.helper_funcs import questionary_select
 # PYPI PACKAGE
 from questionary import Choice
 
+from backend_new.utils.logger import Logger
+logger = Logger(__name__)
+
 class GeniusExtractor:
     def __init__(self, access_token: str | None = '') -> None:
         if access_token == '' or access_token is None:

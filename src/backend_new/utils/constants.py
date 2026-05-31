@@ -1,6 +1,6 @@
-#   ===================================================
-#   DIRECTORIES
-#   ===================================================
+#===================================================
+#      DIRECTORIES
+#===================================================
 
 # BASE DIR
 from pathlib import Path
@@ -21,9 +21,9 @@ MODEL_DIR = BASE_DIR / "models"
 ENV_FILE = CONFIG_DIR / ".env"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
-#   ===================================================
-#   DATACLASSES
-#   ===================================================
+#===================================================
+#       DATACLASSES
+#===================================================
 
 
 # SONG CONTEXT
@@ -32,9 +32,9 @@ class SongContext:
     json_song_data: dict
     json_file_path: Path
 
-#   ===================================================
-#   ERRORS / EXCEPTIONS
-#   ===================================================
+#===================================================
+#       ERRORS / EXCEPTIONS
+#===================================================
 
 class DataMismatchError(Exception):
     def __init__(self, logger: Logger, message: str = 'Files do not match the data in .temp directory') -> None:
@@ -50,9 +50,9 @@ class DataMismatchError(Exception):
         self.logger.warning("Please do not rename, convert or alter files in .temp to prevent further errors")
         self.logger.warning("Please clear all files in .temp directory to ensure proper functionality")
 
-#   ===================================================
-#   DEFAULT VARIABLES
-#   ===================================================
+#===================================================
+#      DEFAULT VARIABLES
+#===================================================
 
 DEFAULT_CONFIG = {
     "version": "1.0.0",

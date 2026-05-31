@@ -7,31 +7,48 @@ from pathlib import Path
 # HELPER LIBRARIES
 from backend_new.utils.helper_funcs import read_json_file, write_json_file, questionary_select, load_env_file
 
-from backend_new.extractors.downloader import Downloader
-from backend_new.extractors.geniusextractor import GeniusExtractor
-
-from backend_new.core.processing import VocalSeparation, JPAnalyzer
-from backend_new.core.translation_analysis import Translator
-
 from backend_new.utils.constants import SongContext, DataMismatchError
 from backend_new.utils.constants import TEMP_DIR
 
 from backend_new.utils.logger import Logger
-logger = Logger()
+logger = Logger(__name__)
 
 class WorkflowManager:
-    def __init__(self):
+    def __init__(self, song_ctx: SongContext) -> None:
         self._env_data = load_env_file()
+        self._song_ctx = song_ctx
 
-        self._translator = None
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._cleanup()
+        return False
 
     @staticmethod
-    def download_song(json_file: Path) -> None:
+    def _cleanup() -> None:
+        import gc
+        gc.collect()
+
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
+
+
+    def refresh_song_context(self) -> None:
+        self._song_ctx.json_song_data = read_json_file(self._song_ctx.json_file_path)
+
+
+    @staticmethod
+    def _download_song(json_file: Path) -> None:
         """
         Downloads a song from YouTube using metadata present in .temp
         When no files are present, it will query spotify
         :param json_file: A path to a JSON file containing metadata, optional
         """
+        from backend_new.extractors.downloader import Downloader
+
         def get_youtube_id_from_json(file_path: Path) -> str | None:
             if file_path.suffix == ".json":
                 return str(read_json_file(file_path)["pre_processing"]["youtube_id"])
@@ -42,9 +59,9 @@ class WorkflowManager:
                 raise Exception("No file path provided")
             with Downloader() as downloader:
                 if type(file_path) is str:
-                    downloader.download_youtube_video, url=file_path
+                    downloader.download_youtube_video(url=file_path)
                 if type(file_path) is Path:
-                    downloader.download_youtube_video, url=get_youtube_id_from_json(file_path)
+                    downloader.download_youtube_video(url=get_youtube_id_from_json(file_path))
 
         break_off = False
 
@@ -106,7 +123,7 @@ class WorkflowManager:
             _download(target_id)
 
     # region all processes, returns True if already done
-    def _download(self, song_context_data: SongContext) -> bool:
+    def download(self, song_context_data: SongContext) -> bool:
         """
         Downloads the song, checks if the audio file is present in the .temp dir, if not handle appropriately
         :return: True if already downloaded, False if not
@@ -129,16 +146,18 @@ class WorkflowManager:
             return True
         else:
             logger.debug(f"Song not downloaded, downloading it now.")
-            self.download_song(song_context_data.json_file_path)
+            self._download_song(song_context_data.json_file_path)
             write_json_file(song_context_data.json_file_path, True, ["pre_processing", "downloaded"])
             logger.debug(f"Song downloaded.")
             return False
 
-    def _genius_pull(self, song_context_data: SongContext) -> bool:
+    def genius_pull(self, song_context_data: SongContext) -> bool:
         """
         Pulls Genius metadata for the song
         :return: True if already done, False if not
         """
+        from backend_new.extractors.geniusextractor import GeniusExtractor
+
         if song_context_data.json_song_data.get("genius_data", None) is not None:
             logger.debug(f"Genius data already present, skipping")
             return True
@@ -154,11 +173,13 @@ class WorkflowManager:
             return False
 
     @staticmethod
-    def _vocal_sep(song_context_data: SongContext) -> bool:
+    def vocal_sep(song_context_data: SongContext) -> bool:
         """
         Separates the audio into its stems
         :return: True if already done, False if not
         """
+        from backend_new.core.processing import VocalSeparation
+
         # TODO add vocal sep model chooser
         if song_context_data.json_song_data.get("vocal_separation", {}).get("separated", False) is True:
             if song_context_data.json_song_data.get("vocal_separation", {}).get("vocal_file", None) not in [
@@ -189,7 +210,9 @@ class WorkflowManager:
 
     # TODO requires rework as processing is changing
     @staticmethod
-    def _lyrics_tag(song_context_data: SongContext) -> bool:
+    def lyrics_tag(song_context_data: SongContext) -> bool:
+        from backend_new.core.processing import JPAnalyzer
+
         if song_context_data.json_song_data.get("split_and_tag", {}):
             logger.debug(f"Lyrics already tagged, skipping")
             return True
@@ -204,19 +227,19 @@ class WorkflowManager:
             write_json_file(song_context_data.json_file_path, data, ["split_and_tag"])
             return False
 
-    #! TODO change self._translator to use with Translator
-    def _translate_lyrics(self, song_context_data: SongContext) -> bool:
+    @staticmethod
+    def translate_lyrics(song_context_data: SongContext) -> bool:
+        from backend_new.core.translation_analysis import Translator
+
         if song_context_data.json_song_data.get("translated_lyrics", {}):
             logger.debug(f"Lyrics already translated, skipping")
             return True
         else:
             logger.debug(f"Lyrics not translated, translating it now.")
 
-            if self._translator is None:
-                self._translator = Translator()
-
             lyrics = song_context_data.json_song_data["genius_data"]["lyrics"]
-            data = self._translator.translate_lyrics(lyrics)
+            with Translator() as translator:
+                data = translator.translate_lyrics(lyrics)
 
             write_json_file(song_context_data.json_file_path, data, ["translated_lyrics"])
 

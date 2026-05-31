@@ -13,7 +13,7 @@ from backend_new.utils.constants import ENV_FILE, CONFIG_FILE, DEFAULT_ENV_VARS
 
 # LOGGER
 from backend_new.utils.logger import Logger
-logger = Logger()
+logger = Logger(__name__)
 
 # region questionary
 def questionary_select(question_to_ask: str,

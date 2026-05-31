@@ -20,7 +20,7 @@ from backend_new.utils.constants import TEMP_DIR, CONFIG_FILE
 
 
 from backend_new.utils.logger import Logger
-logger = Logger()
+logger = Logger(__name__)
 
 class Downloader:
     def __init__(self) -> None:
@@ -169,6 +169,7 @@ class Downloader:
                 else:
                     offset -= 5
             elif user_song_choice == '__retry__':
+                query = ''
                 _ask_for_query()
             else:
                 break
