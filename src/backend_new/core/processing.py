@@ -183,7 +183,12 @@ class JPDictionary:
         all_dicts = [path for path in self._dict_dir.iterdir() if path.is_dir()]
         self._available_dicts_directories = all_dicts
 
-    # FORMAT YOMITAN JSON SCHEMA
+    #==================================
+    #   FORMAT YOMITAN JSON SCHEMA
+    #==================================
+    def _structured_content_read(self, content: list) -> dict:
+        ...
+
     def _read_index_5_definition(self, data: list) -> dict:
         definition_data = []
         for definition in data:
@@ -192,7 +197,7 @@ class JPDictionary:
                     definition_data.append(definition.get("description", ""))
                 #TODO do object
                 case "structured-content":
-                    pass
+                    ...
                 case "invalid":
                     if type(definition) is str:
                         definition_data.append(definition)
