@@ -7,12 +7,22 @@ from backend_new.utils.helper_funcs import questionary_select
 # PYPI PACKAGE
 from questionary import Choice
 
+from backend_new.utils.logger import Logger
+logger = Logger(__name__)
+
 class GeniusExtractor:
     def __init__(self, access_token: str | None = '') -> None:
         if access_token == '' or access_token is None:
             raise Exception('Access token is required')
 
         self._genius = Genius(access_token)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._genius = None
+        return False
 
     def _search_song(self, title: str, artist: str) -> Song | None:
         """

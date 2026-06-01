@@ -10,12 +10,14 @@ from pathlib import Path
 # HELPER LIBRARIES
 from backend_new.utils.helper_funcs import read_json_file
 
+# PYPI LIBRARIES
+from lmdeploy import GenerationConfig
+
+from backend_new.utils.logger import Logger
+logger = Logger(__name__)
 
 class LLMModel:
     def __init__(self) -> None:
-        from backend_new.utils import logger
-        self._logger = logger.Logger()
-
         self._pipe = None
 
         # model save loc
@@ -79,7 +81,7 @@ class LLMModel:
             self.init_model()
         return self
 
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         self._close()
         return False
 
@@ -119,14 +121,22 @@ class LLMModel:
         Starts the model up, ready to be used
         """
         if self._pipe is None:
-            from lmdeploy import pipeline
+            from lmdeploy import pipeline, TurbomindEngineConfig
 
-            self._logger.debug(f"Initializing model: {self._model_id}")
+            logger.debug(f"Initializing model: {self._model_id}")
 
             now = time.time()
 
-            self._pipe = pipeline(self._model_id)
-            self._logger.debug(f"Loaded model in {(time.time() - now):.2f} seconds")
+            backend_config = TurbomindEngineConfig(
+                model_format='awq',
+                cache_max_entry_count=0.8,
+                tp=1
+            )
+
+            self._pipe = pipeline(self._model_id,
+                                  backend_config=backend_config,
+                                  log_level="WARNING")
+            logger.debug(f"Loaded model in {(time.time() - now):.2f} seconds")
 
             # get available VRAM
             import torch
@@ -142,13 +152,14 @@ class LLMModel:
 
             free_mem_bytes = total_mem - (allocated_mem + reserved_mem)
             self._free_vram = free_mem_bytes / (1024 ** 3)
-            self._logger.debug(f"Available VRAM: {self._free_vram}")
+            logger.debug(f"Available VRAM: {self._free_vram}")
         else:
-            self._logger.debug("Model already initialized, skipping")
+            logger.debug("Model already initialized, skipping")
 
-    def batch_inference(self, prompts: list[str], batch_size: int = -1, estimated_output_cost: int = 2048) -> list[str]:
+    def batch_inference(self, prompts: list[str], batch_size: int = -1, estimated_output_cost: int = 2048, gen_config: GenerationConfig = None) -> list[str]:
         """
         Performs inference on a batch of prompts.
+        :param gen_config: A generation config object to change how the LLM generates
         :param prompts: List of prompts to infer
         :param batch_size: How much prompts to send each batch
             Possible Values:
@@ -158,17 +169,23 @@ class LLMModel:
         :return: A list of all the responses
         """
         import torch
+        from lmdeploy import GenerationConfig
+
+        if gen_config is None:
+            gen_config = GenerationConfig()
+        else:
+            gen_config = gen_config
 
         if self._pipe is None:
             self.init_model()
 
-        self._logger.debug(f"How many prompts to process: {len(prompts)}")
+        logger.debug(f"How many prompts to process: {len(prompts)}")
         # region batch sizing
         if batch_size > 1:
-            self._logger.info(f"Manual Batch size of {batch_size}")
+            logger.info(f"Manual Batch size of {batch_size}")
             pass
         if batch_size == 0:
-            self._logger.info("No batching")
+            logger.info("No batching")
             batch_size = len(prompts)
         if batch_size == -1:
             # automatic sizing
@@ -180,11 +197,11 @@ class LLMModel:
 
             batch_size = ceil(num_prompts / num_batches)
 
-            self._logger.info("Automatic Batch Sizing")
-            self._logger.debug(f"Estimated Prompt Cost: {total_prompt_cost}")
-            self._logger.debug(f"Model Weight: {self._model_weight}")
-            self._logger.debug(f"Number of batches: {num_batches}")
-            self._logger.debug(f"Batch size: ~{batch_size}")
+            logger.info("Automatic Batch Sizing")
+            logger.debug(f"Estimated Prompt Cost: {total_prompt_cost}")
+            logger.debug(f"Model Weight: {self._model_weight}")
+            logger.debug(f"Number of batches: {num_batches}")
+            logger.debug(f"Batch size: ~{batch_size}")
 
         batched_prompts = list(batched(prompts, batch_size))
         # endregion
@@ -193,19 +210,32 @@ class LLMModel:
         now = time.time()
         for idx, batch in enumerate(batched_prompts, start=1):
             batch_now = time.time()
-            results.extend([response.text for response in self._pipe(list(batch))])
+            results.extend([response.text for response in self._pipe(list(batch), gen_config)])
             gc.collect()
             torch.cuda.empty_cache()
-            self._logger.debug(f"Completed Batch {idx} in {(time.time() - batch_now):.2f} seconds")
+            logger.debug(f"Completed Batch {idx} in {(time.time() - batch_now):.2f} seconds")
 
-        self._logger.info(f"Completed Batch Inference in {(time.time() - now):.2f} seconds")
+        logger.info(f"Completed Batch Inference in {(time.time() - now):.2f} seconds")
         return results
 
 
 class Translator:
     def __init__(self) -> None:
-        from backend_new.utils import logger
-        self._logger = logger.Logger()
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._close()
+        return False
+
+    def _close(self) -> None:
+        self._pipe = None
+
+        import torch
+        gc.collect()
+        torch.cuda.empty_cache()
 
     def translate_lyrics(self, texts: list[str] | str, use_context: bool = False) -> list[str]:
         """
@@ -318,8 +348,10 @@ class Translator:
             mapping_index.append((idx, "do"))
             processed_lyrics[text] = idx
 
+        gen_config = GenerationConfig(max_new_tokens=50)
+
         with LLMModel() as llm:
-            responses = dict(zip([idx for idx, exp in mapping_index if exp == "do"], llm.batch_inference(prompts, estimated_output_cost=50)))
+            responses = dict(zip([idx for idx, exp in mapping_index if exp == "do"], llm.batch_inference(prompts, estimated_output_cost=50, gen_config=gen_config)))
 
         results = []
         # remap all unprocessed, remove special whitespace and strips
@@ -358,7 +390,7 @@ class Translator:
                 formatted_response = clean_unicode(d)
                 results.append(formatted_response)
 
-        self._logger.debug(f"Finished translating in {(time.time() - now):.2f} seconds")
+        logger.debug(f"Finished translating in {(time.time() - now):.2f} seconds")
 
         return results
 

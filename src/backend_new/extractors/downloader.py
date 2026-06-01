@@ -1,9 +1,10 @@
 # STANDARD LIBRARY
 from pathlib import Path
 from time import sleep, time
+import json
 
 # HELPER LIBRARIES
-from backend_new.utils.helper_funcs import questionary_select
+from backend_new.utils.helper_funcs import questionary_select, load_env_file, read_json_file
 
 # PYPI LIBRARIES
 import spotipy
@@ -14,43 +15,44 @@ import questionary as q
 import yt_dlp
 from yt_dlp.utils import DownloadError, ExtractorError
 
+# CONSTANTS
+from backend_new.utils.constants import TEMP_DIR, CONFIG_FILE
+
+
+from backend_new.utils.logger import Logger
+logger = Logger(__name__)
 
 class Downloader:
-    def __init__(self, spotify_client_id: str,
-                 spotify_client_secret: str,
-                 youtube_cookie_path: str | None = None,
-                 cli_output_format: dict[str, bool] | None = None) -> None:
+    def __init__(self) -> None:
         """
         Initializes the downloader
         :param spotify_client_id:
         :param spotify_client_secret:
         :param youtube_cookie_path: Path to the YouTube cookie file, not recommended to use. Cookies require extra authentication and are not guaranteed to work
         """
-
-        from backend_new.utils import logger
-        self._logger = logger.Logger()
-
-        if spotify_client_id is None or spotify_client_secret is None:
-            raise Exception('Spotify client id and secret are required')
-
         current_dir = Path(__file__).resolve().parent
         while current_dir.name != "src" and current_dir != current_dir.parent:
             current_dir = current_dir.parent
         self._base_dir = current_dir
 
-        self._spotify_client_id = spotify_client_id
-        self._spotify_client_secret = spotify_client_secret
-        self._youtube_cookie_path = youtube_cookie_path if youtube_cookie_path else ''
-        self._cli_output_format = cli_output_format
+        self._env_data = load_env_file()
+        self._cli_output_format = read_json_file(CONFIG_FILE)["spotify_downloader"]["output_format"]
 
         self._authenticate()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._sp = None
+        return False
 
     def _authenticate(self) -> None:
         """
         Initializes the spotipy client
         """
-        auth_manager = SpotifyClientCredentials(client_id=self._spotify_client_id,
-                                                client_secret=self._spotify_client_secret)
+        auth_manager = SpotifyClientCredentials(client_id=self._env_data["SPOTIFY_CLIENT_ID"],
+                                                client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"])
 
         self._sp = spotipy.Spotify(auth_manager=auth_manager)
 
@@ -96,7 +98,6 @@ class Downloader:
     def cli_search_song(self, limit: int = 10, query: str = '') -> dict: # TODO make limit in config file
         """
         Searches a song using spotify querying
-        :param cli_output_format: The output format for the CLI, shows different information to help differentiate duplicate songs when querying
         :param query: A query to search for, defaults to none using CLI interface
         :param limit: How many songs to show at a time
         :return: A dict of the song metadata (spotify)
@@ -168,6 +169,7 @@ class Downloader:
                 else:
                     offset -= 5
             elif user_song_choice == '__retry__':
+                query = ''
                 _ask_for_query()
             else:
                 break
@@ -189,8 +191,8 @@ class Downloader:
         ydl_opts = {'quiet': True,
                     'no_warnings': True,
                     'extract_flat': True}
-        if self._youtube_cookie_path != '':
-            ydl_opts["cookiefile"] = self._youtube_cookie_path
+        if self._env_data.get("YOUTUBE_COOKIE_PATH", "") != "":
+            ydl_opts["cookiefile"] = self._env_data["YOUTUBE_COOKIE_PATH"]
             ydl_opts['remote_components'] = ['ejs:github']
             ydl_opts['compat_opts'] = ['no-external-interpreter']
 
@@ -243,8 +245,8 @@ class Downloader:
                     }]}
         # TODO add option for macOS since idk if ffmpeg works for macOS
 
-        if self._youtube_cookie_path != '':
-            ydl_opts["cookiefile"] = self._youtube_cookie_path
+        if self._env_data.get("YOUTUBE_COOKIE_PATH", "") != "":
+            ydl_opts["cookiefile"] = self._env_data["YOUTUBE_COOKIE_PATH"]
             ydl_opts['remote_components'] = ['ejs:github']
             ydl_opts['compat_opts'] = ['no-external-interpreter']
 
@@ -260,4 +262,18 @@ class Downloader:
                     break
             except (DownloadError, ExtractorError):
                 sleep(sleep_time_if_fail)
-        self._logger.debug(f"Finished downloading video in {(time() - now):.2f} seconds")
+        logger.debug(f"Finished downloading video in {(time() - now):.2f} seconds")
+        
+    def query_song_spotify(self) -> None:
+        """
+        query a song from spotify and save it to a JSON file with all data needed
+        """
+        data = self.cli_search_song()
+        view_name = self.get_title_artist(metadata=data)
+        youtube_id = self.youtube_query(query=view_name)
+        json_data = json.dumps(
+            {"pre_processing": {"youtube_id": youtube_id, "view_name": view_name, "raw_metadata": data}}, indent=4)
+        file_path = TEMP_DIR / f"{view_name}.json"
+
+        file_path.write_text(json_data)
+        logger.info(f"Saved song data: {view_name} -> {file_path}")
