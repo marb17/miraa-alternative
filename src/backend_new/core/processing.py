@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 from functools import partial
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from dataclasses import dataclass
 
 # HELPER LIBRARIES
 from backend_new.utils.helper_funcs import read_json_file
@@ -127,23 +128,35 @@ class VocalSeparation:
 
 # region dictionaries
 class JPDictionary:
-    def __init__(self) -> None:
-        from backend_new.utils import logger
-        logger = logger.Logger()
+    @dataclass
+    class YomitanEntry:
+        dictionary: str
+        term: str
+        reading: str
+        definition_tags: str | None
+        deinflection_rules: str
+        popularity_score: int
+        definitions: list[str | dict[str, Any]]
+        sequence_number: int
+        term_tags: str
 
+
+    def __init__(self) -> None:
         current_dir = Path(__file__).resolve().parent
         while current_dir.name != "src" and current_dir != current_dir.parent:
             current_dir = current_dir.parent
         self._base_dir = current_dir
         self._dict_dir = self._base_dir / "dicts"
 
-        self._available_dicts: list[Path] = []
+        self._available_dicts_directories: list[Path] = []
         # TODO change any to something meaningful
         self._lookup_table: Any = None
 
         # prepare all dicts
         self._extract_zip_files()
         self._read_all_available_dicts()
+
+    # TODO make it save into a json file so it doesnt have to reprocess everytime
 
     def _extract_zip_files(self):
         all_zip_files = [file for file in self._dict_dir.iterdir() if file.suffix == ".zip"]
@@ -168,20 +181,48 @@ class JPDictionary:
 
     def _read_all_available_dicts(self) -> None:
         all_dicts = [path for path in self._dict_dir.iterdir() if path.is_dir()]
-        self._available_dicts = all_dicts
+        self._available_dicts_directories = all_dicts
+
+    # FORMAT YOMITAN JSON SCHEMA
+    def _read_index_5_definition(self, data: list) -> dict:
+        definition_data = []
+        for definition in data:
+            match definition.get("type", "invalid"):
+                case "string":
+                    definition_data.append(definition.get("description", ""))
+                #TODO do object
+                case "structured-content":
+                    pass
+                case "invalid":
+                    if type(definition) is str:
+                        definition_data.append(definition)
 
     def _read_single_dict(self, dict_path: Path) -> dict:
+        # TODO add final for faster read after dong processing
+        
         all_term_bank_files = list(dict_path.rglob("term_bank_*.json"))
+        completion_counter = 0
 
-        #! temporary test, have to learn the format of the data
-        single = all_term_bank_files[0]
+        single_bank_entries = {}
 
-        file_data = read_json_file(single)
-        print(file_data[100])
+        for term_bank_file in all_term_bank_files:
+            file_data = read_json_file(term_bank_file)
+
+            for entry in file_data:
+                if entry[0] in single_bank_entries:
+                    single_bank_entries[entry[0]].append(self.YomitanEntry(dict_path.stem, *entry))
+
+                single_bank_entries[entry[0]] = [self.YomitanEntry(dict_path.stem, *entry)]
+
+            completion_counter += 1
+            logger.debug(f"Term bank {term_bank_file.stem} completed. ({completion_counter} / {len(all_term_bank_files)})")
+
+        print(single_bank_entries.get("魔物", "dont have"))
+
 
     def _initialize_lookup(self):
         # TODO allow user to choose what dicts to use cuz yeah would be cool and accept the always ask so it doesnt keep asking
-        self._read_single_dict(self._available_dicts[0])
+        self._read_single_dict(self._available_dicts_directories[0])
 
 
 # endregion
