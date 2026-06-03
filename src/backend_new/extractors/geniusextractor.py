@@ -1,3 +1,6 @@
+# STANDARD LIBRARY
+from typing import Any
+
 # HELPER LIBRARIES
 from lyricsgenius.types import Song
 from lyricsgenius import Genius
@@ -27,19 +30,26 @@ class GeniusExtractor:
     def _search_song(self, title: str, artist: str) -> Song | None:
         """
         Searches for a song on genius using title and artist
-        :param title:
-        :param artist:
-        :return:
+        :param title: Title of song to be searched
+        :type title: str
+        :param artist: Artist of song to be searched
+        :type artist: str
+        :return: Song object or None
+        :rtype: Song | None
         """
         return self._genius.search_song(title=title, artist=artist, get_full_info=True)
 
-    def return_metadata(self, song: Song | None = None, title: str = '', artist: str = '') -> dict | None:
+    def return_metadata(self, song: Song | None = None, title: str = '', artist: str = '') -> dict[str, Any] | None:
         """
         Returns the metadata of a song from genius, either choose Song or title and artist
         :param song: A song object to extract
+        :type song: Song | None
         :param title: Title of the song
+        :type title: str
         :param artist: Artist of the song
-        :return:
+        :type artist: str
+        :return: Data of the song
+        :rtype: dict[str, Any]
         """
         if song is not None and (title != '' or artist != ''):
             raise Exception('Song and title/artist are mutually exclusive')

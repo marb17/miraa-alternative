@@ -17,6 +17,11 @@ logger = Logger(__name__)
 
 class WorkflowManager:
     def __init__(self, song_ctx: SongContext) -> None:
+        """
+        Loads the WorkflowManager for a specific song
+        :param song_ctx: Song to be processed
+        :type song_ctx: SongContext
+        """
         self._env_data = load_env_file()
         self._song_ctx = song_ctx
 
@@ -39,15 +44,23 @@ class WorkflowManager:
 
 
     def refresh_song_context(self) -> None:
+        """
+        Updates the .json data to be the newest
+        :return: None
+        :rtype: None
+        """
         self._song_ctx.json_song_data = read_json_file(self._song_ctx.json_file_path)
 
 
     @staticmethod
-    def _download_song(json_file: Path) -> None:
+    def _download_song(json_file: Path | None) -> None:
         """
         Downloads a song from YouTube using metadata present in .temp
         When no files are present, it will query spotify
-        :param json_file: A path to a JSON file containing metadata, optional
+        :param json_file: A path to a JSON file containing metadata
+        :type json_file: Path | None
+        :return: None
+        :rtype: None
         """
         from backend_new.extractors.downloader import Downloader
 
@@ -128,7 +141,10 @@ class WorkflowManager:
     def download(self, song_context_data: SongContext) -> bool:
         """
         Downloads the song, checks if the audio file is present in the .temp dir, if not handle appropriately
+        :param song_context_data: SongContext for data
+        :type song_context_data: SongContext
         :return: True if already downloaded, False if not
+        :rtype: bool
         """
         if song_context_data.json_song_data.get("pre_processing", {}).get("downloaded", False):
             # checks if the audio file is present in the .temp dir, if not handle appropriately
@@ -156,7 +172,10 @@ class WorkflowManager:
     def genius_pull(self, song_context_data: SongContext) -> bool:
         """
         Pulls Genius metadata for the song
+        :param song_context_data: SongContext for data
+        :type song_context_data: SongContext
         :return: True if already done, False if not
+        :rtype: bool
         """
         from backend_new.extractors.geniusextractor import GeniusExtractor
         from backend_new.core.translation_analysis import Translator
@@ -193,7 +212,10 @@ class WorkflowManager:
     def vocal_sep(song_context_data: SongContext) -> bool:
         """
         Separates the audio into its stems
+        :param song_context_data: SongContext for data
+        :type song_context_data: SongContext
         :return: True if already done, False if not
+        :rtype: bool
         """
         from backend_new.core.processing import VocalSeparation
 
@@ -228,6 +250,13 @@ class WorkflowManager:
     # TODO requires rework as processing is changing
     @staticmethod
     def lyrics_tag(song_context_data: SongContext) -> bool:
+        """
+        on work
+        :param song_context_data:
+        :type song_context_data:
+        :return:
+        :rtype:
+        """
         from backend_new.core.processing import JPAnalyzer
 
         if song_context_data.json_song_data.get("split_and_tag", {}):
@@ -246,6 +275,13 @@ class WorkflowManager:
 
     @staticmethod
     def translate_lyrics(song_context_data: SongContext) -> bool:
+        """
+        Translates the lyrics to English
+        :param song_context_data: SongContext for data
+        :type song_context_data: SongContext
+        :return: True if already done, False if not
+        :rtype: bool
+        """
         from backend_new.core.translation_analysis import Translator
 
         if song_context_data.json_song_data.get("translated_lyrics", {}):

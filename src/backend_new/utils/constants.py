@@ -38,6 +38,13 @@ class SongContext:
 
 class DataMismatchError(Exception):
     def __init__(self, logger: Logger, message: str = 'Files do not match the data in .temp directory') -> None:
+        """
+        An error occurring when a data file does not match the expected files or other data required
+        :param logger: Logger object used for logging instructions
+        :type logger: Logger
+        :param message: Custom message to display
+        :type message: str
+        """
         self.logger = logger
         self.message = message
 

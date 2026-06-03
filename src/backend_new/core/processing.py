@@ -7,6 +7,7 @@ from typing import Any
 from functools import partial
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
+from typing import Literal
 
 # HELPER LIBRARIES
 from backend_new.utils.helper_funcs import read_json_file
@@ -23,21 +24,28 @@ logger = Logger(__name__)
 # region vocal sep
 class VocalSeparation:
     # TODO add normal models for more stuff yesyes
-    PRESETS = {
+    PRESETS: dict[str, tuple[str, str]] = {
         "vocal_full": ("vocal_full", "ensemble"),
         "vocal_clean": ("vocal_clean", "ensemble"),
         "instrumental_full": ("instrumental_full", "ensemble"),
         "instrumental_low_resource": ("instrumental_low_resource", "ensemble"),
     }
 
-    def __init__(self, model_name: str = "vocal_full") -> None:
+    ALLOWED_MODEL_NAMES = Literal["vocal_full", "vocal_clean", "instrumental_full", "instrumental_low_resource"]
+
+    # TODO fix docs here cuz its bad
+    def __init__(self, model_name: ALLOWED_MODEL_NAMES = "vocal_full") -> None:
         """
-        Separator object:
-        vocal_full: A rawer vocal stem with noise artifacts but the most clear articulation
-        vocal_clean: A more processed vocal stem with fewer noise artifacts but more muffled in certain areas
-        instrumental_full: A model best for getting a clear instrumental stem, not ideal vocals
-        instrumental_low_resource: A good low-resource model, decent quality for both stems but with some slight bleeding
+        Initializes the VocalSeparation object.
+
+        :param model_name: Model that will be used for separation.
+            ``vocal_full``: A rawer vocal stem with noise artifacts but the most clear articulation
+            ``vocal_clean``: A more processed vocal stem with fewer noise artifacts but more muffled in certain areas
+            ``instrumental_full``: A model best for getting a clear instrumental stem, not ideal vocals
+            ``instrumental_low_resource``: A good low-resource model, decent quality for both stems but with some slight bleeding
+        :type model_name: ALLOWED_MODEL_NAMES
         """
+
         from audio_separator.separator import Separator
 
         current_dir = Path(__file__).resolve().parent
@@ -62,7 +70,12 @@ class VocalSeparation:
             if self.PRESETS[self._model_name][1] == "ensemble":
                 self._selected_model = Separator(output_dir=str(self._output_dir),
                                                  model_file_dir=str(self._model_file_dir),
-                                                 ensemble_preset=self._model_name)
+                                                 ensemble_preset=self._model_name,
+                                                 use_autocast=True,
+                                                 use_soundfile=False,
+                                                 normalization_threshold=0.9,
+                                                 mdx_params={"batch_size": 32},
+                                                 vr_params={"batch_size": 32})
 
     def __del__(self) -> None:
         self._close()
@@ -96,10 +109,20 @@ class VocalSeparation:
             raise ValueError(f"Model wrapper for {self._model_name} did not initialize properly")
         self._selected_model.load_model()
 
-    def separate_vocal(self, audio_path: str) -> None:
+    def separate_vocal(self, audio_path: str | Path) -> None:
+        """
+        Separates vocals into respective stems determined by model used
+        :param audio_path: Path to the file
+        :type audio_path: str | Path
+        :return: None
+        :rtype: None
+        """
         self._init_model()
 
-        win_audio_path = Path(audio_path)
+        if type(audio_path) is str:
+            win_audio_path = Path(audio_path)
+        elif type(audio_path) is Path:
+            win_audio_path = audio_path
 
         now = time.time()
         output_files = self._selected_model.separate(audio_path)
@@ -262,6 +285,9 @@ class TaggedData:
 
 class MorphemeData:
     def __init__(self, morpheme: Morpheme) -> None:
+        """
+        A class used to abstract the Morpheme object
+        """
         self._surface = morpheme.surface()
         self._dictionary_form = morpheme.dictionary_form()
         self._normalized_form = morpheme.normalized_form()
@@ -389,6 +415,15 @@ class JPAnalyzer:
         return final_results
 
     def process(self, text: str, split_newline: bool = True) -> dict[str, Any] | list[dict[str, Any] | None] | None:
+        """
+        Processes a text and returns a dict containing the words, part of speech, reading, definitions, and morphemes
+        :param text: Input text to be processed
+        :type text: str
+        :param split_newline: Whether to treat the string as a whole to split by newlines
+        :type split_newline: bool
+        :return: All the data as a dict
+        :rtype: dict[str, Any] | list[dict[str, Any] | None] | None
+        """
         if split_newline:
             data_list = text.split("\n")
         else:
