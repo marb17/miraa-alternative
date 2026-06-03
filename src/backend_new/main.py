@@ -7,7 +7,8 @@ from pathlib import Path
 # HELPER LIBRARIES
 from backend_new.utils.helper_funcs import (read_json_file, write_json_file,
                                             questionary_select, questionary_checkbox,
-                                            load_env_file)
+                                            load_env_file,
+                                            clear_temp_dir)
 
 from backend_new.core.workflow import WorkflowManager
 
@@ -70,6 +71,10 @@ class Analyzer:
             dicts_file.write_text(DEFAULT_DICTS_MESSAGE, encoding="utf-8")
         else:
             pass
+
+    @staticmethod
+    def _clear_temp_directory() -> None:
+        clear_temp_dir()
     # endregion
 
     # region pre-process checking
@@ -230,7 +235,7 @@ def main() -> None:
     # ana.download_song()
     # ana.query_song_spotify()
     ana.process_song()
-
+    # ana._clear_temp_directory()
 
 if __name__ == "__main__":
     main()

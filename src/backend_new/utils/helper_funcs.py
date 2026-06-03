@@ -7,9 +7,10 @@ from dotenv import load_dotenv
 import json
 import base58
 import os
+import re
 
 # CONSTANTS
-from backend_new.utils.constants import ENV_FILE, CONFIG_FILE, DEFAULT_ENV_VARS
+from backend_new.utils.constants import ENV_FILE, TEMP_DIR, DEFAULT_ENV_VARS
 
 # LOGGER
 from backend_new.utils.logger import Logger
@@ -153,7 +154,7 @@ def base58_to_str(string: str) -> str:
     return base58.b58decode(string).decode('utf-8')
 # endregion
 
-# region file system setup
+# region file system stuff
 def load_env_file() -> dict[Any, str | None]:
     """
     Loads the environment variables from the .env file.
@@ -171,4 +172,30 @@ def load_env_file() -> dict[Any, str | None]:
     load_dotenv()
     return dict([(var, os.getenv(var))for var in DEFAULT_ENV_VARS])
 
+def clear_temp_dir() -> None:
+    if q.confirm(f"Are you sure you want to clear the .temp directory?\n{TEMP_DIR}", auto_enter=False, default=False).ask():
+        for item in TEMP_DIR.iterdir():
+            if item.suffix == ".wav":
+                item.unlink()
+            elif item.suffix == ".json":
+                item.unlink()
+            else:
+                logger.info(f"{item} is not a a .wav or .json file")
+    else:
+        logger.info("Cancelling operation")
+# endregion
+
+# region japanese specific
+
+# This checks for:
+# - Hiragana: \u3040-\u309f
+# - Katakana: \u30a0-\u30ff
+# - Kanji (CJK Unified Ideographs): \u4e00-\u9faf
+JAPANESE_CHAR_PATTERN = re.compile(r"[\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]")
+
+def contains_japanese(string: str) -> bool:
+    if type(string) is not str:
+        return False
+
+    return bool(JAPANESE_CHAR_PATTERN.search(string))
 # endregion
