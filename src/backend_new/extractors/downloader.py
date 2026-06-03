@@ -2,6 +2,7 @@
 from pathlib import Path
 from time import sleep, time
 import json
+from typing import Any
 
 # HELPER LIBRARIES
 from backend_new.utils.helper_funcs import questionary_select, load_env_file, read_json_file
@@ -26,9 +27,6 @@ class Downloader:
     def __init__(self) -> None:
         """
         Initializes the downloader
-        :param spotify_client_id:
-        :param spotify_client_secret:
-        :param youtube_cookie_path: Path to the YouTube cookie file, not recommended to use. Cookies require extra authentication and are not guaranteed to work
         """
         current_dir = Path(__file__).resolve().parent
         while current_dir.name != "src" and current_dir != current_dir.parent:
@@ -68,7 +66,9 @@ class Downloader:
         """
         Searches for a song on Spotify and returns the metadata
         :param query: Query to be searched for
+        :type query: str
         :return: metadata of the song
+        :rtype: dict[str, Any]
         """
         if query == '':
             raise Exception('Spotify query is required')
@@ -80,8 +80,11 @@ class Downloader:
         """
         Returns the title and artist given a query or metadata, only returns the featured artist
         :param query: A query of a spotify song, a URL
+        :type query: str | None
         :param metadata: A dict from a song metadata, from search_song_metadata
+        :type metadata: dict[str, Any]
         :return: a str in the form of "TITLE - ARTIST"
+        :rtype: str
         """
         if query is not None and metadata is not None:
             raise Exception('Spotify query and metadata are mutually exclusive')
@@ -95,12 +98,15 @@ class Downloader:
             return self._extract_title_artist(metadata)
         return '' # so my static code checker doesn't get angry at me
 
-    def cli_search_song(self, limit: int = 10, query: str = '') -> dict: # TODO make limit in config file
+    def cli_search_song(self, limit: int = 10, query: str = '') -> dict[str, Any]: # TODO make limit in config file
         """
         Searches a song using spotify querying
         :param query: A query to search for, defaults to none using CLI interface
+        :type query: str
         :param limit: How many songs to show at a time
+        :type limit: int
         :return: A dict of the song metadata (spotify)
+        :rtype: dict[str, Any]
         """
         query = ''
 
@@ -180,9 +186,13 @@ class Downloader:
         """
         Searches for a song on YouTube and returns the id of the song
         :param query: Query to search for
+        :type query: str
         :param limit: How many to search for
+        :type limit: int
         :param choose_top_result: Will always return the first result without asking the user
+        :type choose_top_result: bool
         :return: YouTube video id
+        :rtype: str
         """
 
         limit = 1 if choose_top_result else limit
@@ -228,8 +238,11 @@ class Downloader:
         """
         Downloads a YouTube video to .temp
         :param retry_count: How many times to retry downloading the video
+        :type retry_count: int
         :param sleep_time_if_fail: How long to wait before retrying to download the video if a fail occurs
+        :type sleep_time_if_fail: float
         :param url: A url to the video ID
+        :type url: str
         """
         now = time()
 

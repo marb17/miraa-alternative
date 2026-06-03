@@ -73,9 +73,6 @@ class LLMModel:
         """
         self._gb_per_token = (model_data["hidden_size"] * model_data["num_hidden_layers"] * 2) / (1024 ** 3)
 
-    def __del__(self) -> None:
-        self._close()
-
     def __enter__(self):
         if self._pipe is None:
             self.init_model()
@@ -86,11 +83,18 @@ class LLMModel:
         return False
 
     def _close(self) -> None:
+        self._pipe.close()
         self._pipe = None
 
         import torch
         gc.collect()
-        torch.cuda.empty_cache()
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
 
     # region batched inference
     def _calculate_prompt_cost(self, prompt: list[str], estimated_output_token_cost: int) -> float:
@@ -156,17 +160,22 @@ class LLMModel:
         else:
             logger.debug("Model already initialized, skipping")
 
-    def batch_inference(self, prompts: list[str], batch_size: int = -1, estimated_output_cost: int = 2048, gen_config: GenerationConfig = None) -> list[str]:
+    def batch_inference(self, prompts: list[str], batch_size: int = -1, estimated_output_cost: int = 2048, gen_config: GenerationConfig | None = None) -> list[str]:
         """
         Performs inference on a batch of prompts.
         :param gen_config: A generation config object to change how the LLM generates
+        :type gen_config: GenerationConfig | None
         :param prompts: List of prompts to infer
+        :type prompts: list[str]
         :param batch_size: How much prompts to send each batch
             Possible Values:
             * '0' - Not batched
             * '-1' - Auto sized
+        :type batch_size: int
         :param estimated_output_cost: Estimated how many tokens are used for each output
+        :type estimated_output_cost: int
         :return: A list of all the responses
+        :rtype: list[str]
         """
         import torch
         from lmdeploy import GenerationConfig
@@ -231,19 +240,42 @@ class Translator:
         return False
 
     def _close(self) -> None:
-        self._pipe = None
+        logger.debug("Closing Translator")
 
         import torch
         gc.collect()
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
 
+    # remap all unprocessed, remove special whitespace and strips
     @staticmethod
-    def translate_lyrics(texts: list[str] | str, use_context: bool = False) -> list[str]:
+    def _clean_unicode(input_string: str) -> str:
+        input_string = re.sub(r"[\u2005\u200a\u205f\u2014]", " ", input_string)
+        input_string = re.sub(r"\u2019", "'", input_string)
+        input_string = input_string.strip()
+
+        return input_string
+
+    def _clean_translation_header_and_unicode(self, input_string: str) -> str:
+        """Also cleans Unicode"""
+        input_string = input_string.strip()
+        input_string = re.sub(
+            r"^\*?\*?Translation:\*?\*?\s*", "", input_string, flags=re.IGNORECASE
+        )
+        input_string = self._clean_unicode(input_string)
+
+        return input_string
+
+    def translate_lyrics(self, texts: list[str] | str, use_context: bool = False) -> list[str]:
         """
         Translates lyrics
         :param texts: Pure string or list of strings (pure string splits by newlines)
+        :type texts: str | list[str]
         :param use_context: Whether to use context for the prompts
+        :type use_context: bool
         :return: Translated lyrics in list form
+        :rtype: list[str]
         """
         now = time.time()
 
@@ -344,48 +376,30 @@ class Translator:
             responses = dict(zip([idx for idx, exp in mapping_index if exp == "do"], llm.batch_inference(prompts, estimated_output_cost=50, gen_config=gen_config)))
 
         results = []
-        # remap all unprocessed, remove special whitespace and strips
-        def clean_unicode(input_string: str) -> str:
-            input_string = re.sub(r"[\u2005\u200a\u205f\u2014]", " ", input_string)
-            input_string = re.sub(r"\u2019", "'", input_string)
-            input_string = input_string.strip()
-
-            return input_string
-
-        def clean_translation_header_and_unicode(input_string: str) -> str:
-            """Also cleans Unicode"""
-            input_string = input_string.strip()
-            input_string = re.sub(
-                r"^\*?\*?Translation:\*?\*?\s*", "", input_string, flags=re.IGNORECASE
-            )
-            input_string = clean_unicode(input_string)
-
-            return input_string
 
         for idx, d in enumerate(data):
             if (idx, "do") in mapping_index:
                 response = responses[idx]
 
                 # remove translation header
-                formatted_response = clean_translation_header_and_unicode(response)
+                formatted_response = self._clean_translation_header_and_unicode(response)
                 results.append(formatted_response)
             elif (idx, "dup") in mapping_index:
                 prev_processed_idx = processed_lyrics[d]
                 response = responses[prev_processed_idx]
 
                 # remove translation header
-                formatted_response = clean_translation_header_and_unicode(response)
+                formatted_response = self._clean_translation_header_and_unicode(response)
                 results.append(formatted_response)
             else:
-                formatted_response = clean_unicode(d)
+                formatted_response = self._clean_unicode(d)
                 results.append(formatted_response)
 
         logger.debug(f"Finished translating in {(time.time() - now):.2f} seconds")
 
         return results
 
-    @staticmethod
-    def romaji_to_script(lyrics: str) -> str:
+    def romaji_to_script(self, lyrics: str) -> str:
         prompt = f"""
         You are an expert Japanese Language Processor specializing in Orthographic Reconstruction. 
 
@@ -411,9 +425,6 @@ class Translator:
         with LLMModel() as llm:
             data = llm.batch_inference([prompt])[0].strip()
 
-        print(data)
+        data = self._clean_translation_header_and_unicode(data)
 
-if __name__ == "__main__":
-    trans = Translator()
-    lyrics = "Itsuka no koe ga ima boku no kokoro wo kyuukutsu ni shite iku\nAa dattan desho kou dattan desho\nMigatte kaishaku receiver\nKawaranakya akimashitatte kawareba kawarimashita yo ne tte\nIttai nan dai? sore nan dai?\nHoko to tate wa nakunaranai you deshite\n\n\nShiawase wa pin boke suru furyouhin ai shattaa\nKurushii koto wa sensai ni utsuru kou gashitsu renzu de\n\n\nSeiippai yatten da betsu ni kimi no tame janai\nNee sou daro?\nShou ni awanai koto shite ikireru hodo yoyuu nai\n\n\nJinsei sou hai ni\nJinsei sou mae ni\nJinsei soumei ni ikitai no wa yamayama da ga\nWari to konkyo mo shoumei mo nai you na genjou sekai kurai ga choudo yokute\n\n\nJinsei sou rafu ni\nJinsei sou tafu ni\nJinsei sou geemu mitai ni tanjun na mono de ii daro\nA.B botan de kakete kimetai mirai mo arun da\n\n\nHiiroo no puraibeeto wa kitto shou mo nai to omoun da\nWari to negatibu dattari futsuu no ningen shiteru sa\n\n\nTanin no koe ni madowasareru hodo yoyuu nai\n\n\nMou isso furan ni\nMou isso fuantei ni\nMou kitto setsumeisho doori wa kireisugite shimau kara\nYogose kowase kimerareta tsumaranai kotei gainen nante sutero\n\n\nMou jissai dou ni demo nare\nOshikoroshita koe de yaritakunai koto ni\nKarugarushiku unazuku no wa yamero agero kao wo agero\n\n\nTsukarete shimattan da\nHito no ego de tsukurareta utsuo ni dake wa naritaku wa nakute\nJikan wa mada aru to iza hitorime no mae ni shita koukai to\nShindenzu wa gushagusha no manma omou koto wa tada hitotsu\nUrei urei urei urei urei urei urei\n\n\nJinsei sou hai ni\nJinsei sou mae ni\nJinsei soumei ni kawaritai no wa yamayama da ga\nWatashi wa konkyo mo shoumei mo nai you na genjou sekai kurai ga oniai da\n\n\nJinsei sou rafu ni\nJinsei sou tafu ni\nJissai sou geemu mitai ni tanjun meikai ikitaku tte\nA.B botan de kaete mitai mirai mo arun da"
-    trans.romaji_to_script(lyrics)
+        return data
