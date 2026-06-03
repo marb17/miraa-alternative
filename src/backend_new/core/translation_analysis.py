@@ -8,7 +8,7 @@ from math import ceil
 from pathlib import Path
 
 # HELPER LIBRARIES
-from backend_new.utils.helper_funcs import read_json_file
+from backend_new.utils.helper_funcs import read_json_file, contains_japanese
 
 # PYPI LIBRARIES
 from lmdeploy import GenerationConfig
@@ -237,7 +237,8 @@ class Translator:
         gc.collect()
         torch.cuda.empty_cache()
 
-    def translate_lyrics(self, texts: list[str] | str, use_context: bool = False) -> list[str]:
+    @staticmethod
+    def translate_lyrics(texts: list[str] | str, use_context: bool = False) -> list[str]:
         """
         Translates lyrics
         :param texts: Pure string or list of strings (pure string splits by newlines)
@@ -245,20 +246,6 @@ class Translator:
         :return: Translated lyrics in list form
         """
         now = time.time()
-        # region japanese character check
-
-        # This checks for:
-        # - Hiragana: \u3040-\u309f
-        # - Katakana: \u30a0-\u30ff
-        # - Kanji (CJK Unified Ideographs): \u4e00-\u9faf
-        JAPANESE_CHAR_PATTERN = re.compile(r"[\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]")
-
-        def contains_japanese(string: str) -> bool:
-            if type(string) is not str:
-                return False
-
-            return bool(JAPANESE_CHAR_PATTERN.search(string))
-        # endregion
 
         # allows pure string and list of string & context creation
         if type(texts) is str:
@@ -350,6 +337,9 @@ class Translator:
 
         gen_config = GenerationConfig(max_new_tokens=50)
 
+        if not prompts:
+            raise ValueError("No prompts found to be generated, please re-check lyrics to ensure they are in Japanese Scripts")
+
         with LLMModel() as llm:
             responses = dict(zip([idx for idx, exp in mapping_index if exp == "do"], llm.batch_inference(prompts, estimated_output_cost=50, gen_config=gen_config)))
 
@@ -393,3 +383,37 @@ class Translator:
         logger.debug(f"Finished translating in {(time.time() - now):.2f} seconds")
 
         return results
+
+    @staticmethod
+    def romaji_to_script(lyrics: str) -> str:
+        prompt = f"""
+        You are an expert Japanese Language Processor specializing in Orthographic Reconstruction. 
+
+        Your sole task is to reconstruct raw Romaji text back into authentic Japanese orthography (a natural, native balance of Kanji, Hiragana, and Katakana).
+
+        ** STRICT REGULATORY RULES **:
+        1. DO NOT translate the meaning into English or any other language. 
+        2. DO NOT alter, expand, or poetically reinterpret the lines. This is a script conversion task, not a creative rewriting task.
+        3. Preserve the exact line breaks, stanzas, and structural layout of the input text.
+        4. If a line contains actual English words or punctuation, preserve them exactly as they are written.
+        5. Use the surrounding thematic context of the verse to choose the correct Kanji for homonyms (e.g., distinguishing "kimi" as 君 vs. 黄身 based on the song's tone).
+
+        ** INPUT ROMAJI LYRICS **:
+        {lyrics}
+    
+        ** OUTPUT FORMAT **:
+        Return ONLY the reconstructed Japanese script. Do not include conversational filler, notes, or introductions. Use the exact block wrapper below:
+
+        **Translation:**
+        <your reconstructed Japanese text here>
+        """
+
+        with LLMModel() as llm:
+            data = llm.batch_inference([prompt])[0].strip()
+
+        print(data)
+
+if __name__ == "__main__":
+    trans = Translator()
+    lyrics = "Itsuka no koe ga ima boku no kokoro wo kyuukutsu ni shite iku\nAa dattan desho kou dattan desho\nMigatte kaishaku receiver\nKawaranakya akimashitatte kawareba kawarimashita yo ne tte\nIttai nan dai? sore nan dai?\nHoko to tate wa nakunaranai you deshite\n\n\nShiawase wa pin boke suru furyouhin ai shattaa\nKurushii koto wa sensai ni utsuru kou gashitsu renzu de\n\n\nSeiippai yatten da betsu ni kimi no tame janai\nNee sou daro?\nShou ni awanai koto shite ikireru hodo yoyuu nai\n\n\nJinsei sou hai ni\nJinsei sou mae ni\nJinsei soumei ni ikitai no wa yamayama da ga\nWari to konkyo mo shoumei mo nai you na genjou sekai kurai ga choudo yokute\n\n\nJinsei sou rafu ni\nJinsei sou tafu ni\nJinsei sou geemu mitai ni tanjun na mono de ii daro\nA.B botan de kakete kimetai mirai mo arun da\n\n\nHiiroo no puraibeeto wa kitto shou mo nai to omoun da\nWari to negatibu dattari futsuu no ningen shiteru sa\n\n\nTanin no koe ni madowasareru hodo yoyuu nai\n\n\nMou isso furan ni\nMou isso fuantei ni\nMou kitto setsumeisho doori wa kireisugite shimau kara\nYogose kowase kimerareta tsumaranai kotei gainen nante sutero\n\n\nMou jissai dou ni demo nare\nOshikoroshita koe de yaritakunai koto ni\nKarugarushiku unazuku no wa yamero agero kao wo agero\n\n\nTsukarete shimattan da\nHito no ego de tsukurareta utsuo ni dake wa naritaku wa nakute\nJikan wa mada aru to iza hitorime no mae ni shita koukai to\nShindenzu wa gushagusha no manma omou koto wa tada hitotsu\nUrei urei urei urei urei urei urei\n\n\nJinsei sou hai ni\nJinsei sou mae ni\nJinsei soumei ni kawaritai no wa yamayama da ga\nWatashi wa konkyo mo shoumei mo nai you na genjou sekai kurai ga oniai da\n\n\nJinsei sou rafu ni\nJinsei sou tafu ni\nJissai sou geemu mitai ni tanjun meikai ikitaku tte\nA.B botan de kaete mitai mirai mo arun da"
+    trans.romaji_to_script(lyrics)

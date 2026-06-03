@@ -5,12 +5,14 @@ from concurrent.futures.thread import ThreadPoolExecutor
 from pathlib import Path
 
 # HELPER LIBRARIES
-from backend_new.utils.helper_funcs import read_json_file, write_json_file, questionary_select, load_env_file
+from backend_new.utils.helper_funcs import read_json_file, write_json_file, questionary_select, load_env_file, contains_japanese
 
 from backend_new.utils.constants import SongContext, DataMismatchError
 from backend_new.utils.constants import TEMP_DIR
 
 from backend_new.utils.logger import Logger
+from core.translation_analysis import LLMModel
+
 logger = Logger(__name__)
 
 class WorkflowManager:
@@ -157,6 +159,7 @@ class WorkflowManager:
         :return: True if already done, False if not
         """
         from backend_new.extractors.geniusextractor import GeniusExtractor
+        from backend_new.core.translation_analysis import Translator
 
         if song_context_data.json_song_data.get("genius_data", None) is not None:
             logger.debug(f"Genius data already present, skipping")
@@ -169,6 +172,20 @@ class WorkflowManager:
                     artist=song_context_data.json_song_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
                 )
             write_json_file(song_context_data.json_file_path, genius_data, ["genius_data"])
+
+            # check if lyrics are romanized
+            if not contains_japanese(genius_data.get("lyrics", "")):
+                logger.warning("Lyrics are romanized, using LLM to convert to Japanese script")
+
+                with Translator() as translator:
+                    script_lyrics = translator.romaji_to_script(genius_data["lyrics"])
+
+                write_json_file(song_context_data.json_file_path, script_lyrics, ["lyrics_main"])
+                write_json_file(song_context_data.json_file_path, genius_data["lyrics"], ["lyrics_sub"])
+            else:
+                write_json_file(song_context_data.json_file_path, genius_data["lyrics"], ["lyrics_main"])
+                write_json_file(song_context_data.json_file_path, "", ["lyrics_sub"])
+
             logger.debug(f"Genius data pulled.")
             return False
 
@@ -221,7 +238,7 @@ class WorkflowManager:
 
             jp_analyzer = JPAnalyzer()
 
-            lyrics = song_context_data.json_song_data["genius_data"]["lyrics"]
+            lyrics = song_context_data.json_song_data["lyrics_main"]
             # ! UNABLE TO BE USED FOR NOW
             data = jp_analyzer.tag(lyrics)
             write_json_file(song_context_data.json_file_path, data, ["split_and_tag"])
@@ -237,7 +254,7 @@ class WorkflowManager:
         else:
             logger.debug(f"Lyrics not translated, translating it now.")
 
-            lyrics = song_context_data.json_song_data["genius_data"]["lyrics"]
+            lyrics = song_context_data.json_song_data["lyrics_main"]
             with Translator() as translator:
                 data = translator.translate_lyrics(lyrics)
 
