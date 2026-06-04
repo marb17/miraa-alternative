@@ -150,20 +150,22 @@ class VocalSeparation:
 # endregion
 
 # region dictionaries
+# TODO make a dataclass that has everything in valid termbank in temp.py yummy not excited.
+
+@dataclass
+class RawYomitanEntry:
+    dictionary: str
+    term: str
+    reading: str
+    definition_tags: str | None
+    deinflection_rules: str
+    popularity_score: int
+    definitions: list[str | dict[str, Any]]
+    sequence_number: int
+    term_tags: str
+
+
 class JPDictionary:
-    @dataclass
-    class YomitanEntry:
-        dictionary: str
-        term: str
-        reading: str
-        definition_tags: str | None
-        deinflection_rules: str
-        popularity_score: int
-        definitions: list[str | dict[str, Any]]
-        sequence_number: int
-        term_tags: str
-
-
     def __init__(self) -> None:
         current_dir = Path(__file__).resolve().parent
         while current_dir.name != "src" and current_dir != current_dir.parent:
@@ -238,14 +240,18 @@ class JPDictionary:
 
             for entry in file_data:
                 if entry[0] in single_bank_entries:
-                    single_bank_entries[entry[0]].append(self.YomitanEntry(dict_path.stem, *entry))
+                    single_bank_entries[entry[0]].append(RawYomitanEntry(dict_path.stem, *entry))
 
-                single_bank_entries[entry[0]] = [self.YomitanEntry(dict_path.stem, *entry)]
+                single_bank_entries[entry[0]] = [RawYomitanEntry(dict_path.stem, *entry)]
 
             completion_counter += 1
             logger.debug(f"Term bank {term_bank_file.stem} completed. ({completion_counter} / {len(all_term_bank_files)})")
 
-        print(single_bank_entries.get("魔物", "dont have"))
+            break
+
+
+        temp = single_bank_entries.get("其奴", "dont have")
+        print(temp)
 
 
     def _initialize_lookup(self):
