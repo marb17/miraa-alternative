@@ -8,10 +8,11 @@ from pathlib import Path
 from backend_new.utils.helper_funcs import read_json_file, write_json_file, questionary_select, load_env_file, contains_japanese
 
 from backend_new.utils.constants import SongContext, DataMismatchError
+
+# CONSTANTS
 from backend_new.utils.constants import TEMP_DIR
 
 from backend_new.utils.logger import Logger
-from core.translation_analysis import LLMModel
 
 logger = Logger(__name__)
 
@@ -51,92 +52,6 @@ class WorkflowManager:
         """
         self._song_ctx.json_song_data = read_json_file(self._song_ctx.json_file_path)
 
-
-    @staticmethod
-    def _download_song(json_file: Path | None) -> None:
-        """
-        Downloads a song from YouTube using metadata present in .temp
-        When no files are present, it will query spotify
-        :param json_file: A path to a JSON file containing metadata
-        :type json_file: Path | None
-        :return: None
-        :rtype: None
-        """
-        from backend_new.extractors.downloader import Downloader
-
-        def get_youtube_id_from_json(file_path: Path) -> str | None:
-            if file_path.suffix == ".json":
-                return str(read_json_file(file_path)["pre_processing"]["youtube_id"])
-            return None
-
-        def _download(file_path: Path | str | None) -> None:
-            if file_path is None:
-                raise Exception("No file path provided")
-            with Downloader() as downloader:
-                if type(file_path) is str:
-                    downloader.download_youtube_video(url=file_path)
-                if type(file_path) is Path:
-                    downloader.download_youtube_video(url=get_youtube_id_from_json(file_path))
-
-        break_off = False
-
-        if json_file is None:
-            while True:
-                if break_off:
-                    break
-
-                all_files = list(TEMP_DIR.iterdir())
-                all_files_stem = [file.stem for file in all_files]
-                available_json_files = [file for file in all_files if
-                                        file.suffix == ".json" and get_youtube_id_from_json(
-                                            file) not in all_files_stem]
-
-                # if songs are available, ask user which one to download or download the only one present
-                if available_json_files:
-                    # if only one song is available, download it
-                    if len(available_json_files) == 1:
-                        target_id = get_youtube_id_from_json(available_json_files[0])
-                        _download(target_id)
-                    # if multiple songs are available, ask user which one to download
-                    elif len(available_json_files) > 1:
-                        while True:
-                            all_files = list(TEMP_DIR.iterdir())
-                            all_files_stem = [file.stem for file in all_files]
-                            available_json_files = [file for file in all_files
-                                                    if file.suffix == ".json" and
-                                                    get_youtube_id_from_json(file) not in all_files_stem]
-
-                            file_list = [{"name": file.stem, "value": file} for file in available_json_files]
-
-                            user_choice = questionary_select("Please choose the song:",
-                                                             choose_data=file_list,
-                                                             enable_pages=True,
-                                                             enable_all="Download All",
-                                                             enable_exit="Exit",
-                                                             batch_data=True)
-
-                            if user_choice == "__all__":
-                                target_ids = [get_youtube_id_from_json(file) for file in available_json_files]
-
-                                with ThreadPoolExecutor(max_workers=5) as executor:
-                                    _ = executor.map(_download, target_ids)
-
-                                for file in available_json_files:
-                                    write_json_file(file, True, ["pre_processing", "downloaded"])
-                                break_off = True
-                                break
-                            else:
-                                file_data = read_json_file(user_choice)
-                                _download(file_data["pre_processing"]["youtube_id"])
-
-                # if no songs are available, query spotify
-                else:
-                    with Downloader() as down:
-                        down.query_song_spotify()
-        else:
-            target_id = get_youtube_id_from_json(json_file)
-            _download(target_id)
-
     # region all processes, returns True if already done
     def download(self, song_context_data: SongContext) -> bool:
         """
@@ -146,6 +61,8 @@ class WorkflowManager:
         :return: True if already downloaded, False if not
         :rtype: bool
         """
+        from backend_new.extractors.downloader import Downloader
+
         if song_context_data.json_song_data.get("pre_processing", {}).get("downloaded", False):
             # checks if the audio file is present in the .temp dir, if not handle appropriately
             if song_context_data.json_song_data["pre_processing"].get("youtube_id", None) not in [file.stem for file
@@ -164,7 +81,8 @@ class WorkflowManager:
             return True
         else:
             logger.debug(f"Song not downloaded, downloading it now.")
-            self._download_song(song_context_data.json_file_path)
+            with Downloader() as dl:
+                dl.select_song_to_download(song_context_data.json_file_path)
             write_json_file(song_context_data.json_file_path, True, ["pre_processing", "downloaded"])
             logger.debug(f"Song downloaded.")
             return False
@@ -220,29 +138,18 @@ class WorkflowManager:
         from backend_new.core.processing import VocalSeparation
 
         # TODO add vocal sep model chooser
-        if song_context_data.json_song_data.get("vocal_separation", {}).get("separated", False) is True:
+        if song_context_data.json_song_data.get("vocal_separation", {}).get("separated", {}).get("vocal", False) is True:
             if song_context_data.json_song_data.get("vocal_separation", {}).get("vocal_file", None) not in [
                 file.stem for file in TEMP_DIR.iterdir() if file.suffix == ".wav"]:
                 raise DataMismatchError(logger,
                                              "Data file says audio has been separated, but it isn't present in .temp directory")
-            if song_context_data.json_song_data.get("vocal_separation", {}).get("inst_file", None) not in [file.stem
-                                                                                                           for file
-                                                                                                           in
-                                                                                                           TEMP_DIR.iterdir()
-                                                                                                           if
-                                                                                                           file.suffix == ".wav"]:
-                raise DataMismatchError(logger,
-                                             "Data file says audio has been separated, but it isn't present in .temp directory")
-
             logger.debug(f"Vocal separation already done, skipping")
             return True
         else:
             with VocalSeparation() as vs:
-                vs.separate_vocal(
+                vs.separate_audio(
                     f"../.temp/{song_context_data.json_song_data["pre_processing"]["youtube_id"]}.wav")
-                write_json_file(song_context_data.json_file_path, {"separated": True,
-                                                                   "vocal_file": f"{song_context_data.json_song_data["pre_processing"]["youtube_id"]}_vocal",
-                                                                   "inst_file": f"{song_context_data.json_song_data["pre_processing"]["youtube_id"]}_inst"},
+                write_json_file(song_context_data.json_file_path, {"separated": {"vocal": True}, "vocal_file": f"{song_context_data.json_song_data["pre_processing"]["youtube_id"]}_vocal"},
                                 ["vocal_separation"])
 
             return False

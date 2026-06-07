@@ -12,6 +12,9 @@ from typing import Literal
 # HELPER LIBRARIES
 from backend_new.utils.helper_funcs import read_json_file
 
+# CONSTANTS
+from backend_new.utils.constants import TEMP_DIR, AUDIO_MODEL_PRESETS
+
 # PYPI LIBRARIES
 from sudachipy.morpheme import Morpheme
 from sudachipy import dictionary, tokenizer
@@ -22,27 +25,17 @@ from backend_new.utils.logger import Logger
 logger = Logger(__name__)
 
 # region vocal sep
+ALLOWED_MODEL_NAMES = Literal["vocal_full", "vocal_clean", "instrumental_full", "instrumental_low_resource",
+                              "htdemucs_ft", "htdemucs_6s",
+                              "drum_sep", "dereverb", "crowd_iso"]
+
 class VocalSeparation:
-    # TODO add normal models for more stuff yesyes
-    PRESETS: dict[str, tuple[str, str]] = {
-        "vocal_full": ("vocal_full", "ensemble"),
-        "vocal_clean": ("vocal_clean", "ensemble"),
-        "instrumental_full": ("instrumental_full", "ensemble"),
-        "instrumental_low_resource": ("instrumental_low_resource", "ensemble"),
-    }
-
-    ALLOWED_MODEL_NAMES = Literal["vocal_full", "vocal_clean", "instrumental_full", "instrumental_low_resource"]
-
     # TODO fix docs here cuz its bad
     def __init__(self, model_name: ALLOWED_MODEL_NAMES = "vocal_full") -> None:
         """
         Initializes the VocalSeparation object.
 
         :param model_name: Model that will be used for separation.
-            ``vocal_full``: A rawer vocal stem with noise artifacts but the most clear articulation
-            ``vocal_clean``: A more processed vocal stem with fewer noise artifacts but more muffled in certain areas
-            ``instrumental_full``: A model best for getting a clear instrumental stem, not ideal vocals
-            ``instrumental_low_resource``: A good low-resource model, decent quality for both stems but with some slight bleeding
         :type model_name: ALLOWED_MODEL_NAMES
         """
 
@@ -57,25 +50,35 @@ class VocalSeparation:
         self._model_file_dir = f'{self._base_dir / "models/audioseparator"}'
 
         # select model and list available models
-        self._available_models = [key for key in self.PRESETS]
+        self._available_models = [key for key in AUDIO_MODEL_PRESETS]
         self._model_name = model_name
 
         # check if model available
-        model = self.PRESETS.get(model_name, None)
+        model = AUDIO_MODEL_PRESETS.get(model_name, None)
         if model is None:
             raise Exception(f"Model {model_name} not found, choose from: {self._available_models}")
         else:
             self._selected_model = None
 
-            if self.PRESETS[self._model_name][1] == "ensemble":
+            if AUDIO_MODEL_PRESETS[self._model_name]["type"] == "ensemble":
                 self._selected_model = Separator(output_dir=str(self._output_dir),
                                                  model_file_dir=str(self._model_file_dir),
-                                                 ensemble_preset=self._model_name,
+                                                 ensemble_preset=AUDIO_MODEL_PRESETS[self._model_name]["model_name"],
                                                  use_autocast=True,
                                                  use_soundfile=False,
                                                  normalization_threshold=0.9,
                                                  mdx_params={"batch_size": 32},
-                                                 vr_params={"batch_size": 32})
+                                                 vr_params={"batch_size": 32},
+                                                 mdxc_params={"batch_size": 32})
+            elif AUDIO_MODEL_PRESETS[self._model_name]["type"] == "single":
+                self._selected_model = Separator(output_dir=str(self._output_dir),
+                                                 model_file_dir=str(self._model_file_dir),
+                                                 use_autocast=True,
+                                                 use_soundfile=False,
+                                                 normalization_threshold=0.9,
+                                                 mdx_params={"batch_size": 32},
+                                                 vr_params={"batch_size": 32},
+                                                 mdxc_params={"batch_size": 32})
 
     def __del__(self) -> None:
         self._close()
@@ -107,9 +110,12 @@ class VocalSeparation:
     def _init_model(self) -> None:
         if self._selected_model is None:
             raise ValueError(f"Model wrapper for {self._model_name} did not initialize properly")
-        self._selected_model.load_model()
+        if AUDIO_MODEL_PRESETS[self._model_name]["type"] == "ensemble":
+            self._selected_model.load_model()
+        elif AUDIO_MODEL_PRESETS[self._model_name]["type"] == "single":
+            self._selected_model.load_model(model_filename=AUDIO_MODEL_PRESETS[self._model_name]["model_name"])
 
-    def separate_vocal(self, audio_path: str | Path) -> None:
+    def separate_audio(self, audio_path: str | Path) -> None:
         """
         Separates vocals into respective stems determined by model used
         :param audio_path: Path to the file
@@ -119,34 +125,30 @@ class VocalSeparation:
         """
         self._init_model()
 
-        if type(audio_path) is str:
+        if isinstance(audio_path, str):
             win_audio_path = Path(audio_path)
-        elif type(audio_path) is Path:
+        elif isinstance(audio_path, Path):
             win_audio_path = audio_path
 
+        # ALWAYS CONVERTS A PARENTLESS PATH TO BASE DIR AT .TEMP
+        if len(win_audio_path.parts) == 1:
+            win_audio_path = TEMP_DIR / win_audio_path
+
         now = time.time()
-        output_files = self._selected_model.separate(audio_path)
+        output_files = self._selected_model.separate([win_audio_path])
         logger.info(f"Took {(time.time() - now):.2f} seconds to separate stems")
 
         output_files = [Path(f) for f in output_files]
 
         def rename_file(file_path: Path, name: str) -> None:
+            if len(file_path.parts) == 1:
+                file_path = TEMP_DIR / file_path
+
             file_path.rename(f"{str(self._output_dir)}/{win_audio_path.stem}_{name}.wav")
 
-        # different models output differently, if flipped recheck this
-        match self._model_name:
-            case "vocal_full":
-                rename_file(output_files[0], "inst")
-                rename_file(output_files[1], "vocal")
-            case "vocal_clean":
-                rename_file(output_files[0], "inst")
-                rename_file(output_files[1], "vocal")
-            case "instrumental_full":
-                rename_file(output_files[0], "vocal")
-                rename_file(output_files[1], "inst")
-            case "instrumental_low_resource":
-                rename_file(output_files[0], "vocal")
-                rename_file(output_files[1], "inst")
+        # different models output differently, if flipped recheck constants.py
+        for file, rename_to in zip(output_files, AUDIO_MODEL_PRESETS[self._model_name]["rename_order"]):
+            rename_file(file, rename_to)
 # endregion
 
 # region dictionaries
