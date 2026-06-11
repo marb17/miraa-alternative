@@ -16,7 +16,8 @@ from backend_new.core.workflow import WorkflowManager
 from questionary import Choice, confirm, path
 
 # CONSTANTS
-from backend_new.utils.constants import DEFAULT_CONFIG, DEFAULT_DICTS_MESSAGE, SongContext
+from backend_new.utils.constants import DEFAULT_CONFIG, DEFAULT_DICTS_MESSAGE
+from backend_new.utils.structures import SongContext
 
 from backend_new.utils.logger import Logger
 logger = Logger(__name__)

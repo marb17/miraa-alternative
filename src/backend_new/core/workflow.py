@@ -7,11 +7,11 @@ from pathlib import Path
 # HELPER LIBRARIES
 from backend_new.utils.helper_funcs import read_json_file, write_json_file, questionary_select, load_env_file, contains_japanese
 
-from backend_new.utils.constants import SongContext, DataMismatchError
+from backend_new.utils.exceptions import DataMismatchError
+from backend_new.utils.structures import SongContext
 from backend_new.utils.constants import TEMP_DIR
 
 from backend_new.utils.logger import Logger
-from core.translation_analysis import LLMModel
 
 logger = Logger(__name__)
 

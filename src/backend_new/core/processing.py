@@ -152,19 +152,6 @@ class VocalSeparation:
 # region dictionaries
 # TODO make a dataclass that has everything in valid termbank in temp.py yummy not excited.
 
-@dataclass
-class RawYomitanEntry:
-    dictionary: str
-    term: str
-    reading: str
-    definition_tags: str | None
-    deinflection_rules: str
-    popularity_score: int
-    definitions: list[str | dict[str, Any]]
-    sequence_number: int
-    term_tags: str
-
-
 class JPDictionary:
     def __init__(self) -> None:
         current_dir = Path(__file__).resolve().parent
@@ -178,31 +165,9 @@ class JPDictionary:
         self._lookup_table: Any = None
 
         # prepare all dicts
-        self._extract_zip_files()
         self._read_all_available_dicts()
 
     # TODO make it save into a json file so it doesnt have to reprocess everytime
-
-    def _extract_zip_files(self):
-        all_zip_files = [file for file in self._dict_dir.iterdir() if file.suffix == ".zip"]
-        all_zip_files_stem = [file.stem for file in all_zip_files]
-
-        if all_zip_files:
-            logger.debug("New .zip files detected, extracting now")
-            for file_path, stem_name in zip(all_zip_files, all_zip_files_stem):
-                dir_path = self._dict_dir / f"{stem_name}"
-                dir_path.mkdir(parents=True, exist_ok=True)
-
-                logger.debug(f"Extracting: {file_path}")
-                try:
-                    shutil.unpack_archive(file_path, dir_path)
-                    logger.debug(f"Completed extracting: {file_path}, deleting old .zip files")
-                    file_path.unlink()
-                except:
-                    raise Exception("File unsuccessfully extracted, please re-run and check for any unintended changes in 'dict' directory")
-            logger.debug("All .zip files extracted successfully")
-        else:
-            logger.debug("No new .zip files detected, skipping")
 
     def _read_all_available_dicts(self) -> None:
         all_dicts = [path for path in self._dict_dir.iterdir() if path.is_dir()]
