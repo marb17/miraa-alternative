@@ -33,7 +33,12 @@ def download_audio(url: str, rename_id: bool) -> None:
         file_path.rename(f"{TEMP_DIR / file_data["title"]}.wav")
 
 @main.command()
-@click.argument("file")
+@click.argument("file",
+                type=click.Path(exists=True,
+                                file_okay=True,
+                                dir_okay=False,
+                                readable=True,
+                                path_type=Path))
 @click.option("--model",
               type=click.Choice([key for key in AUDIO_MODEL_PRESETS]),
               default="vocal_full",

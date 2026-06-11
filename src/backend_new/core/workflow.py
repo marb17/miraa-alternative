@@ -108,7 +108,6 @@ class WorkflowManager:
                     title=song_context_data.json_song_data["pre_processing"]["raw_metadata"]["name"],
                     artist=song_context_data.json_song_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
                 )
-            write_json_file(song_context_data.json_file_path, genius_data, ["genius_data"])
 
             # check if lyrics are romanized
             if not contains_japanese(genius_data.get("lyrics", "")):
@@ -122,6 +121,8 @@ class WorkflowManager:
             else:
                 write_json_file(song_context_data.json_file_path, genius_data["lyrics"], ["lyrics_main"])
                 write_json_file(song_context_data.json_file_path, "", ["lyrics_sub"])
+
+            write_json_file(song_context_data.json_file_path, genius_data, ["genius_data"])
 
             logger.debug(f"Genius data pulled.")
             return False
