@@ -11,19 +11,7 @@ dependencies = [
     "spotipy",
     "lyricsgenius",
     "nagisa",
-    "lmdeploy",
-    "audio-separator"
 ]
 
-[[tool.uv.index]]
-name = "pytorch-cu126"
-url = "https://download.pytorch.org/whl/cu126"
-explicit = true
-
-[tool.uv.sources]
-torch = { index = "pytorch-cu126" }
-torchvision = { index = "pytorch-cu126" }
-torchaudio = { index = "pytorch-cu126" }
-
 [project.scripts]
-miraa-alt = "backend_new.cli.main"
+miraa-alt = "backend_new.cli:main"
