@@ -33,7 +33,7 @@ class RawYomitanEntry:
 class DefinitionSense:
     sense_number: int | None = None
     parts_of_speech: list[str] = field(default_factory=list) # all parts of speech
-    glossaries: list[str] = field(default_factory=list) # all definitions
+    glossaries: list[str | list[str]] = field(default_factory=list) # all definitions
     examples: list[dict[str, str]] = field(default_factory=list) # example sentences [{"en": "..."}, {"jp": "..."}]
 
 @dataclass
@@ -43,3 +43,8 @@ class DictionaryEntry:
     reading: str # how its read
     senses: list[DefinitionSense] = field(default_factory=list) # all information
     alternative_forms: list[str] = field(default_factory=list) # alt forms
+
+@dataclass
+class WordEntry:
+    word: str
+    entries: list[DictionaryEntry] = field(default_factory=list)

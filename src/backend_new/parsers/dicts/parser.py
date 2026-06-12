@@ -6,6 +6,8 @@ from backend_new.utils.exceptions import InvalidDictDefinitionFormatError
 from pathlib import Path
 from backend_new.utils.helper_funcs import read_json_file
 from typing import Any
+from concurrent.futures import ProcessPoolExecutor
+import os
 
 from backend_new.utils.logger import Logger
 logger = Logger(__name__)
@@ -14,10 +16,13 @@ class JitendexYomitanParser(BaseDictionaryParser):
     DICTIONARY_PATTERN = "*jitendex-yomitan*"
 
     def _sense_group_parser(self, data: list[dict[str, Any]]) -> Any:
-        holding = DefinitionSense()
+        holding: DefinitionSense = DefinitionSense()
+
+        if isinstance(data, dict):
+            data = [data]
 
         for section in data:
-            if section["tag"] == "span" and section['data']['content'] == "part-of-speech-info":
+            if section["tag"] == "span" and section.get('data', {}).get('content') == "part-of-speech-info":
                 holding.parts_of_speech.append(section['title'])
 
             elif section["tag"] == "div" and section['data']['content'] == "sense":
@@ -47,24 +52,29 @@ class JitendexYomitanParser(BaseDictionaryParser):
                     else:
                         raise InvalidDictDefinitionFormatError()
 
-            elif section["tag"] == "ul" and section['data']['content'] == "glossary":
+            elif section["tag"] == "ul" and section.get('data', {}).get('content') == "glossary":
                 glossary_contents = section['content']
+                raw_definition_holding = []
+
                 if isinstance(glossary_contents, dict):
                     glossary_contents = [glossary_contents]
 
                 for glossary_content in glossary_contents:
                     if glossary_content['tag'] == "li":
-                        holding.glossaries.append(glossary_content['content'])
+                        # holding.glossaries.append(glossary_content['content'])
+                        raw_definition_holding.append(glossary_content['content'])
                     else:
                         raise InvalidDictDefinitionFormatError()
 
-            elif section["tag"] == "span" and section['data']['content'] == "misc-info":
+                return raw_definition_holding
+
+            elif section["tag"] == "span" and section.get('data', {}).get('content') == "misc-info":
                 ...
 
-            elif section["tag"] == "span" and section['data']['content'] == "dialect-info":
+            elif section["tag"] == "span" and section.get('data', {}).get('content') == "dialect-info":
                 ...
 
-            elif section["tag"] == "span" and section['data']['content'] == "field-info":
+            elif section["tag"] == "span" and section.get('data', {}).get('content') == "field-info":
                 ...
 
             elif section["tag"] == "ol":
@@ -73,23 +83,44 @@ class JitendexYomitanParser(BaseDictionaryParser):
                 if isinstance(senses_content, dict):
                     senses_content = [senses_content]
 
+                # glossary_holding: list[DefinitionSense] = []
+
                 for sense in senses_content:
                     sense_content = sense['content']
-                    print(sense_content)
 
                     response = self._sense_group_parser(sense_content)
 
-                    print(response)
+                    # glossary_holding.append(response)
+                    holding.glossaries.append(response)
 
-            # so it doesnt error out on useless shit
+
+            # so it doesnt shit itself on useless shit
             elif section["tag"] == "div" and section["data"]["content"] == "extra-info":
                 pass
 
-            elif section["tag"] == "span" and section["data"]["content"] == "forms-label":
+            elif section["tag"] == "span" and section.get('data', {}).get('content') == "forms-label":
+                pass
+
+            elif section["tag"] == "table" and section.get("content", [])[0].get('data', {}).get('content') == "forms-header-row":
+                pass
+
+            elif section["tag"] == "table" and section.get('data', {}).get('content') == "forms-header-row":
+                pass
+
+            elif section["tag"] == "table" and section.get("content", [])[0].get('data', {}).get('content') == "forms-col-senses-row":
+                pass
+
+            elif section["tag"] == "span" and section.get('content', [])[0].get("data", {}).get("class") == "form-special":
+                pass
+
+            elif section["tag"] == "ul" and isinstance(section["content"], list):
+                pass
+
+            elif section["tag"] == "ul" and section.get("content", {}).get("tag") == "li":
                 pass
 
             else:
-                print(section)
+                print(section, data, sep="\n")
                 raise InvalidDictDefinitionFormatError()
 
         return holding
@@ -125,6 +156,9 @@ class JitendexYomitanParser(BaseDictionaryParser):
                     elif section['tag'] == "ul" and section['data']['content'] == "sense-groups":
                         sense_groups_contents = section['content']
 
+                        if isinstance(sense_groups_contents, dict):
+                            sense_groups_contents = [sense_groups_contents]
+
                         for sense_group in sense_groups_contents:
                             response = self._sense_group_parser(sense_group['content'])
                             definitions.append(DictionaryEntry(self._dict_name, raw_data.term, raw_data.reading, response))
@@ -143,7 +177,6 @@ class JitendexYomitanParser(BaseDictionaryParser):
             else:
                 raise InvalidDictDefinitionFormatError()
 
-        print(definitions)
         return definitions
 
 
@@ -154,15 +187,23 @@ class JitendexYomitanParser(BaseDictionaryParser):
         for entry in json_data:
             results.append(self._parse(RawYomitanEntry(*entry)))
 
+        return results
 
 
     def parse_dict(self) -> list[DictionaryEntry]:
         dict_data: list[DictionaryEntry] = list()
 
-        for file in self._term_bank_files:
-            dict_data.extend(self._parse_file(file))
-            #! TEMP
-            break
+        max_workers = (os.cpu_count() or 8) // 4
+
+        import time
+        now = time.time()
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            results = executor.map(self._parse_file, self._term_bank_files)
+
+            for file_data in results:
+                dict_data.extend(file_data)
+        print(f"time taken: {time.time() - now}")
+
 
 
 if __name__ == "__main__":
