@@ -14,6 +14,11 @@ class SongContext:
 
 # YOMITAN PARSER
 @dataclass
+class ExampleSentence:
+    lang: str # language of the example sentence
+    sentence: str # the example sentence itself
+
+@dataclass
 class RawYomitanEntry:
     term: str
     reading: str
@@ -26,7 +31,7 @@ class RawYomitanEntry:
 
 @dataclass
 class DefinitionSense:
-    sense_number: int
+    sense_number: int | None = None
     parts_of_speech: list[str] = field(default_factory=list) # all parts of speech
     glossaries: list[str] = field(default_factory=list) # all definitions
     examples: list[dict[str, str]] = field(default_factory=list) # example sentences [{"en": "..."}, {"jp": "..."}]

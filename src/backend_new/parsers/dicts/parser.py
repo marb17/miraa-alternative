@@ -1,31 +1,151 @@
 from backend_new.parsers.dicts.base import BaseDictionaryParser
-from backend_new.utils.structures import DictionaryEntry, RawYomitanEntry
+from backend_new.utils.structures import DictionaryEntry, RawYomitanEntry, ExampleSentence, DefinitionSense
 from backend_new.utils.exceptions import InvalidDictDefinitionFormatError
 
 #! TEMP
 from pathlib import Path
 from backend_new.utils.helper_funcs import read_json_file
+from typing import Any
+
+from backend_new.utils.logger import Logger
+logger = Logger(__name__)
 
 class JitendexYomitanParser(BaseDictionaryParser):
     DICTIONARY_PATTERN = "*jitendex-yomitan*"
 
-    # region HELPER
-    def _sense_group_parse(self, data: list[dict]) -> Any:
-        for entry in data:
-            ...
-    # endregion
+    def _sense_group_parser(self, data: list[dict[str, Any]]) -> Any:
+        holding = DefinitionSense()
 
-    def _parse(self, raw_data) -> DictionaryEntry:
+        for section in data:
+            if section["tag"] == "span" and section['data']['content'] == "part-of-speech-info":
+                holding.parts_of_speech.append(section['title'])
+
+            elif section["tag"] == "div" and section['data']['content'] == "sense":
+                sense_contents = section['content']
+                if isinstance(sense_contents, dict):
+                    sense_contents = [sense_contents]
+
+                for sense_content in sense_contents:
+                    if sense_content['tag'] == "ul" and sense_content['data']['content'] == "glossary":
+                        glossary_contents = sense_content['content']
+                        if isinstance(glossary_contents, dict):
+                            glossary_contents = [glossary_contents]
+
+                        for glossary_content in glossary_contents:
+                            if glossary_content['tag'] == "li":
+                                holding.glossaries.append(glossary_content['content'])
+                            else:
+                                raise InvalidDictDefinitionFormatError()
+
+                    elif sense_content['tag'] == "div" and sense_content['data']['content'] == "extra-info":
+                        extra_info_contents = sense_content['content']
+                        if isinstance(extra_info_contents, dict):
+                            extra_info_contents = [extra_info_contents]
+
+                        # TODO add example sentences
+
+                    else:
+                        raise InvalidDictDefinitionFormatError()
+
+            elif section["tag"] == "ul" and section['data']['content'] == "glossary":
+                glossary_contents = section['content']
+                if isinstance(glossary_contents, dict):
+                    glossary_contents = [glossary_contents]
+
+                for glossary_content in glossary_contents:
+                    if glossary_content['tag'] == "li":
+                        holding.glossaries.append(glossary_content['content'])
+                    else:
+                        raise InvalidDictDefinitionFormatError()
+
+            elif section["tag"] == "span" and section['data']['content'] == "misc-info":
+                ...
+
+            elif section["tag"] == "span" and section['data']['content'] == "dialect-info":
+                ...
+
+            elif section["tag"] == "span" and section['data']['content'] == "field-info":
+                ...
+
+            elif section["tag"] == "ol":
+                senses_content = section['content']
+
+                if isinstance(senses_content, dict):
+                    senses_content = [senses_content]
+
+                for sense in senses_content:
+                    sense_content = sense['content']
+                    print(sense_content)
+
+                    response = self._sense_group_parser(sense_content)
+
+                    print(response)
+
+            # so it doesnt error out on useless shit
+            elif section["tag"] == "div" and section["data"]["content"] == "extra-info":
+                pass
+
+            elif section["tag"] == "span" and section["data"]["content"] == "forms-label":
+                pass
+
+            else:
+                print(section)
+                raise InvalidDictDefinitionFormatError()
+
+        return holding
+
+    def _parse(self, raw_data) -> list[DictionaryEntry]:
         definition_data = raw_data.definitions
 
+        definitions = []
+
         for definition in definition_data:
+            #TODO add redirection
+            if isinstance(definition, list):
+                continue
+
             if definition.get("type", "") != "structured-content":
                 raise InvalidDictDefinitionFormatError("Type is not structured-content")
 
-            content = definition.get("content", [])
-            for cont in content:
-                if cont.get("tag") == "div":
+            main_content = definition.get("content")
+
+            if isinstance(main_content, list):
+                for section in main_content:
+                    if section['tag'] == "div" and section['data']['content'] == "sense-group":
+                        sense_group_content = section['content']
+                        response = self._sense_group_parser(sense_group_content)
+                        definitions.append(DictionaryEntry(self._dict_name, raw_data.term, raw_data.reading, response))
+
+                    elif section['tag'] == "div" and section['data']['content'] == "attribution":
+                        ...
+
+                    elif section['tag'] == "div" and section['data']['content'] == "forms":
+                        ...
+
+                    elif section['tag'] == "ul" and section['data']['content'] == "sense-groups":
+                        sense_groups_contents = section['content']
+
+                        for sense_group in sense_groups_contents:
+                            response = self._sense_group_parser(sense_group['content'])
+                            definitions.append(DictionaryEntry(self._dict_name, raw_data.term, raw_data.reading, response))
+
+                    else:
+                        raise InvalidDictDefinitionFormatError()
+
+            elif isinstance(main_content, dict):
+                if main_content.get("data", {}).get("content") == "redirect-glossary":
                     ...
+
+                else:
+                    # TODO should i add this?
+                    raise InvalidDictDefinitionFormatError()
+
+            else:
+                raise InvalidDictDefinitionFormatError()
+
+        print(definitions)
+        return definitions
+
 
     def _parse_file(self, file_path: Path) -> list[DictionaryEntry]:
         json_data = read_json_file(file_path)
@@ -33,6 +153,8 @@ class JitendexYomitanParser(BaseDictionaryParser):
         results: list[DictionaryEntry] = list()
         for entry in json_data:
             results.append(self._parse(RawYomitanEntry(*entry)))
+
+
 
     def parse_dict(self) -> list[DictionaryEntry]:
         dict_data: list[DictionaryEntry] = list()

@@ -21,6 +21,7 @@ class BaseDictionaryParser(ABC):
             )
 
         self._term_bank_files = self._get_term_bank_files()
+        self._dict_name = self._target_dir.name
 
     def __enter__(self):
         return self
