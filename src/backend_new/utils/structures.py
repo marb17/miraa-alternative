@@ -35,6 +35,7 @@ class DefinitionSense:
     parts_of_speech: list[str] = field(default_factory=list) # all parts of speech
     glossaries: list[str | list[str]] = field(default_factory=list) # all definitions
     examples: list[dict[str, str]] = field(default_factory=list) # example sentences [{"en": "..."}, {"jp": "..."}]
+    series: list[str] = field(default_factory=list) # where the word is derived from, like a new word e.g. from Harry Potter
 
 @dataclass
 class DictionaryEntry:

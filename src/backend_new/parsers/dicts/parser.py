@@ -18,7 +18,7 @@ logger = Logger(__name__)
 class JitendexYomitanParser(BaseDictionaryParser):
     DICTIONARY_PATTERN = "*jitendex-yomitan*"
 
-    def _sense_group_parser(self, data: list[dict[str, Any]]) -> Any:
+    def _sense_group_parser(self, data: list[dict[str, Any]]) -> DefinitionSense | list[str]:
         holding: DefinitionSense = DefinitionSense()
 
         if isinstance(data, dict):
@@ -128,14 +128,13 @@ class JitendexYomitanParser(BaseDictionaryParser):
 
         return holding
 
-    def _parse(self, raw_data) -> list[DictionaryEntry | RedirectEntry]:
+    def _parse(self, raw_data: RawYomitanEntry) -> list[DictionaryEntry | RedirectEntry]:
         definition_data = raw_data.definitions
         raw_word = raw_data.term
 
         definitions = []
 
         for definition in definition_data:
-            #TODO add redirection
             if isinstance(definition, list):
                 continue
 
@@ -149,7 +148,7 @@ class JitendexYomitanParser(BaseDictionaryParser):
                     if section['tag'] == "div" and section['data']['content'] == "sense-group":
                         sense_group_content = section['content']
                         response = self._sense_group_parser(sense_group_content)
-                        definitions.append(DictionaryEntry(self._dict_name, raw_data.term, raw_data.reading, response))
+                        definitions.append(DictionaryEntry(self.dict_name, raw_data.term, raw_data.reading, response))
 
                     elif section['tag'] == "div" and section['data']['content'] == "attribution":
                         ...
@@ -165,7 +164,7 @@ class JitendexYomitanParser(BaseDictionaryParser):
 
                         for sense_group in sense_groups_contents:
                             response = self._sense_group_parser(sense_group['content'])
-                            definitions.append(DictionaryEntry(self._dict_name, raw_data.term, raw_data.reading, response))
+                            definitions.append(DictionaryEntry(self.dict_name, raw_data.term, raw_data.reading, response))
 
                     else:
                         raise InvalidDictDefinitionFormatError()
@@ -180,17 +179,16 @@ class JitendexYomitanParser(BaseDictionaryParser):
                     if first_pattern.match(redirect_info):
                         redirect_word, redirect_primary_reading = first_pattern.findall(redirect_info)[0]
                         redirect_word, redirect_primary_reading = unquote(redirect_word), unquote(redirect_primary_reading)
-                        definitions.append(RedirectEntry(self._dict_name, raw_word, redirect_word, redirect_primary_reading))
+                        definitions.append(RedirectEntry(self.dict_name, raw_word, redirect_word, redirect_primary_reading))
                     elif second_pattern.match(redirect_info):
                         redirect_word = second_pattern.findall(redirect_info)[0]
                         redirect_word = unquote(redirect_word)
-                        definitions.append(RedirectEntry(self._dict_name, raw_word, redirect_word))
+                        definitions.append(RedirectEntry(self.dict_name, raw_word, redirect_word))
                     else:
                         print(redirect_info)
                         raise InvalidDictDefinitionFormatError(redirect_info)
 
                 else:
-                    # TODO should i add this?
                     raise InvalidDictDefinitionFormatError()
 
             else:
@@ -199,46 +197,66 @@ class JitendexYomitanParser(BaseDictionaryParser):
         return definitions
 
 
-    def _parse_file(self, file_path: Path) -> list[list[DictionaryEntry | RedirectEntry]]:
-        json_data = read_json_file(file_path)
+class PixivLightParser(BaseDictionaryParser):
+    DICTIONARY_PATTERN = "*PixivLight*"
 
-        results: list[list[DictionaryEntry | RedirectEntry]] = list()
-        for entry in json_data:
-            results.append(self._parse(RawYomitanEntry(*entry)))
+    def _parse(self, raw_data: RawYomitanEntry) -> list[DictionaryEntry | RedirectEntry] | DictionaryEntry | RedirectEntry:
+        definition_data = raw_data.definitions
 
-        return results
+        holding: DefinitionSense = DefinitionSense()
 
-    def _execute_parsing(self) -> list[Any]:
-        dict_data: list[DictionaryEntry] = list()
+        for definition in definition_data:
+            if isinstance(definition, list):
+                continue
 
-        max_workers = (os.cpu_count() or 8) // 4
+            if definition.get("type", "") != "structured-content":
+                raise InvalidDictDefinitionFormatError("Type is not structured-content")
 
-        now = time.time()
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            results = executor.map(self._parse_file, self._term_bank_files)
+            main_content = definition.get("content")
 
-            for file_data in results:
-                dict_data.extend(file_data)
+            if isinstance(main_content, list):
+                for section in main_content:
+                    if section["tag"] == "ul" and section["data"]["pixiv"] == "summary":
+                        summary_contents = section["content"]
 
-        final_dictionary: dict[str, list[DictionaryEntry | RedirectEntry]] = dict()
-        for entry in dict_data:
-            for sub_entry in entry:
-                if isinstance(sub_entry, DictionaryEntry):
-                    main_term = sub_entry.word
-                elif isinstance(sub_entry, RedirectEntry):
-                    main_term = sub_entry.word
-                else:
-                    print(type(sub_entry))
-                    print(sub_entry)
-                    raise InvalidDictDefinitionFormatError()
+                        if isinstance(summary_contents, dict):
+                            summary_contents = [summary_contents]
 
-                if main_term in final_dictionary:
-                    final_dictionary[main_term].append(sub_entry)
-                else:
-                    final_dictionary[main_term] = [sub_entry]
+                        for summary_content in summary_contents:
+                            if summary_content["tag"] == "li":
+                                holding.glossaries.append(summary_content["content"])
+                            else:
+                                raise InvalidDictDefinitionFormatError()
+
+                    elif section["tag"] == "div" and section["data"]["pixiv"] == "series":
+                        if isinstance(section["content"], str):
+                            holding.series.append(section["content"])
+
+                        else:
+                            raise InvalidDictDefinitionFormatError()
+
+                    # so it doesnt shit it self
+                    elif section["tag"] == "div" and section["data"]["pixiv"] == "footer":
+                        ...
+
+                    elif section["tag"] == "div" and section["data"]["pixiv"] == "parent-link":
+                        # TODO idk what this is
+                        ...
+
+                    else:
+                        print(section)
+                        raise InvalidDictDefinitionFormatError()
+
+            else:
+                raise InvalidDictDefinitionFormatError()
+
+        return DictionaryEntry(self.dict_name, raw_data.term, raw_data.reading, [holding])
+
+
+
 
 
 
 if __name__ == "__main__":
-    with JitendexYomitanParser() as parser:
+    with PixivLightParser() as parser:
         parser.parse_dict()
