@@ -45,6 +45,12 @@ class DictionaryEntry:
     alternative_forms: list[str] = field(default_factory=list) # alt forms
 
 @dataclass
+class RedirectEntry:
+    word: str
+    redirect_to: str
+
+@dataclass
 class WordEntry:
     word: str
+    primary_reading: str
     entries: list[DictionaryEntry] = field(default_factory=list)

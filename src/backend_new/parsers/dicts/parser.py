@@ -8,6 +8,7 @@ from backend_new.utils.helper_funcs import read_json_file
 from typing import Any
 from concurrent.futures import ProcessPoolExecutor
 import os
+import re
 
 from backend_new.utils.logger import Logger
 logger = Logger(__name__)
@@ -168,7 +169,19 @@ class JitendexYomitanParser(BaseDictionaryParser):
 
             elif isinstance(main_content, dict):
                 if main_content.get("data", {}).get("content") == "redirect-glossary":
-                    ...
+                    redirect_info = main_content["content"][1]["href"]
+
+                    first_pattern = re.compile(r"\?query=([%A-Z0-9\-\.]*)\&wildcards=off\&primary_reading=([%A-Z0-9\-\.]*)")
+                    second_pattern = re.compile(r"\?query=([%A-Z0-9\-\.]*)\&wildcards=off")
+
+                    if first_pattern.match(redirect_info):
+                        redirect_word, redirect_primary_reading = first_pattern.findall(redirect_info)[0]
+                    elif second_pattern.match(redirect_info):
+                        redirect_word = second_pattern.findall(redirect_info)[0]
+                    else:
+                        print(redirect_info)
+                        raise InvalidDictDefinitionFormatError(redirect_info)
+
 
                 else:
                     # TODO should i add this?
