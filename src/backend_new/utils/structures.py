@@ -46,11 +46,12 @@ class DictionaryEntry:
 
 @dataclass
 class RedirectEntry:
+    dictionary: str
     word: str
     redirect_to: str
+    primary_reading: str | None = None
 
 @dataclass
 class WordEntry:
     word: str
-    primary_reading: str
     entries: list[DictionaryEntry] = field(default_factory=list)

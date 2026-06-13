@@ -1,8 +1,16 @@
 from abc import ABC, abstractmethod
 from typing import Any
+from functools import wraps
 from pathlib import Path
 from backend_new.utils.structures import DictionaryEntry, RawYomitanEntry
 from backend_new.utils.constants import DICTS_DIR
+import time
+
+from backend_new.utils.logger import Logger
+logger = Logger(__name__)
+
+
+
 
 class BaseDictionaryParser(ABC):
     DICTIONARY_PATTERN: str = ""
@@ -31,6 +39,20 @@ class BaseDictionaryParser(ABC):
         gc.collect()
         return False
 
+    @staticmethod
+    def _time_taken_to_parse_dict(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            instance = args[0] if args else None
+
+            now = time.time()
+            result = func(*args, **kwargs)
+            logger.debug(f"Time taken to parse {instance._dict_name}: {time.time() - now:.2f}s")
+
+            return result
+
+        return wrapper
+
     def _get_term_bank_files(self):
         return list(self._target_dir.rglob("term_bank_*.json"))
 
@@ -46,5 +68,11 @@ class BaseDictionaryParser(ABC):
         pass
 
     @abstractmethod
+    def _execute_parsing(self) -> list[DictionaryEntry]:
+        """Internal parsing logic implemented by specific dictionary types."""
+        pass
+
+    @_time_taken_to_parse_dict
     def parse_dict(self) -> list[DictionaryEntry]:
-        """Searches the entire directory and outputs list of DictionaryEntry"""
+        """Public API method that handles the timing and triggers the subclass parsing."""
+        return self._execute_parsing()

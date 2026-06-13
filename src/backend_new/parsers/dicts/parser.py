@@ -1,5 +1,5 @@
 from backend_new.parsers.dicts.base import BaseDictionaryParser
-from backend_new.utils.structures import DictionaryEntry, RawYomitanEntry, ExampleSentence, DefinitionSense
+from backend_new.utils.structures import DictionaryEntry, RawYomitanEntry, ExampleSentence, DefinitionSense, RedirectEntry
 from backend_new.utils.exceptions import InvalidDictDefinitionFormatError
 
 #! TEMP
@@ -9,6 +9,8 @@ from typing import Any
 from concurrent.futures import ProcessPoolExecutor
 import os
 import re
+from urllib.parse import unquote
+import time
 
 from backend_new.utils.logger import Logger
 logger = Logger(__name__)
@@ -126,8 +128,9 @@ class JitendexYomitanParser(BaseDictionaryParser):
 
         return holding
 
-    def _parse(self, raw_data) -> list[DictionaryEntry]:
+    def _parse(self, raw_data) -> list[DictionaryEntry | RedirectEntry]:
         definition_data = raw_data.definitions
+        raw_word = raw_data.term
 
         definitions = []
 
@@ -176,12 +179,15 @@ class JitendexYomitanParser(BaseDictionaryParser):
 
                     if first_pattern.match(redirect_info):
                         redirect_word, redirect_primary_reading = first_pattern.findall(redirect_info)[0]
+                        redirect_word, redirect_primary_reading = unquote(redirect_word), unquote(redirect_primary_reading)
+                        definitions.append(RedirectEntry(self._dict_name, raw_word, redirect_word, redirect_primary_reading))
                     elif second_pattern.match(redirect_info):
                         redirect_word = second_pattern.findall(redirect_info)[0]
+                        redirect_word = unquote(redirect_word)
+                        definitions.append(RedirectEntry(self._dict_name, raw_word, redirect_word))
                     else:
                         print(redirect_info)
                         raise InvalidDictDefinitionFormatError(redirect_info)
-
 
                 else:
                     # TODO should i add this?
@@ -193,29 +199,43 @@ class JitendexYomitanParser(BaseDictionaryParser):
         return definitions
 
 
-    def _parse_file(self, file_path: Path) -> list[DictionaryEntry]:
+    def _parse_file(self, file_path: Path) -> list[list[DictionaryEntry | RedirectEntry]]:
         json_data = read_json_file(file_path)
 
-        results: list[DictionaryEntry] = list()
+        results: list[list[DictionaryEntry | RedirectEntry]] = list()
         for entry in json_data:
             results.append(self._parse(RawYomitanEntry(*entry)))
 
         return results
 
-
-    def parse_dict(self) -> list[DictionaryEntry]:
+    def _execute_parsing(self) -> list[Any]:
         dict_data: list[DictionaryEntry] = list()
 
         max_workers = (os.cpu_count() or 8) // 4
 
-        import time
         now = time.time()
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             results = executor.map(self._parse_file, self._term_bank_files)
 
             for file_data in results:
                 dict_data.extend(file_data)
-        print(f"time taken: {time.time() - now}")
+
+        final_dictionary: dict[str, list[DictionaryEntry | RedirectEntry]] = dict()
+        for entry in dict_data:
+            for sub_entry in entry:
+                if isinstance(sub_entry, DictionaryEntry):
+                    main_term = sub_entry.word
+                elif isinstance(sub_entry, RedirectEntry):
+                    main_term = sub_entry.word
+                else:
+                    print(type(sub_entry))
+                    print(sub_entry)
+                    raise InvalidDictDefinitionFormatError()
+
+                if main_term in final_dictionary:
+                    final_dictionary[main_term].append(sub_entry)
+                else:
+                    final_dictionary[main_term] = [sub_entry]
 
 
 
