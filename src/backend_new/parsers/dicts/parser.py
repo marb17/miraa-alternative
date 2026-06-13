@@ -136,6 +136,9 @@ class JitendexYomitanParser(BaseDictionaryParser):
 
         for definition in definition_data:
             if isinstance(definition, list):
+                redirect_to = definition[0]
+                word = re.findall(r"redirected from (.*)", definition[1][0])[0]
+                definitions.append(RedirectEntry(self.dict_name, word, redirect_to))
                 continue
 
             if definition.get("type", "") != "structured-content":
@@ -206,9 +209,6 @@ class PixivLightParser(BaseDictionaryParser):
         holding: DefinitionSense = DefinitionSense()
 
         for definition in definition_data:
-            if isinstance(definition, list):
-                continue
-
             if definition.get("type", "") != "structured-content":
                 raise InvalidDictDefinitionFormatError("Type is not structured-content")
 
@@ -253,10 +253,25 @@ class PixivLightParser(BaseDictionaryParser):
         return DictionaryEntry(self.dict_name, raw_data.term, raw_data.reading, [holding])
 
 
+class JMnedictParser(BaseDictionaryParser):
+    DICTIONARY_PATTERN = "*JMnedict*"
 
+    def _parse(self, raw_data: RawYomitanEntry) -> list[DictionaryEntry | RedirectEntry] | DictionaryEntry | RedirectEntry:
+        definition_data = raw_data.definitions
+
+        holding: DefinitionSense = DefinitionSense()
+
+        for definition in definition_data:
+            if isinstance(definition, str):
+                holding.glossaries.append(definition)
+
+            else:
+                raise InvalidDictDefinitionFormatError()
+
+        return DictionaryEntry(self.dict_name, raw_data.term, raw_data.reading, [holding])
 
 
 
 if __name__ == "__main__":
-    with PixivLightParser() as parser:
+    with JMnedictParser() as parser:
         parser.parse_dict()

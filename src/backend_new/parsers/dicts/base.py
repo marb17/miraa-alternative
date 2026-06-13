@@ -100,7 +100,6 @@ class BaseDictionaryParser(ABC):
                     main_term = sub_entry.word
                 elif isinstance(sub_entry, RedirectEntry):
                     main_term = sub_entry.word
-                    logger.debug(sub_entry)
                 else:
                     # print(dict_data)
                     print(entry)
@@ -112,6 +111,17 @@ class BaseDictionaryParser(ABC):
                     final_dictionary[main_term].append(sub_entry)
                 else:
                     final_dictionary[main_term] = [sub_entry]
+
+        # temp = dict()
+        # for main_term in final_dictionary:
+        #     len_term = len(final_dictionary[main_term])
+        #     if len_term not in temp:
+        #         temp[len_term] = 1
+        #     else:
+        #         temp[len_term] += 1
+        # print(temp)
+
+        logger.debug(f"Length of dictionary is: {len(final_dictionary)}")
 
         return final_dictionary
 
