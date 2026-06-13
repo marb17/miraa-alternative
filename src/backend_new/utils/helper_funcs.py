@@ -8,6 +8,7 @@ import json
 import base58
 import os
 import re
+import gzip
 
 # CONSTANTS
 from backend_new.utils.constants import ENV_FILE, TEMP_DIR, DEFAULT_ENV_VARS
@@ -100,40 +101,86 @@ def questionary_checkbox(question_to_ask: str,
 # endregion
 
 # region json read and write
-def read_json_file(file_path: Path) -> dict:
+def read_json_file(file_path: Path, use_gzip: bool = False) -> Any:
     """
-    Reads a JSON file in a directory
+    Reads a standard or GZipped JSON file.
+
     :param file_path: File path to the JSON file
-    :return: A dict containing the JSON data
+    :param use_gzip: Whether to treat the file as a GZipped compressed stream
+    :return: The decoded JSON data (can be a dict, list, etc.)
     """
+    if use_gzip and file_path.suffix != ".gz":
+        file_path = file_path.with_suffix(file_path.suffix + ".gz")
+
     if not file_path.exists():
         logger.warning(f"File {file_path} does not exist")
         return {}
 
-    try:
-        return json.loads(file_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
-        raise json.JSONDecodeError(f"The provided JSON file is not a valid JSON file or is corrupted, please remove / repair this file. {file_path}", e.doc, e.pos)
+    open_func = gzip.open if use_gzip else open
+    mode = "rt" if use_gzip else "r"
 
-def write_json_file(file_path: Path, payload: Any, keys: list[str] = None) -> None:
+    try:
+        with open_func(file_path, mode, encoding="utf-8") as f:
+            return json.load(f)
+    except json.JSONDecodeError as e:
+        raise json.JSONDecodeError(
+            f"The provided JSON file is not valid or is corrupted, please remove/repair: {file_path}",
+            e.doc,
+            e.pos
+        )
+
+
+def write_json_file(
+        file_path: Path,
+        payload: Any,
+        keys: list[str] = None,
+        indent: int = 4,
+        use_gzip: bool = False) -> None:
     """
-    Writes data to a JSON file in a directory
+    Writes data to a standard or GZipped JSON file, supporting nested key updates.
+
     :param file_path: File path to the JSON file
     :param payload: Data to write
-    :param keys: A list of keys to navigate the JSON file
+    :param keys: A list of keys to navigate/nest inside the JSON file
+    :param indent: How much to indent the data (set to None for minified spacing)
+    :param use_gzip: Whether to compress the file using GZIP
     """
-    data = read_json_file(file_path)
+    if keys is None:
+        keys = []
+
+    if use_gzip and file_path.suffix != ".gz":
+        file_path = file_path.with_suffix(file_path.suffix + ".gz")
+
+    if not file_path.exists():
+        logger.warning(f"File {file_path} does not exist, creating an empty object base")
+        open_func = gzip.open if use_gzip else open
+        mode = "wt" if use_gzip else "w"
+        with open_func(file_path, mode, encoding="utf-8") as f:
+            f.write("{}")
+
+    data = read_json_file(file_path, use_gzip=use_gzip)
+    if not isinstance(data, dict) and keys:
+        data = {}
 
     current_level = data
-    for key in keys[:-1]:
-        if key not in current_level or not isinstance(current_level[key], dict):
-            current_level[key] = {}
-        current_level = current_level[key]
-
     if keys:
-        current_level[keys[-1]] = payload
+        for key in keys[:-1]:
+            if key not in current_level or not isinstance(current_level[key], dict):
+                current_level[key] = {}
+            current_level = current_level[key]
 
-    file_path.write_text(json.dumps(data, indent=4))
+        current_level[keys[-1]] = payload
+    else:
+        data = payload
+
+    open_func = gzip.open if use_gzip else open
+    mode = "wt" if use_gzip else "w"
+
+    with open_func(file_path, mode, encoding="utf-8") as f:
+        if indent is None:
+            json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
+        else:
+            json.dump(data, f, ensure_ascii=False, indent=indent)
 # endregion
 
 # region base 58 conv

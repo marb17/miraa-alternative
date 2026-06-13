@@ -4,13 +4,15 @@ from backend_new.utils.exceptions import InvalidDictDefinitionFormatError
 
 #! TEMP
 from pathlib import Path
-from backend_new.utils.helper_funcs import read_json_file
+from backend_new.utils.helper_funcs import read_json_file, write_json_file
+from backend_new.utils.constants import DICTS_DIR
 from typing import Any
 from concurrent.futures import ProcessPoolExecutor
 import os
 import re
 from urllib.parse import unquote
 import time
+import json
 
 from backend_new.utils.logger import Logger
 logger = Logger(__name__)
@@ -273,5 +275,14 @@ class JMnedictParser(BaseDictionaryParser):
 
 
 if __name__ == "__main__":
-    with JMnedictParser() as parser:
-        parser.parse_dict()
+    from dataclasses import asdict
+
+    with JitendexYomitanParser() as parser:
+        grouped_dict_data = parser.parse_dict()
+
+        serialized_map = {
+            headword: [asdict(entry) for entry in entries_list]
+            for headword, entries_list in grouped_dict_data.items()
+        }
+
+        write_json_file(DICTS_DIR / "temp.json", serialized_map, ["data"], indent=0, use_gzip=True)
