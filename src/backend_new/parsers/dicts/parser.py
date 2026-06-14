@@ -287,44 +287,61 @@ class GiongoGitaigoJitenParser(BaseDictionaryParser):
         newline = re.compile(r"\n")
 
         for definition in definition_data:
+            print("--- ", definition)
             if isinstance(definition, dict):
                 if definition["type"] == "structured-content":
                     definition_contents = definition["content"]
 
                     for idx, content in enumerate(definition_contents):
                         if isinstance(content, dict):
-                            if content["tag"] == "span":
-                                span_content = content["content"].strip()
+                            try:
+                                if content["tag"] == "span" and content.get("style", None) is not None and content["content"] == "類義語":
+                                    pass
 
-                                if circled_numbers.match(span_content):
+                                elif content["tag"] == "span" and isinstance(content["content"], str) and jp_starting_quote.match(content["content"]) and len(content["content"]) == 1:
+                                    # check if next two element is the ending quotes
+                                    if not jp_ending_quote.match(definition_contents[idx + 2]['content']):
+                                        raise InvalidDictDefinitionFormatError()
+
                                     # TODO add the saving thing
+                                    print(definition_contents[idx + 1])
+                                    synonym_content = definition_contents[idx + 1]["content"]
+
+                                elif content["tag"] == "span" and isinstance(content["content"], str) and newline.match(content["content"]) and idx != len(definition_contents) - 1:
+                                    synonym_explanation = definition_contents[idx + 1]["content"]
+
+                                elif content["tag"] == "span" and isinstance(content["content"], dict) and content.get("content", {}).get("tag") == "a":
+                                    # TODO add the synonyms thing
                                     ...
 
-                                elif jp_starting_quote.match(span_content):
-                                    # TODO add the saving thing
+                                elif content["tag"] == "span" and isinstance(content["content"], str) and jp_ending_quote.match(content["content"]):
                                     ...
+
+                                elif content["tag"] == "span":
+                                    print(content)
+                                    span_content = content["content"].strip()
+
+                                    if circled_numbers.match(span_content):
+                                        # TODO add the saving thing
+                                        ...
+
+                                    elif jp_starting_quote.match(span_content):
+                                        # TODO add the saving thing
+                                        ...
+
+                                    else:
+                                        # TODO synonym explanation i guess
+                                        ...
+                                        # print(definition_data, "\n")
+                                        # print(span_content)
+                                        # raise InvalidDictDefinitionFormatError()
 
                                 else:
-                                    print(definition_data, "\n")
-                                    print(span_content)
                                     raise InvalidDictDefinitionFormatError()
 
-                            elif content["tag"] == "span" and content.get("style", None) is not None and content["content"] == "類義語":
-                                pass
-
-                            elif content["tag"] == "span" and jp_starting_quote.match(content["content"]):
-                                # check if next two element is the ending quotes
-                                if not jp_ending_quote.match(definition_contents[idx + 2]):
-                                    raise InvalidDictDefinitionFormatError()
-
-                                # TODO add the saving thing
-                                synonym_content = definition_contents[idx + 1]["content"]["content"]
-
-                            elif content["tag"] == "span" and newline.match(content["content"]):
-                                print("yay")
-
-                            else:
-                                raise InvalidDictDefinitionFormatError()
+                            except Exception as e:
+                                print(content)
+                                raise e
 
                         else:
                             raise InvalidDictDefinitionFormatError()
@@ -335,8 +352,6 @@ class GiongoGitaigoJitenParser(BaseDictionaryParser):
             else:
                 raise InvalidDictDefinitionFormatError()
 
-        print(definition_data)
-        raise InvalidDictDefinitionFormatError
 
 
 if __name__ == "__main__":
