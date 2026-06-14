@@ -273,16 +273,79 @@ class JMnedictParser(BaseDictionaryParser):
         return DictionaryEntry(self.dict_name, raw_data.term, raw_data.reading, [holding])
 
 
+class GiongoGitaigoJitenParser(BaseDictionaryParser):
+    DICTIONARY_PATTERN = "*擬音語・擬態語辞典*"
+
+    def _parse(self, raw_data: RawYomitanEntry) -> list[DictionaryEntry | RedirectEntry] | DictionaryEntry | RedirectEntry:
+        definition_data = raw_data.definitions
+
+        holding: DefinitionSense = DefinitionSense()
+
+        circled_numbers = re.compile(r"[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]")
+        jp_starting_quote = re.compile(r"「")
+        jp_ending_quote = re.compile(r"」")
+        newline = re.compile(r"\n")
+
+        for definition in definition_data:
+            if isinstance(definition, dict):
+                if definition["type"] == "structured-content":
+                    definition_contents = definition["content"]
+
+                    for idx, content in enumerate(definition_contents):
+                        if isinstance(content, dict):
+                            if content["tag"] == "span":
+                                span_content = content["content"].strip()
+
+                                if circled_numbers.match(span_content):
+                                    # TODO add the saving thing
+                                    ...
+
+                                elif jp_starting_quote.match(span_content):
+                                    # TODO add the saving thing
+                                    ...
+
+                                else:
+                                    print(definition_data, "\n")
+                                    print(span_content)
+                                    raise InvalidDictDefinitionFormatError()
+
+                            elif content["tag"] == "span" and content.get("style", None) is not None and content["content"] == "類義語":
+                                pass
+
+                            elif content["tag"] == "span" and jp_starting_quote.match(content["content"]):
+                                # check if next two element is the ending quotes
+                                if not jp_ending_quote.match(definition_contents[idx + 2]):
+                                    raise InvalidDictDefinitionFormatError()
+
+                                # TODO add the saving thing
+                                synonym_content = definition_contents[idx + 1]["content"]["content"]
+
+                            elif content["tag"] == "span" and newline.match(content["content"]):
+                                print("yay")
+
+                            else:
+                                raise InvalidDictDefinitionFormatError()
+
+                        else:
+                            raise InvalidDictDefinitionFormatError()
+
+                else:
+                    raise InvalidDictDefinitionFormatError()
+
+            else:
+                raise InvalidDictDefinitionFormatError()
+
+        print(definition_data)
+        raise InvalidDictDefinitionFormatError
+
 
 if __name__ == "__main__":
-    from dataclasses import asdict
-
-    with JitendexYomitanParser() as parser:
+    with GiongoGitaigoJitenParser() as parser:
         grouped_dict_data = parser.parse_dict()
 
-        serialized_map = {
-            headword: [asdict(entry) for entry in entries_list]
-            for headword, entries_list in grouped_dict_data.items()
-        }
-
-        write_json_file(DICTS_DIR / "temp.json", serialized_map, ["data"], indent=0, use_gzip=True)
+        # serialized_map = {
+        #     headword: [asdict(entry) for entry in entries_list]
+        #     for headword, entries_list in grouped_dict_data.items()
+        # }
+        #
+        # write_json_file(DICTS_DIR / "temp.json", serialized_map, ["data"], indent=0, use_gzip=True)
