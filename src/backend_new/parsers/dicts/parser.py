@@ -289,7 +289,7 @@ class JMnedictParser(BaseDictionaryParser):
 
         return DictionaryEntry(self.dict_name, raw_data.term, raw_data.reading, [holding])
 
-#! TODO might redo
+
 class GiongoGitaigoJitenParser(BaseDictionaryParser):
     DICTIONARY_PATTERN = "*擬音語・擬態語辞典*"
 
@@ -396,12 +396,94 @@ class GiongoGitaigoJitenParser(BaseDictionaryParser):
 
         return definitions
 
-            # raise Exception
+
+class YonJiJukugoNoHyakkaJitenParser(BaseDictionaryParser):
+    DICTIONARY_PATTERN = "*四字熟語の百科事典*"
+
+    def _parse(self, raw_data: RawYomitanEntry) -> list[DictionaryEntry | RedirectEntry] | DictionaryEntry | RedirectEntry:
+        definition_data = raw_data.definitions
+        raw_word = raw_data.term
+
+        main_word = re.compile(r"【(.*)】")
+
+        definitions = []
+
+        for definition in definition_data:
+            if definition["type"] == "structured-content":
+                structured_contents = definition["content"]
+            else:
+                raise InvalidDictDefinitionFormatError()
+
+            if isinstance(structured_contents, list):
+                pass
+            else:
+                raise InvalidDictDefinitionFormatError()
+
+            if len(structured_contents) == 3:
+                overview = structured_contents[0]
+                meaning = structured_contents[1]
+                example_sentences = structured_contents[2]
+            elif len(structured_contents) == 4:
+                overview = structured_contents[0]
+                image_data = structured_contents[1]
+                meaning = structured_contents[2]
+                example_sentences = structured_contents[3]
+            else:
+                raise InvalidDictDefinitionFormatError()
+
+            if overview['tag'] == "span" and overview["data"]["name"] == "header":
+                inner_content = overview["content"]
+                if len(inner_content) != 3:
+                    raise InvalidDictDefinitionFormatError()
+
+                idiom = main_word.findall(inner_content[1]["content"])[0]
+                reading = inner_content[0]["content"]
+            else:
+                print(overview)
+                raise InvalidDictDefinitionFormatError()
+
+            if meaning["tag"] == "div" and meaning["data"]["name"] == "意味":
+                if len(meaning["content"]) != 2:
+                    raise InvalidDictDefinitionFormatError()
+                definition = meaning["content"][1]["content"]
+            else:
+                raise InvalidDictDefinitionFormatError()
+
+            if example_sentences["tag"] == "div" and example_sentences["data"]["name"] == "使い方":
+                examples = []
+                if len(example_sentences["content"]) == 2:
+                    list_of_examples = example_sentences["content"][1]["content"]
+                    if example_sentences["content"][1]["tag"] != "ul":
+                        raise InvalidDictDefinitionFormatError()
+
+                    if isinstance(list_of_examples, list):
+                        for li in list_of_examples:
+                            if len(li["content"]) != 1:
+                                raise InvalidDictDefinitionFormatError()
+                            meaning = li["content"][0]["content"]
+                            examples.append(meaning)
+                    else:
+                        raise InvalidDictDefinitionFormatError()
+                else:
+                    raise InvalidDictDefinitionFormatError()
+
+            else:
+                raise InvalidDictDefinitionFormatError()
+
+            holding = DefinitionSense()
+
+            holding.examples.extend(examples)
+            holding.glossaries.append(definition)
+
+            final_def = DictionaryEntry(self.dict_name, raw_data.term, reading, [holding])
+            definitions.append(final_def)
+
+        return definitions
 
 
 
 if __name__ == "__main__":
-    with GiongoGitaigoJitenParser() as parser:
+    with YonJiJukugoNoHyakkaJitenParser() as parser:
         grouped_dict_data = parser.parse_dict()
 
         # serialized_map = {

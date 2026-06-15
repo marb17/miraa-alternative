@@ -39,7 +39,7 @@ class DefinitionSense:
     examples: list[dict[str, str]] = field(default_factory=list) # example sentences [{"en": "..."}, {"jp": "..."}]
     series: list[str] = field(default_factory=list) # where the word is derived from, like a new word e.g. from Harry Potter
 
-ALLOWED_EXTRA_INFO_KEYS = Literal["synonyms", "synonym_info", "similar_words", "extra_info", "see_also"]
+ALLOWED_EXTRA_INFO_KEYS = Literal["synonyms", "synonym_info", "similar_words", "extra_info", "see_also", "links"]
 
 @dataclass
 class DictionaryEntry:
