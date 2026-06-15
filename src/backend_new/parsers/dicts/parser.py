@@ -482,6 +482,8 @@ class YonJiJukugoNoHyakkaJitenParser(BaseDictionaryParser):
 
 
 
+
+
 if __name__ == "__main__":
     with YonJiJukugoNoHyakkaJitenParser() as parser:
         grouped_dict_data = parser.parse_dict()
