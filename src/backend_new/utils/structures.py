@@ -1,4 +1,6 @@
 from dataclasses import dataclass, field
+from typing import Literal
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -37,16 +39,18 @@ class DefinitionSense:
     examples: list[dict[str, str]] = field(default_factory=list) # example sentences [{"en": "..."}, {"jp": "..."}]
     series: list[str] = field(default_factory=list) # where the word is derived from, like a new word e.g. from Harry Potter
 
+ALLOWED_EXTRA_INFO_KEYS = Literal["synonyms", "synonym_info", "similar_words", "extra_info"]
+
 @dataclass
 class DictionaryEntry:
     dictionary: str # what dictionary is this entry from
     word: str # the word itself
     reading: str # how its read
     senses: list[DefinitionSense] = field(default_factory=list) # all information
-    alternative_forms: list[str] = field(default_factory=list) # alt forms or synonyms
-    misc_info: list[str] = field(default_factory=list) # misc information
-    related_words: list[str] = field(default_factory=list) # words that are similar, more like a see also type of thing
-
+    alternative_forms: list[str] = field(default_factory=list) # alt forms, different readings
+    extra_info: defaultdict[ALLOWED_EXTRA_INFO_KEYS, list[str]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
 @dataclass
 class RedirectEntry:
     dictionary: str

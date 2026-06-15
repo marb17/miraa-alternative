@@ -97,7 +97,19 @@ class JitendexYomitanParser(BaseDictionaryParser):
                     response = self._sense_group_parser(sense_content)
 
                     # glossary_holding.append(response)
-                    holding.glossaries.append(response)
+                    if isinstance(response, DefinitionSense):
+                        if response.glossaries:
+                            raise InvalidDictDefinitionFormatError()
+                        if response.examples:
+                            raise InvalidDictDefinitionFormatError()
+                        if response.sense_number:
+                            raise InvalidDictDefinitionFormatError()
+                        if response.parts_of_speech:
+                            raise InvalidDictDefinitionFormatError()
+                        if response.series:
+                            raise InvalidDictDefinitionFormatError()
+                    else:
+                        holding.glossaries.append(response)
 
 
             # so it doesnt shit itself on useless shit
@@ -281,19 +293,20 @@ class GiongoGitaigoJitenParser(BaseDictionaryParser):
         definition_data = raw_data.definitions
 
         holding: DefinitionSense = DefinitionSense()
-        misc_info = []
+        extra_info = []
+        synonyms = []
         synonyms_info = []
-        see_also = []
+        similar_words = []
 
         skip_by: int = 0
 
         circled_numbers = re.compile(r"[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]")
-        jp_starting_quote = re.compile(r"「")
-        jp_ending_quote = re.compile(r"」")
-        newline = re.compile(r"\n")
-        end_newline = re.compile(r".*\n")
-        synonyms = re.compile(r"類義語")
-        arrow = re.compile(r"➜")
+        jp_quotes = re.compile(r"「.*」")
+        synonyms_content = re.compile(r"類義語(.*)")
+        redirect_format = re.compile(r"「\?query=([^」^「]*)&wildcards=off」")
+        arrow_redirect = re.compile(r"➜(.*)")
+        full_stop_ending = re.compile(r".*。")
+        for_reference = re.compile(r"参考(.*)")
 
         for definition in definition_data:
             if definition["type"] == "structured-content":
@@ -301,127 +314,67 @@ class GiongoGitaigoJitenParser(BaseDictionaryParser):
             else:
                 raise InvalidDictDefinitionFormatError()
 
-            print(structured_contents)
+            temporary_string = ""
 
             for idx, section in enumerate(structured_contents):
-                if skip_by > 0:
-                    skip_by -= 1
-                    continue
+                content = section["content"]
 
-                def_tag = section["tag"]
-                def_content = section["content"]
+                if isinstance(content, str):
+                    temporary_string += content
+                elif isinstance(content, dict):
+                    if content["tag"] == "a":
+                        temporary_string += content["href"]
 
-                if isinstance(def_content, str):
-                    def_inner_content = None
-                elif isinstance(def_content, dict):
-                    def_inner_content = def_content["content"]
-                    def_inner_tag = def_content["tag"]
-                    def_inner_href = def_content.get("href")
-                else:
-                    raise InvalidDictDefinitionFormatError()
-
-                if def_tag == "span":
-                    if isinstance(def_content, str):
-                        if circled_numbers.match(def_content) and end_newline.match(def_content):
-                            if (jp_starting_quote.match(structured_contents[idx + 1]["content"]) and
-                                    end_newline.match(structured_contents[idx + 1]["content"])):
-                                holding.glossaries.append(def_content)
-                                holding.examples.append({"jp": structured_contents[idx + 1]["content"]})
-
-                                skip_by += 1
-                            else:
-                                holding.glossaries.append(def_content)
-                                # raise InvalidDictDefinitionFormatError()
-
-                            # holding.glossaries.append(def_content)
-                            # holding.examples.append({"jp": structured_contents[idx + 1]["content"]})
-
-                        elif synonyms.match(def_content):
-                            idx_counter = 0
-
-                            while (jp_starting_quote.match(structured_contents[idx + 1 + idx_counter]["content"]) and
-                                   jp_ending_quote.match(structured_contents[idx + 3 + idx_counter]["content"])):
-
-                                if isinstance(structured_contents[idx + 2 + idx_counter]["content"], dict):
-                                    word_synonym = structured_contents[idx + 2 + idx_counter]["content"]["content"]
-                                elif isinstance(structured_contents[idx + 2 + idx_counter]["content"], str):
-                                    word_synonym = structured_contents[idx + 2 + idx_counter]["content"]
-                                else:
-                                    raise InvalidDictDefinitionFormatError()
-
-                                synonyms_info.append(word_synonym)
-
-                                idx_counter += 3
-
-                            if newline.match(structured_contents[idx + 1 + idx_counter]["content"]):
-                                if structured_contents[idx + 2 + idx_counter]["content"] == "参考":
-                                    explanation = structured_contents[idx + 3 + idx_counter]["content"]
-                                    idx_counter += 3
-                                else:
-                                    explanation = structured_contents[idx + 2 + idx_counter]["content"]
-                                    idx_counter += 2
-
-                                misc_info.append(explanation)
-
-                                skip_by += idx_counter
-
-                            else:
-                                raise InvalidDictDefinitionFormatError()
-
-                        elif arrow.match(def_content):
-                            idx_counter = 0
-
-                            while (jp_starting_quote.match(structured_contents[idx + 1 + idx_counter]["content"]) and
-                                   jp_ending_quote.match(structured_contents[idx + 3 + idx_counter]["content"])):
-
-                                if isinstance(structured_contents[idx + 2 + idx_counter]["content"], dict):
-                                    related_word = structured_contents[idx + 2 + idx_counter]["content"]["content"]
-                                else:
-                                    raise InvalidDictDefinitionFormatError()
-
-                                see_also.append(related_word)
-
-                                idx_counter += 3
-
-                            skip_by += idx_counter
-
-                            if newline.match(structured_contents[idx + 1 + idx_counter]["content"]):
-                                if idx + 1 + idx_counter == len(structured_contents) - 1:
-                                    idx_counter += 1
-                                else:
-                                    if structured_contents[idx + 2 + idx_counter]["content"] == "参考":
-                                        explanation = structured_contents[idx + 3 + idx_counter]["content"]
-                                        idx_counter += 3
-                                    else:
-                                        explanation = structured_contents[idx + 2 + idx_counter]["content"]
-                                        idx_counter += 2
-
-                                    misc_info.append(explanation)
-
-                                skip_by += idx_counter
-
-                        elif def_content == "参考":
-                            skip_by += 1
-                            misc_info.append(def_content)
-
-                        # fall back cuz weird structure idk
-                        elif end_newline.match(def_content):
-                            holding.glossaries.append(def_content)
-
-                        else:
-                            print(def_content)
-                            raise InvalidDictDefinitionFormatError()
-
-                    elif isinstance(def_content, dict):
-                        ...
+                    elif content["tag"] == "ruby":
+                        temporary_string += content["content"][0]
 
                     else:
+                        print(content)
                         raise InvalidDictDefinitionFormatError()
 
                 else:
                     raise InvalidDictDefinitionFormatError()
 
-        # raise Exception
+            formatted_contents = temporary_string.split("\n")
+            for i in formatted_contents: print(i)
+
+            # ---------------------------------------------------
+
+            for line in formatted_contents:
+                if circled_numbers.match(line):
+                    holding.glossaries.append(line)
+
+                elif jp_quotes.match(line):
+                    holding.examples.append({"jp": line})
+
+                elif synonyms_content.match(line):
+                    contents = synonyms_content.findall(line)[0]
+                    response = redirect_format.findall(contents)
+                    synonyms.extend(response)
+
+                elif "類義語" in line:
+                    synonyms_info.append(line)
+
+                elif arrow_redirect.match(line):
+                    contents = arrow_redirect.findall(line)[0]
+                    redirect_info = redirect_format.findall(contents)
+                    similar_words.extend(redirect_info)
+
+                elif for_reference.match(line):
+                    # TODO
+
+                elif line.strip() == "":
+                    pass
+
+                # fall back
+                elif full_stop_ending.match(line):
+                    holding.glossaries.append(line)
+
+                else:
+                    print("\n", line)
+                    raise InvalidDictDefinitionFormatError()
+
+            # raise Exception
 
 
 
