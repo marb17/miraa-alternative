@@ -221,9 +221,11 @@ class PixivLightParser(BaseDictionaryParser):
     def _parse(self, raw_data: RawYomitanEntry) -> list[DictionaryEntry | RedirectEntry] | DictionaryEntry | RedirectEntry:
         definition_data = raw_data.definitions
 
-        holding: DefinitionSense = DefinitionSense()
+        definitions = []
 
         for definition in definition_data:
+            holding: DefinitionSense = DefinitionSense()
+
             if definition.get("type", "") != "structured-content":
                 raise InvalidDictDefinitionFormatError("Type is not structured-content")
 
@@ -265,7 +267,9 @@ class PixivLightParser(BaseDictionaryParser):
             else:
                 raise InvalidDictDefinitionFormatError()
 
-        return DictionaryEntry(self.dict_name, raw_data.term, raw_data.reading, [holding])
+            definitions.append(DictionaryEntry(self.dict_name, raw_data.term, raw_data.reading, [holding]))
+
+        return definitions
 
 
 class JMnedictParser(BaseDictionaryParser):
@@ -291,12 +295,9 @@ class GiongoGitaigoJitenParser(BaseDictionaryParser):
 
     def _parse(self, raw_data: RawYomitanEntry) -> list[DictionaryEntry | RedirectEntry] | DictionaryEntry | RedirectEntry:
         definition_data = raw_data.definitions
+        raw_word = raw_data.term
 
-        holding: DefinitionSense = DefinitionSense()
-        extra_info = []
-        synonyms = []
-        synonyms_info = []
-        similar_words = []
+        definitions = []
 
         skip_by: int = 0
 
@@ -309,6 +310,12 @@ class GiongoGitaigoJitenParser(BaseDictionaryParser):
         for_reference = re.compile(r"参考(.*)")
 
         for definition in definition_data:
+            holding: DefinitionSense = DefinitionSense()
+            extra_info = []
+            synonyms = []
+            synonyms_info = []
+            similar_words = []
+
             if definition["type"] == "structured-content":
                 structured_contents = definition["content"]
             else:
@@ -336,9 +343,12 @@ class GiongoGitaigoJitenParser(BaseDictionaryParser):
                     raise InvalidDictDefinitionFormatError()
 
             formatted_contents = temporary_string.split("\n")
-            for i in formatted_contents: print(i)
 
             # ---------------------------------------------------
+
+            if len(formatted_contents) == 1:
+                if arrow_redirect.match(formatted_contents[0]):
+                    definitions.extend([RedirectEntry(self.dict_name, raw_word, redirect_to) for redirect_to in redirect_format.findall(formatted_contents[0])])
 
             for line in formatted_contents:
                 if circled_numbers.match(line):
@@ -360,8 +370,9 @@ class GiongoGitaigoJitenParser(BaseDictionaryParser):
                     redirect_info = redirect_format.findall(contents)
                     similar_words.extend(redirect_info)
 
-                elif for_reference.match(line):
-                    # TODO
+                elif for_reference.match(line) and len(formatted_contents) > 1:
+                    content = for_reference.findall(line)[0]
+                    extra_info.append(content)
 
                 elif line.strip() == "":
                     pass
@@ -371,8 +382,19 @@ class GiongoGitaigoJitenParser(BaseDictionaryParser):
                     holding.glossaries.append(line)
 
                 else:
-                    print("\n", line)
+                    # print("\n", line)
                     raise InvalidDictDefinitionFormatError()
+
+            # extra info stuf
+            entry = DictionaryEntry(self.dict_name, raw_data.term, raw_data.reading, [holding])
+            entry.extra_info["extra_info"].extend(extra_info)
+            entry.extra_info["synonyms"].extend(synonyms)
+            entry.extra_info["synonym_info"].extend(synonyms_info)
+            entry.extra_info["similar_words"].extend(similar_words)
+
+            definitions.append(entry)
+
+        return definitions
 
             # raise Exception
 

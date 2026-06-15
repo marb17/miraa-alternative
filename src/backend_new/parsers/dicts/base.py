@@ -121,6 +121,8 @@ class BaseDictionaryParser(ABC):
         #         temp[len_term] += 1
         # print(temp)
 
+        # print(final_dictionary)
+
         logger.debug(f"Length of dictionary is: {len(final_dictionary)}")
 
         return final_dictionary
