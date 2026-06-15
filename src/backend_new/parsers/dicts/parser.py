@@ -501,14 +501,93 @@ class DaijirinDaiYonHanParser(BaseDictionaryParser):
                 raise InvalidDictDefinitionFormatError()
 
             if isinstance(structured_contents, list):
-                if len(structured_contents) == 2:
-                    ...
-                elif len(structured_contents) == 3:
-                    ...
+                if len(structured_contents) == 2 or len(structured_contents) == 3:
+                    section_1 = structured_contents[0]
+                    section_2 = structured_contents[1]
+                    section_3 = structured_contents[2] if len(structured_contents) == 3 else None
+
+                    # section 1
+                    if section_1["tag"] == "span" and section_1["data"]["name"] == "見出部":
+                        section_1_content = section_1["content"] if isinstance(section_1["content"], list) else [section_1["content"]]
+                        for section in section_1_content:
+                            match section["tag"]:
+                                case "span":
+                                    match section["data"]["name"]:
+                                        case "見出仮名":
+                                            ...
+                                        case "表記G":
+                                            ...
+                                        case "人名":
+                                            ...
+                                        case "歴史仮名":
+                                            ...
+                                        case "アクセントG":
+                                            ...
+                                        case "地名":
+                                            ...
+                                        case "句表記":
+                                            ...
+                                        case "原綴G":
+                                            ...
+                                        case "漢字見出G":
+                                            ...
+                                        case "略語G":
+                                            ...
+                                        case _:
+                                            raise InvalidDictDefinitionFormatError()
+                                case "ul":
+                                    match section["data"]["name"]:
+                                        case "漢字音G":
+                                            ...
+                                        case _:
+                                            raise InvalidDictDefinitionFormatError()
+                                case _:
+                                    raise InvalidDictDefinitionFormatError()
+                    else:
+                        raise InvalidDictDefinitionFormatError()
+
+                    # section 2
+                    if section_2["tag"] == "div" and section_2["data"]["name"] == "解説部":
+                        section_2_content = section_2["content"] if isinstance(section_2["content"], list) else [section_2["content"]]
+                        for section in section_2_content:
+                            match section["tag"]:
+                                case "div":
+                                    match section["data"]["name"]:
+                                        case "大語義":
+                                            ...
+                                        case "解説部":
+                                            ...
+                                        case "補説G":
+                                            ...
+                                        case "慣用G":
+                                            ...
+                                        case "異字同訓":
+                                            ...
+                                        case "派生G":
+                                            ...
+                                        case "語釈":
+                                            ...
+                                        case _:
+                                            print(section)
+                                            raise InvalidDictDefinitionFormatError()
+                                case "span":
+                                    match section["data"]["name"]:
+                                        case "品詞G":
+                                            ...
+                                        case "参照G":
+                                            ...
+                                case _:
+                                    print(section)
+                                    raise InvalidDictDefinitionFormatError()
+                    else:
+                        raise InvalidDictDefinitionFormatError()
                 else:
                     raise InvalidDictDefinitionFormatError()
-            if isinstance(structured_contents, dict):
+            elif isinstance(structured_contents, dict):
                 ...
+
+            else:
+                raise InvalidDictDefinitionFormatError()
 
 
 
