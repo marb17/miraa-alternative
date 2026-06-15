@@ -13,6 +13,7 @@ import re
 from urllib.parse import unquote
 import time
 import json
+import math
 
 from backend_new.utils.logger import Logger
 logger = Logger(__name__)
@@ -272,7 +273,7 @@ class JMnedictParser(BaseDictionaryParser):
 
         return DictionaryEntry(self.dict_name, raw_data.term, raw_data.reading, [holding])
 
-
+#! TODO might redo
 class GiongoGitaigoJitenParser(BaseDictionaryParser):
     DICTIONARY_PATTERN = "*擬音語・擬態語辞典*"
 
@@ -280,77 +281,147 @@ class GiongoGitaigoJitenParser(BaseDictionaryParser):
         definition_data = raw_data.definitions
 
         holding: DefinitionSense = DefinitionSense()
+        misc_info = []
+        synonyms_info = []
+        see_also = []
+
+        skip_by: int = 0
 
         circled_numbers = re.compile(r"[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]")
         jp_starting_quote = re.compile(r"「")
         jp_ending_quote = re.compile(r"」")
         newline = re.compile(r"\n")
+        end_newline = re.compile(r".*\n")
+        synonyms = re.compile(r"類義語")
+        arrow = re.compile(r"➜")
 
         for definition in definition_data:
-            print("--- ", definition)
-            if isinstance(definition, dict):
-                if definition["type"] == "structured-content":
-                    definition_contents = definition["content"]
+            if definition["type"] == "structured-content":
+                structured_contents = definition["content"]
+            else:
+                raise InvalidDictDefinitionFormatError()
 
-                    for idx, content in enumerate(definition_contents):
-                        if isinstance(content, dict):
-                            try:
-                                if content["tag"] == "span" and content.get("style", None) is not None and content["content"] == "類義語":
-                                    pass
+            print(structured_contents)
 
-                                elif content["tag"] == "span" and isinstance(content["content"], str) and jp_starting_quote.match(content["content"]) and len(content["content"]) == 1:
-                                    # check if next two element is the ending quotes
-                                    if not jp_ending_quote.match(definition_contents[idx + 2]['content']):
-                                        raise InvalidDictDefinitionFormatError()
+            for idx, section in enumerate(structured_contents):
+                if skip_by > 0:
+                    skip_by -= 1
+                    continue
 
-                                    # TODO add the saving thing
-                                    print(definition_contents[idx + 1])
-                                    synonym_content = definition_contents[idx + 1]["content"]
+                def_tag = section["tag"]
+                def_content = section["content"]
 
-                                elif content["tag"] == "span" and isinstance(content["content"], str) and newline.match(content["content"]) and idx != len(definition_contents) - 1:
-                                    synonym_explanation = definition_contents[idx + 1]["content"]
+                if isinstance(def_content, str):
+                    def_inner_content = None
+                elif isinstance(def_content, dict):
+                    def_inner_content = def_content["content"]
+                    def_inner_tag = def_content["tag"]
+                    def_inner_href = def_content.get("href")
+                else:
+                    raise InvalidDictDefinitionFormatError()
 
-                                elif content["tag"] == "span" and isinstance(content["content"], dict) and content.get("content", {}).get("tag") == "a":
-                                    # TODO add the synonyms thing
-                                    ...
+                if def_tag == "span":
+                    if isinstance(def_content, str):
+                        if circled_numbers.match(def_content) and end_newline.match(def_content):
+                            if (jp_starting_quote.match(structured_contents[idx + 1]["content"]) and
+                                    end_newline.match(structured_contents[idx + 1]["content"])):
+                                holding.glossaries.append(def_content)
+                                holding.examples.append({"jp": structured_contents[idx + 1]["content"]})
 
-                                elif content["tag"] == "span" and isinstance(content["content"], str) and jp_ending_quote.match(content["content"]):
-                                    ...
+                                skip_by += 1
+                            else:
+                                holding.glossaries.append(def_content)
+                                # raise InvalidDictDefinitionFormatError()
 
-                                elif content["tag"] == "span":
-                                    print(content)
-                                    span_content = content["content"].strip()
+                            # holding.glossaries.append(def_content)
+                            # holding.examples.append({"jp": structured_contents[idx + 1]["content"]})
 
-                                    if circled_numbers.match(span_content):
-                                        # TODO add the saving thing
-                                        ...
+                        elif synonyms.match(def_content):
+                            idx_counter = 0
 
-                                    elif jp_starting_quote.match(span_content):
-                                        # TODO add the saving thing
-                                        ...
+                            while (jp_starting_quote.match(structured_contents[idx + 1 + idx_counter]["content"]) and
+                                   jp_ending_quote.match(structured_contents[idx + 3 + idx_counter]["content"])):
 
-                                    else:
-                                        # TODO synonym explanation i guess
-                                        ...
-                                        # print(definition_data, "\n")
-                                        # print(span_content)
-                                        # raise InvalidDictDefinitionFormatError()
-
+                                if isinstance(structured_contents[idx + 2 + idx_counter]["content"], dict):
+                                    word_synonym = structured_contents[idx + 2 + idx_counter]["content"]["content"]
+                                elif isinstance(structured_contents[idx + 2 + idx_counter]["content"], str):
+                                    word_synonym = structured_contents[idx + 2 + idx_counter]["content"]
                                 else:
                                     raise InvalidDictDefinitionFormatError()
 
-                            except Exception as e:
-                                print(content)
-                                raise e
+                                synonyms_info.append(word_synonym)
+
+                                idx_counter += 3
+
+                            if newline.match(structured_contents[idx + 1 + idx_counter]["content"]):
+                                if structured_contents[idx + 2 + idx_counter]["content"] == "参考":
+                                    explanation = structured_contents[idx + 3 + idx_counter]["content"]
+                                    idx_counter += 3
+                                else:
+                                    explanation = structured_contents[idx + 2 + idx_counter]["content"]
+                                    idx_counter += 2
+
+                                misc_info.append(explanation)
+
+                                skip_by += idx_counter
+
+                            else:
+                                raise InvalidDictDefinitionFormatError()
+
+                        elif arrow.match(def_content):
+                            idx_counter = 0
+
+                            while (jp_starting_quote.match(structured_contents[idx + 1 + idx_counter]["content"]) and
+                                   jp_ending_quote.match(structured_contents[idx + 3 + idx_counter]["content"])):
+
+                                if isinstance(structured_contents[idx + 2 + idx_counter]["content"], dict):
+                                    related_word = structured_contents[idx + 2 + idx_counter]["content"]["content"]
+                                else:
+                                    raise InvalidDictDefinitionFormatError()
+
+                                see_also.append(related_word)
+
+                                idx_counter += 3
+
+                            skip_by += idx_counter
+
+                            if newline.match(structured_contents[idx + 1 + idx_counter]["content"]):
+                                if idx + 1 + idx_counter == len(structured_contents) - 1:
+                                    idx_counter += 1
+                                else:
+                                    if structured_contents[idx + 2 + idx_counter]["content"] == "参考":
+                                        explanation = structured_contents[idx + 3 + idx_counter]["content"]
+                                        idx_counter += 3
+                                    else:
+                                        explanation = structured_contents[idx + 2 + idx_counter]["content"]
+                                        idx_counter += 2
+
+                                    misc_info.append(explanation)
+
+                                skip_by += idx_counter
+
+                        elif def_content == "参考":
+                            skip_by += 1
+                            misc_info.append(def_content)
+
+                        # fall back cuz weird structure idk
+                        elif end_newline.match(def_content):
+                            holding.glossaries.append(def_content)
 
                         else:
+                            print(def_content)
                             raise InvalidDictDefinitionFormatError()
+
+                    elif isinstance(def_content, dict):
+                        ...
+
+                    else:
+                        raise InvalidDictDefinitionFormatError()
 
                 else:
                     raise InvalidDictDefinitionFormatError()
 
-            else:
-                raise InvalidDictDefinitionFormatError()
+        # raise Exception
 
 
 

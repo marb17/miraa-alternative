@@ -43,7 +43,9 @@ class DictionaryEntry:
     word: str # the word itself
     reading: str # how its read
     senses: list[DefinitionSense] = field(default_factory=list) # all information
-    alternative_forms: list[str] = field(default_factory=list) # alt forms
+    alternative_forms: list[str] = field(default_factory=list) # alt forms or synonyms
+    misc_info: list[str] = field(default_factory=list) # misc information
+    related_words: list[str] = field(default_factory=list) # words that are similar, more like a see also type of thing
 
 @dataclass
 class RedirectEntry:
