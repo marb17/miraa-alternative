@@ -481,11 +481,39 @@ class YonJiJukugoNoHyakkaJitenParser(BaseDictionaryParser):
         return definitions
 
 
+class KotowazaKanyoukuNoHyakkaJitenParser(YonJiJukugoNoHyakkaJitenParser):
+    DICTIONARY_PATTERN = "*ことわざ・慣用句の百科事典*"
+
+
+class DaijirinDaiYonHanParser(BaseDictionaryParser):
+    DICTIONARY_PATTERN = "*大辞林*第四版*"
+
+    def _parse(self, raw_data: RawYomitanEntry) -> list[DictionaryEntry | RedirectEntry] | DictionaryEntry | RedirectEntry:
+        definition_data = raw_data.definitions
+        raw_word = raw_data.term
+
+        definitions = []
+
+        for definition in definition_data:
+            if definition["type"] == "structured-content":
+                structured_contents = definition["content"]
+            else:
+                raise InvalidDictDefinitionFormatError()
+
+            if isinstance(structured_contents, list):
+                if len(structured_contents) == 2:
+                    ...
+                elif len(structured_contents) == 3:
+                    ...
+                else:
+                    raise InvalidDictDefinitionFormatError()
+            if isinstance(structured_contents, dict):
+                ...
 
 
 
 if __name__ == "__main__":
-    with YonJiJukugoNoHyakkaJitenParser() as parser:
+    with DaijirinDaiYonHanParser() as parser:
         grouped_dict_data = parser.parse_dict()
 
         # serialized_map = {
