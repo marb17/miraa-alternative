@@ -22,13 +22,22 @@ class DataMismatchError(Exception):
         super().__init__(self.message)
 
     def data_mismatch_error(self):
-        self.logger.warning(self.message)
-        self.logger.warning("Please do not rename, convert or alter files in .temp to prevent further errors")
-        self.logger.warning("Please clear all files in .temp directory to ensure proper functionality")
-# endregion
+        self.logger.critical(f"DataMismatchError: {self.message}")
+        self.logger.critical("Please do not rename, convert or alter files in .temp to prevent further errors")
+        self.logger.critical("Please clear all files in .temp directory to ensure proper functionality")
+
 
 # region YOMITAN DICTS
 class InvalidDictDefinitionFormatError(Exception):
     """Format of the raw dictionary entry is not as expected"""
-    pass
+    def __init__(self, logger: Logger, message: str) -> None:
+        self.logger = logger
+        self.message = message
+
+        self.logger_invalid_dict_format()
+
+        super().__init__(self.message)
+
+    def logger_invalid_dict_format(self):
+        self.logger.critical(f"InvalidDictDefinitionFormatError: {self.message}")
 # endregion

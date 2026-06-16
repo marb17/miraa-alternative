@@ -3,7 +3,10 @@ import json
 import re
 import ast
 
-data = {'tag': 'span', 'style': {'fontWeight': 'bold'}, 'data': {'name': '見出仮名'}, 'content': ['ち', {'tag': 'span', 'data': {'name': '活用分節'}, 'content': '・'}, 'ぶ']}
+data = {'tag': 'span', 'data': {'name': '参照G'}, 'content': ['→', {'tag': 'span', 'data': {'name': '参照'}, 'content': {'tag': 'span', 'data': {'name': 'ref'}, 'content': {'tag': 'a', 'href': '?query=鈴&wildcards=off', 'content': ['れい', {'tag': 'span', 'data': {'name': '参照漢字'}, 'content': '（鈴）'}]}}}]}
+
+
+
 
 
 

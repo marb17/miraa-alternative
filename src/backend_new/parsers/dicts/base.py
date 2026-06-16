@@ -32,8 +32,8 @@ class BaseDictionaryParser(ABC):
                 f"Could not find a directory matching pattern: '{self.DICTIONARY_PATTERN}' inside {DICTS_DIR}"
             )
 
-        self._term_bank_files = self._get_term_bank_files()
-        self.dict_name = self._target_dir.name
+        self._term_bank_files: list[Path] = self._get_term_bank_files()
+        self.dict_name: str = self._target_dir.name
 
     def __enter__(self):
         return self
@@ -87,11 +87,15 @@ class BaseDictionaryParser(ABC):
 
         max_workers = (os.cpu_count() or 8) // 4
 
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            results = executor.map(self._parse_file, self._term_bank_files)
+        #! UNCOMMENT AFTER DONE TESTING
+        # with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        #     results = executor.map(self._parse_file, self._term_bank_files)
+        #
+        #     for file_data in results:
+        #         dict_data.extend(file_data)
 
-            for file_data in results:
-                dict_data.extend(file_data)
+        for i in self._term_bank_files:
+            dict_data.append(self._parse_file(i))
 
         final_dictionary: dict[str, list[DictionaryEntry | RedirectEntry]] = dict()
         for entry in dict_data:
@@ -102,10 +106,10 @@ class BaseDictionaryParser(ABC):
                     main_term = sub_entry.word
                 else:
                     # print(dict_data)
-                    print(entry)
-                    print(type(sub_entry))
-                    print(sub_entry)
-                    raise InvalidDictDefinitionFormatError()
+                    logger.critical(f"Main Entry Data: {entry}")
+                    logger.critical(f"Sub-Entry type: {type(sub_entry)}")
+                    logger.critical(f"Sub-Entry Data: {sub_entry}")
+                    raise InvalidDictDefinitionFormatError(logger, "_parse_file did not return a valid dictionary")
 
                 if main_term in final_dictionary:
                     final_dictionary[main_term].append(sub_entry)

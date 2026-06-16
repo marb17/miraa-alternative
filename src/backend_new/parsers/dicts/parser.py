@@ -138,7 +138,6 @@ class JitendexYomitanParser(BaseDictionaryParser):
                 pass
 
             else:
-                print(section, data, sep="\n")
                 raise InvalidDictDefinitionFormatError()
 
         return holding
@@ -157,7 +156,7 @@ class JitendexYomitanParser(BaseDictionaryParser):
                 continue
 
             if definition.get("type", "") != "structured-content":
-                raise InvalidDictDefinitionFormatError("Type is not structured-content")
+                raise InvalidDictDefinitionFormatError()
 
             main_content = definition.get("content")
 
@@ -203,8 +202,7 @@ class JitendexYomitanParser(BaseDictionaryParser):
                         redirect_word = unquote(redirect_word)
                         definitions.append(RedirectEntry(self.dict_name, raw_word, redirect_word))
                     else:
-                        print(redirect_info)
-                        raise InvalidDictDefinitionFormatError(redirect_info)
+                        raise InvalidDictDefinitionFormatError()
 
                 else:
                     raise InvalidDictDefinitionFormatError()
@@ -227,7 +225,7 @@ class PixivLightParser(BaseDictionaryParser):
             holding: DefinitionSense = DefinitionSense()
 
             if definition.get("type", "") != "structured-content":
-                raise InvalidDictDefinitionFormatError("Type is not structured-content")
+                raise InvalidDictDefinitionFormatError()
 
             main_content = definition.get("content")
 
@@ -261,7 +259,6 @@ class PixivLightParser(BaseDictionaryParser):
                         ...
 
                     else:
-                        print(section)
                         raise InvalidDictDefinitionFormatError()
 
             else:
@@ -336,7 +333,6 @@ class GiongoGitaigoJitenParser(BaseDictionaryParser):
                         temporary_string += content["content"][0]
 
                     else:
-                        print(content)
                         raise InvalidDictDefinitionFormatError()
 
                 else:
@@ -382,7 +378,6 @@ class GiongoGitaigoJitenParser(BaseDictionaryParser):
                     holding.glossaries.append(line)
 
                 else:
-                    # print("\n", line)
                     raise InvalidDictDefinitionFormatError()
 
             # extra info stuf
@@ -439,7 +434,6 @@ class YonJiJukugoNoHyakkaJitenParser(BaseDictionaryParser):
                 idiom = main_word.findall(inner_content[1]["content"])[0]
                 reading = inner_content[0]["content"]
             else:
-                print(overview)
                 raise InvalidDictDefinitionFormatError()
 
             if meaning["tag"] == "div" and meaning["data"]["name"] == "意味":
@@ -561,44 +555,142 @@ class DaijirinDaiYonHanParser(BaseDictionaryParser):
                     if section_2["tag"] == "div" and section_2["data"]["name"] == "解説部":
                         section_2_content = section_2["content"] if isinstance(section_2["content"], list) else [section_2["content"]]
                         for section in section_2_content:
-                            match section["tag"]:
-                                case "div":
-                                    match section["data"]["name"]:
-                                        # major sense / primary definition
-                                        case "大語義":
-                                            ...
-                                        # explanation / comment section
-                                        case "解説部":
-                                            ...
-                                        # supplementary explanation group
-                                        case "補説G":
-                                            ...
-                                        # idiomatic / collocation usage group
-                                        case "慣用G":
-                                            ...
-                                        # differnt kanji, same reading
-                                        case "異字同訓":
-                                            ...
-                                        # derivative / etymology group
-                                        case "派生G":
-                                            ...
-                                        # definition / glossary text
-                                        case "語釈":
-                                            ...
-                                        case _:
-                                            print(section)
-                                            raise InvalidDictDefinitionFormatError()
-                                case "span":
-                                    match section["data"]["name"]:
-                                        # part of speech group
-                                        case "品詞G":
-                                            ...
-                                        # cross - reference group
-                                        case "参照G":
-                                            ...
-                                case _:
-                                    print(section)
-                                    raise InvalidDictDefinitionFormatError()
+                            if section["tag"] == "div":
+                                match section["data"]["name"]:
+                                    # major sense / primary definition
+                                    case "大語義":
+                                        content = section["content"] if isinstance(section["content"], list) else [
+                                            section["content"]]
+                                        for inner_content in content:
+                                            # semi major word sense
+                                            if inner_content.get("data", {}).get("name") == "準大語義":
+                                                ...
+                                            # part of speech group
+                                            elif inner_content.get("data", {}).get("name") == "品詞G":
+                                                ...
+                                            # classical / literary form
+                                            elif inner_content.get("data", {}).get("name") == "文語形":
+                                                ...
+                                            # derivative group
+                                            elif inner_content.get("data", {}).get("name") == "派生G":
+                                                ...
+                                            # supplementary explanation group
+                                            elif inner_content.get("data", {}).get("name") == "補説G":
+                                                ...
+                                            # potential form
+                                            elif inner_content.get("data", {}).get("name") == "可能形":
+                                                ...
+                                            # conjugation / inflection variation
+                                            elif inner_content.get("data", {}).get("name") == "活用変化":
+                                                ...
+                                            # accent group
+                                            elif inner_content.get("data", {}).get("name") == "アクセントG":
+                                                ...
+                                            # original orthography / spelling group
+                                            elif inner_content.get("data", {}).get("name") == "原綴G":
+                                                ...
+                                            # definition / gloss text
+                                            elif inner_content.get("data", {}).get("name") == "語釈":
+                                                ...
+                                            # cross - reference group
+                                            elif inner_content.get("data", {}).get("name") == "参照G":
+                                                ...
+                                            # antonym group
+                                            elif inner_content.get("data", {}).get("name") == "対義語G":
+                                                ...
+                                            elif inner_content.get("tag") == "span" and inner_content.get("content",
+                                                                                                          {}).get(
+                                                    "tag"):
+                                                pass
+                                            else:
+                                                raise InvalidDictDefinitionFormatError(logger, inner_content)
+                                    # supplementary explanation group
+                                    case "補説G":
+                                        content = section["content"] if isinstance(section["content"], list) else [section["content"]]
+                                        for inner_content in content:
+                                            if isinstance(inner_content, str):
+                                                pass
+                                            elif inner_content.get("tag") == "span" and inner_content["data"]["name"] == "補説":
+                                                ...
+                                            else:
+                                                raise InvalidDictDefinitionFormatError(logger, inner_content)
+                                    # idiomatic / collocation usage group
+                                    case "慣用G":
+                                        content = section["content"] if isinstance(section["content"], list) else [section["content"]]
+                                        for inner_content in content:
+                                            if isinstance(inner_content, list):
+                                                ...
+                                            elif isinstance(inner_content, str):
+                                                ...
+                                            elif inner_content["tag"] == "span" and isinstance(inner_content.get("content", {}), list):
+                                                ...
+                                            elif inner_content["tag"] == "span" and inner_content.get("content", {}).get("tag") == "img":
+                                                ...
+                                            elif inner_content.get("tag") == "span" and inner_content["data"]["name"] == "慣用subG":
+                                                ...
+                                            else:
+                                                raise InvalidDictDefinitionFormatError(logger, inner_content)
+                                    # differnt kanji, same reading
+                                    case "異字同訓":
+                                        content = section["content"] if isinstance(section["content"], list) else [section["content"]]
+                                        for inner_content in content:
+                                            if inner_content["tag"] == "span" and isinstance(inner_content.get("content"), list):
+                                                ...
+                                            elif inner_content["tag"] == "span" and inner_content.get("content", {}).get("tag") == "img":
+                                                ...
+                                            elif inner_content["tag"] == "div" and inner_content["data"]["name"] == "異字同訓解説":
+                                                ...
+                                            else:
+                                                raise InvalidDictDefinitionFormatError(logger, inner_content)
+                                    # derivative / etymology group
+                                    case "派生G":
+                                        content = section["content"] if isinstance(section["content"], list) else [section["content"]]
+                                        for inner_content in content:
+                                            if isinstance(inner_content, str):
+                                                ...
+                                            elif inner_content["tag"] == "span" and isinstance(inner_content.get("content", {}), list):
+                                                ...
+                                            elif inner_content["tag"] == "span" and inner_content.get("content", {}).get("tag") == "img":
+                                                ...
+                                            elif inner_content.get("tag") == "span" and inner_content["data"]["name"] == "派生語":
+                                                ...
+                                            else:
+                                                raise InvalidDictDefinitionFormatError(logger, inner_content)
+                                    # definition / glossary text
+                                    case "語釈":
+                                        content = section["content"] if isinstance(section["content"], list) else [section["content"]]
+                                        for inner_content in content:
+                                            if isinstance(inner_content, str):
+                                                ...
+                                            else:
+                                                raise InvalidDictDefinitionFormatError(logger, inner_content)
+                                    case _:
+                                        raise InvalidDictDefinitionFormatError()
+                            elif section["tag"] == "span":
+                                match section["data"]["name"]:
+                                    # part of speech group
+                                    case "品詞G":
+                                        content = section["content"] if isinstance(section["content"], list) else [section["content"]]
+                                        for inner_content in content:
+                                            if inner_content.get("tag") == "span" and inner_content["data"]["name"] == "品詞subG":
+                                                ...
+                                            else:
+                                                raise InvalidDictDefinitionFormatError(logger, inner_content)
+                                    # cross - reference group
+                                    case "参照G":
+                                        if section.get('content') is None:
+                                            pass
+                                        else:
+                                            content = section["content"] if isinstance(section["content"], list) else [section["content"]]
+                                            for inner_content in content:
+                                                if isinstance(inner_content, str):
+                                                    ...
+                                                elif inner_content.get("tag") == "span" and inner_content["data"]["name"] == "参照":
+                                                    ...
+                                                else:
+                                                    raise InvalidDictDefinitionFormatError(logger, inner_content)
+                            else:
+                                raise InvalidDictDefinitionFormatError()
                     else:
                         raise InvalidDictDefinitionFormatError()
                 else:
@@ -610,6 +702,15 @@ class DaijirinDaiYonHanParser(BaseDictionaryParser):
                 raise InvalidDictDefinitionFormatError()
 
 
+"""
+content = section["content"] if isinstance(section["content"], list) else [section["content"]]
+for inner_content in content:
+    print(inner_content)
+    if not False:
+        ...
+    else:
+        raise InvalidDictDefinitionFormatError(logger, inner_content)
+"""
 
 if __name__ == "__main__":
     with DaijirinDaiYonHanParser() as parser:

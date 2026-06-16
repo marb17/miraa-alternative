@@ -159,7 +159,7 @@ class WorkflowManager:
                     "Please do not rename, convert or alter files in .temp to prevent further errors")
                 logger.warning("Please clear all files in .temp directory to ensure proper functionality")
                 raise DataMismatchError(logger,
-                                             "Data file says audio has been downloaded, but it isn't present in .temp directory")
+                                        "Data file says audio has been downloaded, but it isn't present in .temp directory")
             logger.debug(f"Song already downloaded, skipping")
             return True
         else:
@@ -224,7 +224,7 @@ class WorkflowManager:
             if song_context_data.json_song_data.get("vocal_separation", {}).get("vocal_file", None) not in [
                 file.stem for file in TEMP_DIR.iterdir() if file.suffix == ".wav"]:
                 raise DataMismatchError(logger,
-                                             "Data file says audio has been separated, but it isn't present in .temp directory")
+                                        "Data file says audio has been separated, but it isn't present in .temp directory")
             if song_context_data.json_song_data.get("vocal_separation", {}).get("inst_file", None) not in [file.stem
                                                                                                            for file
                                                                                                            in
@@ -232,7 +232,7 @@ class WorkflowManager:
                                                                                                            if
                                                                                                            file.suffix == ".wav"]:
                 raise DataMismatchError(logger,
-                                             "Data file says audio has been separated, but it isn't present in .temp directory")
+                                        "Data file says audio has been separated, but it isn't present in .temp directory")
 
             logger.debug(f"Vocal separation already done, skipping")
             return True
