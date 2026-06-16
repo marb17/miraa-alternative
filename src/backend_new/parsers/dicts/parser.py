@@ -513,32 +513,43 @@ class DaijirinDaiYonHanParser(BaseDictionaryParser):
                             match section["tag"]:
                                 case "span":
                                     match section["data"]["name"]:
+                                        # head word kana
                                         case "見出仮名":
                                             ...
+                                        # orthography & spelling variations
                                         case "表記G":
                                             ...
+                                        # personal name
                                         case "人名":
                                             ...
+                                        # historical kana
                                         case "歴史仮名":
                                             ...
+                                        # accent group
                                         case "アクセントG":
                                             ...
+                                        # grographical place name
                                         case "地名":
                                             ...
+                                        # phrase orthography
                                         case "句表記":
                                             ...
+                                        # original orthography groups
                                         case "原綴G":
                                             ...
+                                        # kanji headword group
                                         case "漢字見出G":
                                             ...
+                                        # abbreviation group
                                         case "略語G":
                                             ...
                                         case _:
                                             raise InvalidDictDefinitionFormatError()
                                 case "ul":
                                     match section["data"]["name"]:
+                                        # kanji sound / reading group
                                         case "漢字音G":
-                                            ...
+                                            pass
                                         case _:
                                             raise InvalidDictDefinitionFormatError()
                                 case _:
@@ -553,18 +564,25 @@ class DaijirinDaiYonHanParser(BaseDictionaryParser):
                             match section["tag"]:
                                 case "div":
                                     match section["data"]["name"]:
+                                        # major sense / primary definition
                                         case "大語義":
                                             ...
+                                        # explanation / comment section
                                         case "解説部":
                                             ...
+                                        # supplementary explanation group
                                         case "補説G":
                                             ...
+                                        # idiomatic / collocation usage group
                                         case "慣用G":
                                             ...
+                                        # differnt kanji, same reading
                                         case "異字同訓":
                                             ...
+                                        # derivative / etymology group
                                         case "派生G":
                                             ...
+                                        # definition / glossary text
                                         case "語釈":
                                             ...
                                         case _:
@@ -572,8 +590,10 @@ class DaijirinDaiYonHanParser(BaseDictionaryParser):
                                             raise InvalidDictDefinitionFormatError()
                                 case "span":
                                     match section["data"]["name"]:
+                                        # part of speech group
                                         case "品詞G":
                                             ...
+                                        # cross - reference group
                                         case "参照G":
                                             ...
                                 case _:
