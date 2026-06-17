@@ -509,41 +509,132 @@ class DaijirinDaiYonHanParser(BaseDictionaryParser):
                                     match section["data"]["name"]:
                                         # head word kana
                                         case "見出仮名":
-                                            ...
+                                            #! TODO FINISHED
+                                            content = section["content"] if isinstance(section["content"], list) else [section["content"]]
+                                            reading = ""
+                                            for inner_content in content:
+                                                if isinstance(inner_content, str):
+                                                    reading += inner_content
+                                                elif inner_content.get("tag") == "span":
+                                                    pass
+                                                else:
+                                                    raise InvalidDictDefinitionFormatError(logger, inner_content)
                                         # orthography & spelling variations
                                         case "表記G":
-                                            ...
-                                        # personal name
+                                            content = section["content"] if isinstance(section["content"], list) else [section["content"]]
+                                            for inner_content in content:
+                                                if isinstance(inner_content, str):
+                                                    if inner_content in ["〖", "【", "〗", "】"]:
+                                                        pass
+                                                elif inner_content["tag"] == "span" and inner_content["data"]["name"] == "原語表記":
+                                                    ...
+                                                elif inner_content["tag"] == "span" and inner_content["data"]["name"] == "標準表記":
+                                                    ...
+                                                else:
+                                                    raise InvalidDictDefinitionFormatError(logger, inner_content)
+                                        # is personal name
                                         case "人名":
-                                            ...
+                                            #! TODO FINISHED
+                                            content = section["content"] if isinstance(section["content"], list) else [section["content"]]
+                                            for inner_content in content:
+                                                if inner_content == "◉":
+                                                    is_personal_name = True
+                                                else:
+                                                    raise InvalidDictDefinitionFormatError(logger, inner_content)
                                         # historical kana
                                         case "歴史仮名":
-                                            ...
+                                            #! TODO FINISHED
+                                            content = section["content"] if isinstance(section["content"], list) else [section["content"]]
+                                            for inner_content in content:
+                                                if isinstance(inner_content, str):
+                                                    historical_kana = inner_content
+                                                else:
+                                                    raise InvalidDictDefinitionFormatError(logger, inner_content)
                                         # accent group
                                         case "アクセントG":
-                                            ...
-                                        # grographical place name
+                                            content = section["content"] if isinstance(section["content"], list) else [section["content"]]
+                                            for inner_content in content:
+                                                if inner_content["tag"] == "span" and inner_content["data"]["name"] == "アクセント":
+                                                    ...
+                                                elif inner_content["tag"] == "span" and inner_content["data"]["name"] == "複合アクセント":
+                                                    ...
+                                                else:
+                                                    raise InvalidDictDefinitionFormatError(logger, inner_content)
+                                        # is geographical place name
                                         case "地名":
-                                            ...
+                                            content = section["content"] if isinstance(section["content"], list) else [section["content"]]
+                                            for inner_content in content:
+                                                if inner_content == "◆":
+                                                    is_geographical_place = True
+                                                else:
+                                                    raise InvalidDictDefinitionFormatError(logger, inner_content)
                                         # phrase orthography
                                         case "句表記":
-                                            ...
+                                            content = section["content"] if isinstance(section["content"], list) else [section["content"]]
+                                            for inner_content in content:
+                                                if isinstance(inner_content, str):
+                                                    ...
+                                                elif inner_content["tag"] == "span" and inner_content["data"]["name"] == "活用分節":
+                                                    ...
+                                                elif inner_content["tag"] == "span" and inner_content["data"]["name"] == "ルビG":
+                                                    ...
+                                                elif inner_content["tag"] == "span" and inner_content["data"]["name"] == "連語句活用分節":
+                                                    ...
+                                                elif inner_content["tag"] == "span" and inner_content["data"]["name"] == "省略":
+                                                    ...
+                                                elif inner_content["tag"] == "span" and inner_content["data"]["name"] == "言換え":
+                                                    ...
+                                                else:
+                                                    raise InvalidDictDefinitionFormatError(logger, inner_content)
                                         # original orthography groups
                                         case "原綴G":
-                                            ...
+                                            content = section["content"] if isinstance(section["content"], list) else [section["content"]]
+                                            original_orthography_group = {"原綴": list(), "原籍": list()}
+                                            for inner_content in content:
+                                                if inner_content in ["〕", "〔"]:
+                                                    ...
+                                                elif inner_content == ";":
+                                                    ...
+                                                elif inner_content in ["〖", "〗"]:
+                                                    ...
+                                                elif inner_content["tag"] == "span" and inner_content["data"]["name"] == "原綴":
+                                                    original_orthography_group["原綴"].append(inner_content["content"])
+                                                elif inner_content["tag"] == "span" and inner_content["data"]["name"] == "原籍":
+                                                    original_orthography_group["原籍"].append(inner_content["content"])
+                                                else:
+                                                    raise InvalidDictDefinitionFormatError(logger, inner_content)
                                         # kanji headword group
                                         case "漢字見出G":
-                                            ...
+                                            content = section["content"] if isinstance(section["content"], list) else [section["content"]]
+                                            for inner_content in content:
+                                                if inner_content in ["】","【"]:
+                                                    ...
+                                                elif inner_content == "・":
+                                                    ...
+                                                elif inner_content["tag"] == "span" and inner_content["data"]["name"] == "漢字見出":
+                                                    ...
+                                                elif inner_content["tag"] == "span" and inner_content["data"]["name"] == "別字体G":
+                                                    ...
+                                                else:
+                                                    raise InvalidDictDefinitionFormatError(logger, inner_content)
                                         # abbreviation group
                                         case "略語G":
-                                            ...
+                                            content = section["content"] if isinstance(section["content"], list) else [section["content"]]
+                                            for inner_content in content:
+                                                print(inner_content)
+                                                if inner_content["tag"] == "span" and inner_content["data"]["name"] == "略語":
+                                                    ...
+                                                elif inner_content["tag"] == "span" and inner_content["data"]["name"] == "読みG":
+                                                    ...
+                                                else:
+                                                    raise InvalidDictDefinitionFormatError(logger, inner_content)
                                         case _:
                                             raise InvalidDictDefinitionFormatError()
                                 case "ul":
                                     match section["data"]["name"]:
                                         # kanji sound / reading group
                                         case "漢字音G":
-                                            pass
+                                            ...
                                         case _:
                                             raise InvalidDictDefinitionFormatError()
                                 case _:

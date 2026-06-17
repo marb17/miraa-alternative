@@ -96,6 +96,7 @@ class BaseDictionaryParser(ABC):
 
         for i in self._term_bank_files:
             dict_data.append(self._parse_file(i))
+            # raise Exception("so my pc no blow up")
 
         final_dictionary: dict[str, list[DictionaryEntry | RedirectEntry]] = dict()
         for entry in dict_data:
