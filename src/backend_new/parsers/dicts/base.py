@@ -83,20 +83,15 @@ class BaseDictionaryParser(ABC):
 
     # @abstractmethod
     def _execute_parsing(self) -> dict[str, list[DictionaryEntry | RedirectEntry]]:
-        dict_data: list[list[DictionaryEntry]] = list()
+        dict_data: list[list[DictionaryEntry | RedirectEntry]] = list()
 
         max_workers = (os.cpu_count() or 8) // 4
 
-        #! UNCOMMENT AFTER DONE TESTING
-        # with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        #     results = executor.map(self._parse_file, self._term_bank_files)
-        #
-        #     for file_data in results:
-        #         dict_data.extend(file_data)
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            results = executor.map(self._parse_file, self._term_bank_files)
 
-        for i in self._term_bank_files:
-            dict_data.append(self._parse_file(i))
-            # raise Exception("so my pc no blow up")
+            for file_data in results:
+                dict_data.extend(file_data)
 
         final_dictionary: dict[str, list[DictionaryEntry | RedirectEntry]] = dict()
         for entry in dict_data:
@@ -110,7 +105,7 @@ class BaseDictionaryParser(ABC):
                     logger.critical(f"Main Entry Data: {entry}")
                     logger.critical(f"Sub-Entry type: {type(sub_entry)}")
                     logger.critical(f"Sub-Entry Data: {sub_entry}")
-                    raise InvalidDictDefinitionFormatError(logger, "_parse_file did not return a valid dictionary")
+                    raise InvalidDictDefinitionFormatError(logger, f"{self.dict_name}: _parse_file did not return a valid dictionary")
 
                 if main_term in final_dictionary:
                     final_dictionary[main_term].append(sub_entry)

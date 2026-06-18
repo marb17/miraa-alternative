@@ -4,6 +4,7 @@ from backend_new.utils.exceptions import InvalidDictDefinitionFormatError
 
 #! TEMP
 from pathlib import Path
+from dataclasses import asdict
 from backend_new.utils.helper_funcs import read_json_file, write_json_file
 from backend_new.utils.constants import DICTS_DIR
 from typing import Any
@@ -17,6 +18,8 @@ import math
 
 from backend_new.utils.logger import Logger
 logger = Logger(__name__)
+
+# region single parsers
 
 class JitendexYomitanParser(BaseDictionaryParser):
     DICTIONARY_PATTERN = "*jitendex-yomitan*"
@@ -46,7 +49,7 @@ class JitendexYomitanParser(BaseDictionaryParser):
                             if glossary_content['tag'] == "li":
                                 holding.glossaries.append(glossary_content['content'])
                             else:
-                                raise InvalidDictDefinitionFormatError()
+                                raise InvalidDictDefinitionFormatError(logger, "")
 
                     elif sense_content['tag'] == "div" and sense_content['data']['content'] == "extra-info":
                         extra_info_contents = sense_content['content']
@@ -56,7 +59,7 @@ class JitendexYomitanParser(BaseDictionaryParser):
                         # TODO add example sentences
 
                     else:
-                        raise InvalidDictDefinitionFormatError()
+                        raise InvalidDictDefinitionFormatError(logger, "")
 
             elif section["tag"] == "ul" and section.get('data', {}).get('content') == "glossary":
                 glossary_contents = section['content']
@@ -70,7 +73,7 @@ class JitendexYomitanParser(BaseDictionaryParser):
                         # holding.glossaries.append(glossary_content['content'])
                         raw_definition_holding.append(glossary_content['content'])
                     else:
-                        raise InvalidDictDefinitionFormatError()
+                        raise InvalidDictDefinitionFormatError(logger, "")
 
                 return raw_definition_holding
 
@@ -99,15 +102,15 @@ class JitendexYomitanParser(BaseDictionaryParser):
                     # glossary_holding.append(response)
                     if isinstance(response, DefinitionSense):
                         if response.glossaries:
-                            raise InvalidDictDefinitionFormatError()
+                            raise InvalidDictDefinitionFormatError(logger, "")
                         if response.examples:
-                            raise InvalidDictDefinitionFormatError()
+                            raise InvalidDictDefinitionFormatError(logger, "")
                         if response.sense_number:
-                            raise InvalidDictDefinitionFormatError()
+                            raise InvalidDictDefinitionFormatError(logger, "")
                         if response.parts_of_speech:
-                            raise InvalidDictDefinitionFormatError()
+                            raise InvalidDictDefinitionFormatError(logger, "")
                         if response.series:
-                            raise InvalidDictDefinitionFormatError()
+                            raise InvalidDictDefinitionFormatError(logger, "")
                     else:
                         holding.glossaries.append(response)
 
@@ -138,7 +141,7 @@ class JitendexYomitanParser(BaseDictionaryParser):
                 pass
 
             else:
-                raise InvalidDictDefinitionFormatError()
+                raise InvalidDictDefinitionFormatError(logger, "")
 
         return holding
 
@@ -156,7 +159,7 @@ class JitendexYomitanParser(BaseDictionaryParser):
                 continue
 
             if definition.get("type", "") != "structured-content":
-                raise InvalidDictDefinitionFormatError()
+                raise InvalidDictDefinitionFormatError(logger, "")
 
             main_content = definition.get("content")
 
@@ -184,7 +187,7 @@ class JitendexYomitanParser(BaseDictionaryParser):
                             definitions.append(DictionaryEntry(self.dict_name, raw_data.term, raw_data.reading, response))
 
                     else:
-                        raise InvalidDictDefinitionFormatError()
+                        raise InvalidDictDefinitionFormatError(logger, "")
 
             elif isinstance(main_content, dict):
                 if main_content.get("data", {}).get("content") == "redirect-glossary":
@@ -202,13 +205,13 @@ class JitendexYomitanParser(BaseDictionaryParser):
                         redirect_word = unquote(redirect_word)
                         definitions.append(RedirectEntry(self.dict_name, raw_word, redirect_word))
                     else:
-                        raise InvalidDictDefinitionFormatError()
+                        raise InvalidDictDefinitionFormatError(logger, "")
 
                 else:
-                    raise InvalidDictDefinitionFormatError()
+                    raise InvalidDictDefinitionFormatError(logger, "")
 
             else:
-                raise InvalidDictDefinitionFormatError()
+                raise InvalidDictDefinitionFormatError(logger, "")
 
         return definitions
 
@@ -225,7 +228,7 @@ class PixivLightParser(BaseDictionaryParser):
             holding: DefinitionSense = DefinitionSense()
 
             if definition.get("type", "") != "structured-content":
-                raise InvalidDictDefinitionFormatError()
+                raise InvalidDictDefinitionFormatError(logger, "")
 
             main_content = definition.get("content")
 
@@ -241,14 +244,14 @@ class PixivLightParser(BaseDictionaryParser):
                             if summary_content["tag"] == "li":
                                 holding.glossaries.append(summary_content["content"])
                             else:
-                                raise InvalidDictDefinitionFormatError()
+                                raise InvalidDictDefinitionFormatError(logger, "")
 
                     elif section["tag"] == "div" and section["data"]["pixiv"] == "series":
                         if isinstance(section["content"], str):
                             holding.series.append(section["content"])
 
                         else:
-                            raise InvalidDictDefinitionFormatError()
+                            raise InvalidDictDefinitionFormatError(logger, "")
 
                     # so it doesnt shit it self
                     elif section["tag"] == "div" and section["data"]["pixiv"] == "footer":
@@ -259,10 +262,10 @@ class PixivLightParser(BaseDictionaryParser):
                         ...
 
                     else:
-                        raise InvalidDictDefinitionFormatError()
+                        raise InvalidDictDefinitionFormatError(logger, "")
 
             else:
-                raise InvalidDictDefinitionFormatError()
+                raise InvalidDictDefinitionFormatError(logger, "")
 
             definitions.append(DictionaryEntry(self.dict_name, raw_data.term, raw_data.reading, [holding]))
 
@@ -282,7 +285,7 @@ class JMnedictParser(BaseDictionaryParser):
                 holding.glossaries.append(definition)
 
             else:
-                raise InvalidDictDefinitionFormatError()
+                raise InvalidDictDefinitionFormatError(logger, "")
 
         return DictionaryEntry(self.dict_name, raw_data.term, raw_data.reading, [holding])
 
@@ -316,7 +319,7 @@ class GiongoGitaigoJitenParser(BaseDictionaryParser):
             if definition["type"] == "structured-content":
                 structured_contents = definition["content"]
             else:
-                raise InvalidDictDefinitionFormatError()
+                raise InvalidDictDefinitionFormatError(logger, "")
 
             temporary_string = ""
 
@@ -333,10 +336,10 @@ class GiongoGitaigoJitenParser(BaseDictionaryParser):
                         temporary_string += content["content"][0]
 
                     else:
-                        raise InvalidDictDefinitionFormatError()
+                        raise InvalidDictDefinitionFormatError(logger, "")
 
                 else:
-                    raise InvalidDictDefinitionFormatError()
+                    raise InvalidDictDefinitionFormatError(logger, "")
 
             formatted_contents = temporary_string.split("\n")
 
@@ -378,7 +381,7 @@ class GiongoGitaigoJitenParser(BaseDictionaryParser):
                     holding.glossaries.append(line)
 
                 else:
-                    raise InvalidDictDefinitionFormatError()
+                    raise InvalidDictDefinitionFormatError(logger, "")
 
             # extra info stuf
             entry = DictionaryEntry(self.dict_name, raw_data.term, raw_data.reading, [holding])
@@ -407,12 +410,12 @@ class YonJiJukugoNoHyakkaJitenParser(BaseDictionaryParser):
             if definition["type"] == "structured-content":
                 structured_contents = definition["content"]
             else:
-                raise InvalidDictDefinitionFormatError()
+                raise InvalidDictDefinitionFormatError(logger, "")
 
             if isinstance(structured_contents, list):
                 pass
             else:
-                raise InvalidDictDefinitionFormatError()
+                raise InvalidDictDefinitionFormatError(logger, "")
 
             if len(structured_contents) == 3:
                 overview = structured_contents[0]
@@ -424,45 +427,45 @@ class YonJiJukugoNoHyakkaJitenParser(BaseDictionaryParser):
                 meaning = structured_contents[2]
                 example_sentences = structured_contents[3]
             else:
-                raise InvalidDictDefinitionFormatError()
+                raise InvalidDictDefinitionFormatError(logger, "")
 
             if overview['tag'] == "span" and overview["data"]["name"] == "header":
                 inner_content = overview["content"]
                 if len(inner_content) != 3:
-                    raise InvalidDictDefinitionFormatError()
+                    raise InvalidDictDefinitionFormatError(logger, "")
 
                 idiom = main_word.findall(inner_content[1]["content"])[0]
                 reading = inner_content[0]["content"]
             else:
-                raise InvalidDictDefinitionFormatError()
+                raise InvalidDictDefinitionFormatError(logger, "")
 
             if meaning["tag"] == "div" and meaning["data"]["name"] == "意味":
                 if len(meaning["content"]) != 2:
-                    raise InvalidDictDefinitionFormatError()
+                    raise InvalidDictDefinitionFormatError(logger, "")
                 definition = meaning["content"][1]["content"]
             else:
-                raise InvalidDictDefinitionFormatError()
+                raise InvalidDictDefinitionFormatError(logger, "")
 
             if example_sentences["tag"] == "div" and example_sentences["data"]["name"] == "使い方":
                 examples = []
                 if len(example_sentences["content"]) == 2:
                     list_of_examples = example_sentences["content"][1]["content"]
                     if example_sentences["content"][1]["tag"] != "ul":
-                        raise InvalidDictDefinitionFormatError()
+                        raise InvalidDictDefinitionFormatError(logger, "")
 
                     if isinstance(list_of_examples, list):
                         for li in list_of_examples:
                             if len(li["content"]) != 1:
-                                raise InvalidDictDefinitionFormatError()
+                                raise InvalidDictDefinitionFormatError(logger, "")
                             meaning = li["content"][0]["content"]
                             examples.append(meaning)
                     else:
-                        raise InvalidDictDefinitionFormatError()
+                        raise InvalidDictDefinitionFormatError(logger, "")
                 else:
-                    raise InvalidDictDefinitionFormatError()
+                    raise InvalidDictDefinitionFormatError(logger, "")
 
             else:
-                raise InvalidDictDefinitionFormatError()
+                raise InvalidDictDefinitionFormatError(logger, "")
 
             holding = DefinitionSense()
 
@@ -492,7 +495,7 @@ class DaijirinDaiYonHanParser(BaseDictionaryParser):
             if definition["type"] == "structured-content":
                 structured_contents = definition["content"]
             else:
-                raise InvalidDictDefinitionFormatError()
+                raise InvalidDictDefinitionFormatError(logger, "")
 
             if isinstance(structured_contents, list):
                 if len(structured_contents) == 2 or len(structured_contents) == 3:
@@ -629,18 +632,18 @@ class DaijirinDaiYonHanParser(BaseDictionaryParser):
                                                 else:
                                                     raise InvalidDictDefinitionFormatError(logger, inner_content)
                                         case _:
-                                            raise InvalidDictDefinitionFormatError()
+                                            raise InvalidDictDefinitionFormatError(logger, "")
                                 case "ul":
                                     match section["data"]["name"]:
                                         # kanji sound / reading group
                                         case "漢字音G":
                                             ...
                                         case _:
-                                            raise InvalidDictDefinitionFormatError()
+                                            raise InvalidDictDefinitionFormatError(logger, "")
                                 case _:
-                                    raise InvalidDictDefinitionFormatError()
+                                    raise InvalidDictDefinitionFormatError(logger, "")
                     else:
-                        raise InvalidDictDefinitionFormatError()
+                        raise InvalidDictDefinitionFormatError(logger, "")
 
                     # section 2
                     if section_2["tag"] == "div" and section_2["data"]["name"] == "解説部":
@@ -756,7 +759,7 @@ class DaijirinDaiYonHanParser(BaseDictionaryParser):
                                             else:
                                                 raise InvalidDictDefinitionFormatError(logger, inner_content)
                                     case _:
-                                        raise InvalidDictDefinitionFormatError()
+                                        raise InvalidDictDefinitionFormatError(logger, "")
                             elif section["tag"] == "span":
                                 match section["data"]["name"]:
                                     # part of speech group
@@ -781,16 +784,16 @@ class DaijirinDaiYonHanParser(BaseDictionaryParser):
                                                 else:
                                                     raise InvalidDictDefinitionFormatError(logger, inner_content)
                             else:
-                                raise InvalidDictDefinitionFormatError()
+                                raise InvalidDictDefinitionFormatError(logger, "")
                     else:
-                        raise InvalidDictDefinitionFormatError()
+                        raise InvalidDictDefinitionFormatError(logger, "")
                 else:
-                    raise InvalidDictDefinitionFormatError()
+                    raise InvalidDictDefinitionFormatError(logger, "")
             elif isinstance(structured_contents, dict):
                 ...
 
             else:
-                raise InvalidDictDefinitionFormatError()
+                raise InvalidDictDefinitionFormatError(logger, "")
 
 
 """
@@ -803,9 +806,62 @@ for inner_content in content:
         raise InvalidDictDefinitionFormatError(logger, inner_content)
 """
 
+# endregion
+
+class JapaneseDictionary():
+    VALID_DICTIONARY_CLASSES = [JitendexYomitanParser, PixivLightParser, JMnedictParser, GiongoGitaigoJitenParser, YonJiJukugoNoHyakkaJitenParser, KotowazaKanyoukuNoHyakkaJitenParser]
+
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        import gc
+        gc.collect()
+        return False
+
+    def create_dictionary_file(self):
+        dictionary_entries: dict[str, list[RedirectEntry | DictionaryEntry]] = dict()
+
+        now = time.time()
+
+        for parser_object in self.VALID_DICTIONARY_CLASSES:
+            with parser_object() as parser:
+                data = parser.parse_dict()
+
+                for key, value in data.items():
+                    if key not in dictionary_entries:
+                        dictionary_entries[key] = value
+                    else:
+                        dictionary_entries[key].extend(value)
+
+        logger.info(f"Finished parsing all dictionaries in {time.time() - now:.2f} seconds.")
+        logger.info(f"Dictionary entries: {len(dictionary_entries)}")
+
+        serialized_map = {
+            headword: [asdict(entry) for entry in entries_list]
+            for headword, entries_list in dictionary_entries.items()
+        }
+
+        dicts_file = DICTS_DIR / "dict.json.gz"
+
+        try:
+            write_json_file(dicts_file, serialized_map, ["data"], indent=0, use_gzip=True)
+        except Exception as e:
+            logger.error("Failed to write dict.json file")
+            logger.error(e)
+            raise e
+
+        logger.info(f"Successfully saved dictionary entries, size of library is: {dicts_file.stat().st_size / 1000000:.2f}MB")
+
+
+
+
 if __name__ == "__main__":
-    with DaijirinDaiYonHanParser() as parser:
-        grouped_dict_data = parser.parse_dict()
+    # with DaijirinDaiYonHanParser() as parser:
+    #     grouped_dict_data = parser.parse_dict()
 
         # serialized_map = {
         #     headword: [asdict(entry) for entry in entries_list]
@@ -813,3 +869,5 @@ if __name__ == "__main__":
         # }
         #
         # write_json_file(DICTS_DIR / "temp.json", serialized_map, ["data"], indent=0, use_gzip=True)
+    with JapaneseDictionary() as jd:
+        jd.create_dictionary_file()
