@@ -10,12 +10,17 @@ from backend_new.utils.logger import Logger
 #! Adjust based on exact depth
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
+#! CHANGE WHEN CHANGING BACKEND FOLDER NAME
+BACKEND_DIR = BASE_DIR / "backend_new"
+
 # DIRECTORIES
 TEMP_DIR = BASE_DIR / ".temp"
 DICTS_DIR = BASE_DIR / "dicts"
 CONFIG_DIR = BASE_DIR / "config"
 DATA_DIR = BASE_DIR / "data"
 MODEL_DIR = BASE_DIR / "models"
+
+TUI_TCSS = BACKEND_DIR / "tui/tcss"
 
 # FILES
 ENV_FILE = CONFIG_DIR / ".env"

@@ -10,7 +10,7 @@ import os
 import re
 
 # CONSTANTS
-from backend_new.utils.constants import ENV_FILE, TEMP_DIR, DEFAULT_ENV_VARS
+from backend_new.utils.constants import ENV_FILE, TEMP_DIR, DEFAULT_ENV_VARS, CONFIG_FILE
 
 # LOGGER
 from backend_new.utils.logger import Logger
@@ -134,6 +134,23 @@ def write_json_file(file_path: Path, payload: Any, keys: list[str] = None) -> No
         current_level[keys[-1]] = payload
 
     file_path.write_text(json.dumps(data, indent=4))
+
+# specialized reader
+def read_config() -> dict[str, Any]:
+    """
+    Reads the config file data
+    :return: Config file data
+    :rtype: dict[str, Any]
+    """
+    return read_json_file(CONFIG_FILE)
+
+def write_config(payload: Any, keys: list[str] = None) -> None:
+    """
+    Writes to the config file
+    :param payload: Data to write
+    :param keys: A list of keys to navigate the JSON file
+    """
+    write_json_file(CONFIG_FILE, payload, keys)
 # endregion
 
 # region base 58 conv
