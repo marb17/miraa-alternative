@@ -1,11 +1,13 @@
 from mmengine.runner import priority
 from rich.box import HEAVY_EDGE
+from sympy.physics.wigner import racah
 from textual import events, containers, work
 from textual.app import ComposeResult
-from textual.widgets import Footer, Header, Switch, TabbedContent, TabPane, Checkbox, Label, Button, Static, ProgressBar, RichLog, Input
-from textual.containers import Horizontal, Vertical, Container, HorizontalGroup, Middle, CenterMiddle, Center, VerticalScroll
+from textual.widgets import Footer, Header, Switch, TabbedContent, TabPane, Checkbox, Label, Button, Static, ProgressBar, RichLog, Input, Link
+from textual.containers import Horizontal, Vertical, Container, HorizontalGroup, Middle, CenterMiddle, Center, VerticalScroll, VerticalGroup, Grid
 from textual.screen import Screen, ModalScreen
 from textual.binding import Binding
+from textual.reactive import reactive
 
 from backend_new.utils.helper_funcs import read_config, write_config
 
@@ -240,6 +242,72 @@ class InitProgress(Screen):
 
 
 class InitEnvKeys(Screen):
+    class InitEnvHelpScreen(ModalScreen):
+        HELP_MESSAGE = """To get your Tokens from Spotify and Genius, please open these links:
+    - [@click="app.open_url('https://developer.spotify.com/dashboard')"]Spotify Dashboard[/]
+    - [@click="app.open_url('https://genius.com/api-clients')"]Genius Dashboard[/]
+
+Genius is easy to create an API key
+Just create an app and press | [bold]Generate Access Token[/bold] |
+
+Spotify is also same but just needs the right Redirect URI
+You can use these for them:
+    - https://127.0.0.1:8080
+    - https://localhost:8080
+"""
+
+        DEFAULT_CSS = """
+        #vert_group {
+            width: 65%;
+            height: auto;
+            max-height: 30;
+            
+            background: $surface;
+            border: solid $primary;
+            
+            align: center middle; 
+            content-align: center middle;
+        }
+        
+        Container {
+            height: auto;
+            
+            align: center middle;
+            content-align: center middle;
+        }
+        
+        Static {
+            margin: 1 2;
+            padding: 1 2;
+            text-align: left;
+            text-overflow: fold;
+        }
+        
+        #text_con {
+            margin: 0 1;
+            width: 100%;
+        }
+        
+        #button_con {
+            width: 100%;
+            margin: 0 0 1 0;
+        }
+        """
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.styles.align = ("center", "middle")
+
+        def compose(self) -> ComposeResult:
+            with Center(id="vert_group"):
+                with Container(id="text_con"):
+                    yield Static(self.HELP_MESSAGE)
+                with Container(id="button_con"):
+                    yield Button("Exit", variant="error", id="exit")
+
+        def on_button_pressed(self, event: Button.Pressed) -> None:
+            if event.button.id == "exit":
+                self.dismiss()
     DEFAULT_CSS = """
     CenterMiddle {
         height: auto;
@@ -261,7 +329,27 @@ class InitEnvKeys(Screen):
         align: center middle;
         content-align: center middle;
     }
+    
+    Button {
+        margin: 1;
+    }
+    
+    #button_con {
+        width: 100%;
+        height: auto;
+    }
+    
+    #button_hor {
+        align: right middle;
+        content-align: right middle;
+    }
     """
+
+    spot_cli_id = None
+    spot_cli_sec = None
+    gen_acc_tok = None
+
+    error_message = ""
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -270,14 +358,73 @@ class InitEnvKeys(Screen):
             with CenterMiddle(id="env_input"):
                 yield Label("Please input your Environment Variables:")
 
-                yield Input(placeholder="SPOTIFY_CLIENT_ID")
-                yield Input(placeholder="SPOTIFY_CLIENT_SECRET")
-                yield Input(placeholder="GENIUS_ACCESS_TOKEN")
+                yield Input(placeholder="SPOTIFY_CLIENT_ID", id="in1")
+                yield Input(placeholder="SPOTIFY_CLIENT_SECRET", id="in2")
+                yield Input(placeholder="GENIUS_ACCESS_TOKEN", id="in3")
 
-                yield Button(variant="success", id="confirm", label="Confirm")
+                err_msg = Static(self.error_message, disabled=True, id="err_msg")
+                err_msg.styles.color = "red"
+                yield err_msg
+
+                with Container(id="button_con"):
+                    with HorizontalGroup(id="button_hor"):
+                        yield Button(variant="warning", id="help_button", label="Help")
+                        yield Button(variant="success", id="confirm", label="Confirm")
 
     def _on_mount(self, event: events.Mount) -> None:
         self.query_one(CenterMiddle).border_title = "Environment Variables"
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.value:
+            if event.input.id == "in1":
+                self.query_one("#in2", Input).focus()
+            elif event.input.id == "in2":
+                self.query_one("#in3", Input).focus()
+            elif event.input.id == "in3":
+                self.query_one("#confirm", Button).focus()
+        else:
+            match event.input.id:
+                case "in1": self.error_message = "SPOTIFY_CLIENT_ID cannot be empty"
+                case "in2": self.error_message = "SPOTIFY_CLIENT_SECRET cannot be empty"
+                case "in3": self.error_message = "GENIUS_ACCESS_TOKEN cannot be empty"
+            self.query_one("#err_msg", Static).content = self.error_message
+            self.query_one("#err_msg", Static).display = True
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        self.query_one("#err_msg", Static).display = False
+
+        if event.input.id == "in1":
+            self.spot_cli_id = event.input.value
+        elif event.input.id == "in2":
+            self.spot_cli_sec = event.input.value
+        elif event.input.id == "in3":
+            self.gen_acc_tok = event.input.value
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        anything_empty = False
+        empty_list: list[str] = list()
+
+        if event.button.id == "confirm":
+            if not self.spot_cli_id:
+                anything_empty = True
+                empty_list.append("SPOTIFY_CLIENT_ID")
+            if not self.spot_cli_sec:
+                anything_empty = True
+                empty_list.append("SPOTIFY_CLIENT_SECRET")
+            if not self.gen_acc_tok:
+                anything_empty = True
+                empty_list.append("GENIUS_ACCESS_TOKEN")
+
+            if anything_empty:
+                self.error_message = f"{', '.join(empty_list)} cannot be empty!"
+                self.query_one("#err_msg", Static).content = self.error_message
+                self.query_one("#err_msg", Static).display = True
+            else:
+                ...
+        elif event.button.id == "help_button":
+            self.app.push_screen(self.InitEnvHelpScreen())
+
+
 
 class FirstTimeInit(Screen):
     BINDINGS = []

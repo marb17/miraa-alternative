@@ -11,7 +11,7 @@ class MiraaInterface(App):
         "config_menu": ConfigMenu,
         "init_screen": FirstTimeInit,
         "init_prog": InitProgress,
-        "init_env": InitEnvKeys
+        "init_env": InitEnvKeys,
     }
 
     BINDINGS = [("ctrl+o", "push_screen('config_menu')", "Config")]
