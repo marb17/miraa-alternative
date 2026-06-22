@@ -1,12 +1,19 @@
 from mmengine.runner import priority
+from rich.box import HEAVY_EDGE
 from textual import events, containers, work
 from textual.app import ComposeResult
-from textual.widgets import Footer, Header, Switch, TabbedContent, TabPane, Checkbox, Label, Button
-from textual.containers import Horizontal, Vertical, Container
+from textual.widgets import Footer, Header, Switch, TabbedContent, TabPane, Checkbox, Label, Button, Static, ProgressBar, RichLog, Input
+from textual.containers import Horizontal, Vertical, Container, HorizontalGroup, Middle, CenterMiddle, Center, VerticalScroll
 from textual.screen import Screen, ModalScreen
 from textual.binding import Binding
 
 from backend_new.utils.helper_funcs import read_config, write_config
+
+from backend_new.main import Analyzer
+
+import time
+
+# region config menu
 
 # default stuff prob like template
 """
@@ -73,8 +80,6 @@ class DownloadMenu(Horizontal):
                 with containers.HorizontalGroup(classes="section_container", id="downloader"):
                     yield Switch(id="downloader_cookies_switch")
                     yield Label("Use cookies for YouTube Downloader?")
-
-        yield Footer()
 
     def _on_mount(self, event: events.Mount) -> None:
         downloader = self.query_one("#downloader", containers.HorizontalGroup)
@@ -158,3 +163,176 @@ class ConfigMenu(Screen):
                 yield ProcessesMenu()
             with TabPane("Downloader"):
                 yield DownloadMenu()
+
+# endregion
+
+# region first time init screeen
+
+class InitProgress(Screen):
+    BINDINGS = []
+    DEFAULT_CSS = """
+    #progress {
+        height: auto;
+        width: 60;
+        
+        padding: 0 2;
+        
+        border: solid $secondary;
+        border-title-style: bold;
+        border-title-color: $primary;
+        border-title-align: center;
+    }
+    
+    #progress > * {
+        padding: 1;
+        width: 100%;
+    }
+    
+    #progress RichLog {
+        height: 6; 
+        width: 100%;
+    }
+    
+    Container {
+        align: center middle;
+        content-align: center middle;
+    }
+    
+    ProgressBar {
+        width: 40;
+        align: center middle;
+    }
+        
+    Label {
+        width: auto;
+        text-align: center;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+
+        with Container():
+            with CenterMiddle(id="progress"):
+                with Center():
+                    yield Label("Completion:")
+                    yield ProgressBar(total=3, show_eta=False)
+
+                yield RichLog(id="logs", highlight=True, markup=True)
+
+    def _on_mount(self, event: events.Mount) -> None:
+        self.query_one(CenterMiddle).border_title = "Main Setup"
+        self.init_miraa()
+        self.set_timer(0.8, self.go_to_next_screen)
+
+    def go_to_next_screen(self) -> None:
+        self.app.switch_screen("init_env")
+
+    @work(thread=True)
+    def init_miraa(self):
+        prog_bar = self.query_one(ProgressBar)
+        logs = self.query_one(RichLog)
+
+        with Analyzer() as a:
+            for log in a.init():
+                prog_bar.advance(1)
+                logs.write(log)
+
+
+class InitEnvKeys(Screen):
+    DEFAULT_CSS = """
+    CenterMiddle {
+        height: auto;
+        width: 100%;
+        
+        padding: 0 4;
+    
+        border: solid $secondary;
+        border-title-style: bold;
+        border-title-color: $primary;
+        border-title-align: center;
+    }
+    
+    Label {
+        padding: 1;
+    }
+    
+    Container {
+        align: center middle;
+        content-align: center middle;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+
+        with Container():
+            with CenterMiddle(id="env_input"):
+                yield Label("Please input your Environment Variables:")
+
+                yield Input(placeholder="SPOTIFY_CLIENT_ID")
+                yield Input(placeholder="SPOTIFY_CLIENT_SECRET")
+                yield Input(placeholder="GENIUS_ACCESS_TOKEN")
+
+                yield Button(variant="success", id="confirm", label="Confirm")
+
+    def _on_mount(self, event: events.Mount) -> None:
+        self.query_one(CenterMiddle).border_title = "Environment Variables"
+
+class FirstTimeInit(Screen):
+    BINDINGS = []
+
+    DEFAULT_CSS = """
+    #confirm_popup {
+        height: auto;
+        width: auto;
+        border: solid $secondary;
+        border-title-style: bold;
+        border-title-color: $primary;
+        border-title-align: center;
+    }
+    
+    #confirm_popup HorizontalGroup {
+        width: 100%;
+        align: center middle;
+        content-align: center middle;
+        padding: 1 0;
+    }
+    
+    #confirm_popup Static {
+        width: auto;
+        text-align: center;
+        padding: 1 2;
+    }
+    
+    #whole_screen {
+        align: center middle;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+
+        with Container(id="whole_screen"):
+            with Container(id="confirm_popup"):
+                yield Static("miraa-alternative isn't initialized yet,\nWould you like to initialize it?")
+
+                with HorizontalGroup():
+                    yield Button(variant="error", label="No", id="deny")
+                    yield Button(variant="success", label="Yes", id="confirm")
+
+        yield Footer()
+
+    def _on_mount(self, event: events.Mount) -> None:
+        popup = self.query_one("#confirm_popup", Container)
+        popup.border_title = "miraa-alternative Initialization"
+
+        self.query_one("#confirm", Button).focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "confirm":
+            self.app.switch_screen("init_prog")
+        elif event.button.id == "deny":
+            self.app.exit()
+
+# endregion

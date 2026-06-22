@@ -11,7 +11,6 @@ from backend_new.utils.constants import SongContext, DataMismatchError
 from backend_new.utils.constants import TEMP_DIR
 
 from backend_new.utils.logger import Logger
-from core.translation_analysis import LLMModel
 
 logger = Logger(__name__)
 

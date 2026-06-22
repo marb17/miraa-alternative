@@ -4,8 +4,11 @@ import json
 from dotenv import set_key
 from pathlib import Path
 
+from collections.abc import Generator
+
 # HELPER LIBRARIES
 from backend_new.utils.helper_funcs import (read_json_file, write_json_file,
+                                            write_config,
                                             questionary_select, questionary_checkbox,
                                             load_env_file,
                                             clear_temp_dir)
@@ -24,14 +27,27 @@ logger = Logger(__name__)
 
 class Analyzer:
     def __init__(self) -> None:
-        """Initialize the analyzer."""
-        self._setup_main_directories()
-        self._env_data = load_env_file()
-        self._setup_config_file()
+        self.init()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return False
+
+    def init(self) -> Generator[str, None, None]:
+        """Initialize the analyzer."""
+        # self.setup_main_directories()
+        yield "Successfully created directory structure."
+
+        # self._env_data = load_env_file()
+        yield "Successfully loaded environment variables."
+
+        # self.setup_config_file()
+        yield "Successfully loaded configuration file."
 
     # region Helper Functions
-    def _setup_main_directories(self) -> None:
+    def setup_main_directories(self) -> None:
         """Sets up the main directories for the analyzer."""
         current_dir = Path(__file__).resolve().parent
         while current_dir.name != "src" and current_dir != current_dir.parent:
@@ -47,9 +63,9 @@ class Analyzer:
         self._config_file = Path(self._base_dir / "config/config.json")
         self._env_file = Path(self._base_dir / "config/.env")
 
-        self._create_misc_files()
+        self.create_misc_files()
 
-    def _setup_config_file(self) -> None:
+    def setup_config_file(self) -> None:
         """Sets up the config file for the analyzer. Writes default values if it doesn't exist."""
         if not self._config_file.exists():
             config_json = json.dumps(DEFAULT_CONFIG, indent=4)
@@ -63,7 +79,7 @@ class Analyzer:
 
         logger.info(f"miraa-alternative Version: {self._config_json['version']}")
 
-    def _create_misc_files(self) -> None:
+    def create_misc_files(self) -> None:
         # dicts directory
         dicts_dir = Path(self._base_dir / "dicts")
         dicts_file = dicts_dir / "readme.md"

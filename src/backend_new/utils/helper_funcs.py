@@ -100,15 +100,19 @@ def questionary_checkbox(question_to_ask: str,
 # endregion
 
 # region json read and write
-def read_json_file(file_path: Path) -> dict:
+def read_json_file(file_path: Path, safe_fail: bool = False) -> dict:
     """
     Reads a JSON file in a directory
     :param file_path: File path to the JSON file
+    :param safe_fail: If true, when file doesn't exist, doesn't raise an exception
     :return: A dict containing the JSON data
     """
     if not file_path.exists():
         logger.warning(f"File {file_path} does not exist")
-        return {}
+        if safe_fail:
+            return {}
+        else:
+            raise FileNotFoundError(f"File {file_path} does not exist")
 
     try:
         return json.loads(file_path.read_text(encoding="utf-8"))
@@ -172,7 +176,7 @@ def base58_to_str(string: str) -> str:
 # endregion
 
 # region file system stuff
-def load_env_file() -> dict[Any, str | None]:
+def load_env_file(safe_empty: bool = True) -> dict[Any, str | None]:
     """
     Loads the environment variables from the .env file.
     Creates a new .env file if it doesn't exist.
@@ -182,9 +186,12 @@ def load_env_file() -> dict[Any, str | None]:
         load_dotenv(dotenv_path=ENV_FILE)
         logger.debug("Loaded .env file.")
     else:
-        logger.critical("No .env file found. Creating empty .env file. Do NOT reorder the variables")
-        ENV_FILE.write_text("\n".join([f"{var}=" for var in DEFAULT_ENV_VARS]))
-        raise FileNotFoundError(".env file not found, creating one. Please add your credentials to the .env file.")
+        if safe_empty:
+            pass
+        else:
+            logger.critical("No .env file found. Creating empty .env file. Do NOT reorder the variables")
+            ENV_FILE.write_text("\n".join([f"{var}=" for var in DEFAULT_ENV_VARS]))
+            raise FileNotFoundError(".env file not found, creating one. Please add your credentials to the .env file.")
 
     load_dotenv()
     return dict([(var, os.getenv(var))for var in DEFAULT_ENV_VARS])

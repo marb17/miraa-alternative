@@ -68,6 +68,8 @@ class DataMismatchError(Exception):
 
 DEFAULT_CONFIG = {
     "version": "1.0.0",
+    "init": True,
+
     "spotify_downloader": {
         "output_format": {
             "duration": True,
@@ -75,19 +77,17 @@ DEFAULT_CONFIG = {
             "popularity": True
         }
     },
+
     "youtube_downloader": {
         "use_cookies": False
     },
+
     "skip_processes": {
         "download_song": False,
         "genius_metadata": False,
         "vocal_separation": False,
         "split_and_tag": False,
         "translate_lyrics": False
-    },
-    "jp_dicts": {
-        "always_ask": False,
-        "dicts_to_use": {}
     }
 }
 
