@@ -9,11 +9,14 @@ from textual.screen import Screen, ModalScreen
 from textual.binding import Binding
 from textual.reactive import reactive
 
-from backend_new.utils.helper_funcs import read_config, write_config
+from backend_new.utils.helper_funcs import read_config, write_config, download_all_dicts
+from backend_new.utils.constants import ENV_FILE, DEFAULT_DICTS_LINK
 
 from backend_new.main import Analyzer
 
 import time
+from dotenv import set_key
+from rich.markup import escape
 
 # region config menu
 
@@ -211,6 +214,8 @@ class InitProgress(Screen):
     }
     """
 
+    finished_init = False
+
     def compose(self) -> ComposeResult:
         yield Header()
 
@@ -225,7 +230,6 @@ class InitProgress(Screen):
     def _on_mount(self, event: events.Mount) -> None:
         self.query_one(CenterMiddle).border_title = "Main Setup"
         self.init_miraa()
-        self.set_timer(0.8, self.go_to_next_screen)
 
     def go_to_next_screen(self) -> None:
         self.app.switch_screen("init_env")
@@ -239,6 +243,13 @@ class InitProgress(Screen):
             for log in a.init():
                 prog_bar.advance(1)
                 logs.write(log)
+
+        self.finished_init = True
+
+    def _on_key(self, event: events.Key) -> None:
+        if self.finished_init:
+            event.stop()
+            self.go_to_next_screen()
 
 
 class InitEnvKeys(Screen):
@@ -264,6 +275,7 @@ You can use these for them:
             
             background: $surface;
             border: solid $primary;
+            border-title-align: center;
             
             align: center middle; 
             content-align: center middle;
@@ -308,6 +320,10 @@ You can use these for them:
         def on_button_pressed(self, event: Button.Pressed) -> None:
             if event.button.id == "exit":
                 self.dismiss()
+
+        def _on_mount(self, event: events.Mount) -> None:
+            self.query_one(Center).border_title = "Environment Variable Help"
+
     DEFAULT_CSS = """
     CenterMiddle {
         height: auto;
@@ -347,6 +363,7 @@ You can use these for them:
 
     spot_cli_id = None
     spot_cli_sec = None
+    spot_redir_uri = None
     gen_acc_tok = None
 
     error_message = ""
@@ -360,7 +377,8 @@ You can use these for them:
 
                 yield Input(placeholder="SPOTIFY_CLIENT_ID", id="in1")
                 yield Input(placeholder="SPOTIFY_CLIENT_SECRET", id="in2")
-                yield Input(placeholder="GENIUS_ACCESS_TOKEN", id="in3")
+                yield Input(placeholder="SPOTIFY_REDIRECT_URI", id="in3")
+                yield Input(placeholder="GENIUS_ACCESS_TOKEN", id="in4")
 
                 err_msg = Static(self.error_message, disabled=True, id="err_msg")
                 err_msg.styles.color = "red"
@@ -381,12 +399,15 @@ You can use these for them:
             elif event.input.id == "in2":
                 self.query_one("#in3", Input).focus()
             elif event.input.id == "in3":
+                self.query_one("#in4", Input).focus()
+            elif event.input.id == "in4":
                 self.query_one("#confirm", Button).focus()
         else:
             match event.input.id:
                 case "in1": self.error_message = "SPOTIFY_CLIENT_ID cannot be empty"
                 case "in2": self.error_message = "SPOTIFY_CLIENT_SECRET cannot be empty"
-                case "in3": self.error_message = "GENIUS_ACCESS_TOKEN cannot be empty"
+                case "in3": self.error_message = "SPOTIFY_REDIRECT_URI cannot be empty"
+                case "in4": self.error_message = "GENIUS_ACCESS_TOKEN cannot be empty"
             self.query_one("#err_msg", Static).content = self.error_message
             self.query_one("#err_msg", Static).display = True
 
@@ -398,6 +419,8 @@ You can use these for them:
         elif event.input.id == "in2":
             self.spot_cli_sec = event.input.value
         elif event.input.id == "in3":
+            self.spot_redir_uri = event.input.value
+        elif event.input.id == "in4":
             self.gen_acc_tok = event.input.value
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -411,6 +434,9 @@ You can use these for them:
             if not self.spot_cli_sec:
                 anything_empty = True
                 empty_list.append("SPOTIFY_CLIENT_SECRET")
+            if not self.spot_redir_uri:
+                anything_empty = True
+                empty_list.append("SPOTIFY_REDIRECT_URI")
             if not self.gen_acc_tok:
                 anything_empty = True
                 empty_list.append("GENIUS_ACCESS_TOKEN")
@@ -420,10 +446,224 @@ You can use these for them:
                 self.query_one("#err_msg", Static).content = self.error_message
                 self.query_one("#err_msg", Static).display = True
             else:
-                ...
+                set_key(ENV_FILE, "SPOTIFY_CLIENT_ID", self.spot_cli_id, quote_mode="never")
+                set_key(ENV_FILE, "SPOTIFY_CLIENT_SECRET", self.spot_cli_sec, quote_mode="never")
+                set_key(ENV_FILE, "SPOTIFY_REDIRECT_URI", self.spot_redir_uri, quote_mode="never")
+                set_key(ENV_FILE, "GENIUS_ACCESS_TOKEN", self.gen_acc_tok, quote_mode="never")
         elif event.button.id == "help_button":
             self.app.push_screen(self.InitEnvHelpScreen())
 
+
+class InitDownloadDicts(Screen):
+    class AutoDownloadDicts(ModalScreen):
+        DEFAULT_CSS = """
+        CenterMiddle {
+            height: auto;
+            width: 80%;
+            
+            padding: 0 4;
+    
+            border: solid $secondary;
+            border-title-style: bold;
+            border-title-color: $primary;
+            border-title-align: center;
+        }
+        
+        RichLog {
+            height: 30;
+            width: 100%;
+            margin: 0 0 1 0;
+        }
+        
+        ProgressBar {
+            margin: 0 0 1 0;
+        }
+        
+        Container {
+            align: center middle;
+            content-align: center middle;
+        }
+        
+        Label {
+            text-align: center;
+        }
+        """
+
+        finished_downloading = False
+        failed_downloading = False
+
+        def compose(self) -> ComposeResult:
+            with Container():
+                with CenterMiddle():
+                    yield Label("")
+                    yield Label("Downloading Dictionaries")
+                    yield ProgressBar(id="progress_bar", total=len(DEFAULT_DICTS_LINK) * 2, show_eta=True)
+                    yield RichLog(id="logs")
+                    yield Static("Finished Downloading, press any key to dismiss", disabled=True, id="finished")
+
+        def _on_mount(self, event: events.Mount) -> None:
+            self.query_one(CenterMiddle).border_title = "Auto Download Dictionaries"
+            self.download_dicts()
+
+        @work(thread=True)
+        def download_dicts(self):
+            try:
+                for log in download_all_dicts():
+                    self.query_one(ProgressBar).advance(1)
+                    self.query_one(RichLog).write(log)
+            except Exception as e:
+                self.query_one(RichLog).write(e)
+                self.query_one("#finished", Static).content = "Failed to download, press any key to dismiss"
+                self.failed_downloading = True
+
+            def reveal_completion_banner():
+                self.query_one("#finished", Static).display = True
+                self.finished_downloading = True
+
+            self.app.call_from_thread(reveal_completion_banner)
+
+        def _on_key(self, event: events.Key) -> None:
+            if self.finished_downloading and not self.failed_downloading:
+                event.stop()
+                self.dismiss(True)
+            elif self.finished_downloading and self.failed_downloading:
+                event.stop()
+                self.dismiss(False)
+
+    #! TODO fix the message it doesnt work
+    class ManualDownloadHelp(ModalScreen):
+        HELP_MESSAGE = """Please download these .zip files and move them to src/dicts directory"""
+        for k, v in DEFAULT_DICTS_LINK.items():
+            safe_key = escape(k)
+            HELP_MESSAGE += f"\n    - [@click=\"app.open_url('{v}')\"]{safe_key}[/]"
+
+        DEFAULT_CSS = """
+        #vert_group {
+            width: 85%;
+            height: auto;
+            max-height: 30;
+
+            background: $surface;
+            border: solid $primary;
+            border-title-align: center;
+
+            align: center middle; 
+            content-align: center middle;
+        }
+
+        Container {
+            height: auto;
+
+            align: center middle;
+            content-align: center middle;
+        }
+
+        Static {
+            margin: 1 2;
+            padding: 1 2;
+            text-align: left;
+            text-overflow: fold;
+        }
+
+        #text_con {
+            margin: 0 1;
+            width: 100%;
+        }
+
+        #button_con {
+            width: 100%;
+            margin: 0 0 1 0;
+        }
+        """
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.styles.align = ("center", "middle")
+
+        def compose(self) -> ComposeResult:
+            with Center(id="vert_group"):
+                with Container(id="text_con"):
+                    yield Static(self.HELP_MESSAGE)
+                with Container(id="button_con"):
+                    yield Button("Exit", variant="error", id="exit")
+
+        def on_button_pressed(self, event: Button.Pressed) -> None:
+            if event.button.id == "exit":
+                self.dismiss()
+
+        def _on_mount(self, event: events.Mount) -> None:
+            self.query_one(Center).border_title = "Manual Download Links"
+
+    DEFAULT_CSS = """
+    CenterMiddle {
+        width: auto;
+        height: auto;
+    
+        border: solid $secondary;
+        border-title-style: bold;
+        border-title-color: $primary;
+        border-title-align: center;
+    }
+    
+    Container {
+        align: center middle;
+        content-align: center middle;
+        
+        border: solid $primary;
+    }
+    
+    Label {
+        width: auto;
+    
+        border: solid $secondary;
+        
+        text-align: center;
+    }
+    
+    HorizontalGroup {
+        border: solid $secondary;
+        
+        align: center middle;
+        content-align: center middle;
+    }
+    
+    #button_con {
+        width: auto;
+        height: auto;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+
+        with Container():
+            with CenterMiddle():
+                yield Label("Please download these JP dictionaries for the app to work!")
+
+                with Container(id="button_con"):
+                    with HorizontalGroup():
+                        yield Button(variant="success", id="download", label="Download All")
+                        yield Button(variant="warning", id="manual", label="Manually Download All")
+
+    def _on_mount(self, event: events.Mount) -> None:
+        self.query_one(CenterMiddle).border_title = "Download Dictionaries"
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "download":
+            self.app.push_screen(self.AutoDownloadDicts(), callback=self.download_failed)
+        elif event.button.id == "manual":
+            self.app.push_screen(self.ManualDownloadHelp())
+
+    def download_failed(self, value: bool) -> None:
+        if value:
+            ...
+            #! TODO go to next screen
+        else:
+            self.query_one("#download", Button).disabled = True
+
+
+class InitExtractDicts(Screen):
+    ...
 
 
 class FirstTimeInit(Screen):

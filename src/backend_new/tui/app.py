@@ -2,7 +2,7 @@ from textual.app import App, ComposeResult
 from textual.widgets import Footer, Header
 from textual import work
 
-from backend_new.tui.screens import ConfigMenu, FirstTimeInit, InitProgress, InitEnvKeys
+from backend_new.tui.screens import ConfigMenu, FirstTimeInit, InitProgress, InitEnvKeys, InitDownloadDicts
 
 from backend_new.utils.helper_funcs import read_config
 
@@ -12,6 +12,7 @@ class MiraaInterface(App):
         "init_screen": FirstTimeInit,
         "init_prog": InitProgress,
         "init_env": InitEnvKeys,
+        "init_dicts": InitDownloadDicts
     }
 
     BINDINGS = [("ctrl+o", "push_screen('config_menu')", "Config")]
@@ -22,8 +23,9 @@ class MiraaInterface(App):
                      show_clock=True)
 
     def on_mount(self) -> None:
-        if not self.check_if_init():
-            self.push_screen("init_screen")
+        self.push_screen("init_dicts")
+        # if not self.check_if_init():
+        #     self.push_screen("init_screen")
 
     @staticmethod
     def check_if_init() -> bool:
@@ -34,7 +36,6 @@ class MiraaInterface(App):
                 return False
         except FileNotFoundError:
             return False
-
 
 
 if __name__ == '__main__':

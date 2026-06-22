@@ -8,9 +8,11 @@ import json
 import base58
 import os
 import re
+import gdown
+from collections.abc import Generator
 
 # CONSTANTS
-from backend_new.utils.constants import ENV_FILE, TEMP_DIR, DEFAULT_ENV_VARS, CONFIG_FILE
+from backend_new.utils.constants import ENV_FILE, TEMP_DIR, DEFAULT_ENV_VARS, CONFIG_FILE, DEFAULT_DICTS_LINK, DICTS_DIR
 
 # LOGGER
 from backend_new.utils.logger import Logger
@@ -222,4 +224,25 @@ def contains_japanese(string: str) -> bool:
         return False
 
     return bool(JAPANESE_CHAR_PATTERN.search(string))
+# endregion
+
+# region download gdrive
+def download_google_drive(link: str, output_path: Path) -> None:
+    gdown.download(link, str(output_path), quiet=False)
+# endregion
+
+# region download dicts
+def download_all_dicts() -> Generator[str, None, None]:
+    try:
+        for k, v in DEFAULT_DICTS_LINK.items():
+            yield f"Downloading: {k}"
+
+            if Path(DICTS_DIR / k).exists():
+                yield "File already exists, skipping"
+            else:
+                download_google_drive(v, DICTS_DIR)
+                yield f"Finished downloading: {k}"
+    except Exception as e:
+        raise e
+
 # endregion

@@ -37,13 +37,13 @@ class Analyzer:
 
     def init(self) -> Generator[str, None, None]:
         """Initialize the analyzer."""
-        # self.setup_main_directories()
+        self.setup_main_directories()
         yield "Successfully created directory structure."
 
-        # self._env_data = load_env_file()
+        self._env_data = load_env_file()
         yield "Successfully loaded environment variables."
 
-        # self.setup_config_file()
+        self.setup_config_file()
         yield "Successfully loaded configuration file."
 
     # region Helper Functions
