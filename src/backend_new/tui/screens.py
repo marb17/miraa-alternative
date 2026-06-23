@@ -1,3 +1,4 @@
+from fontTools.varLib import avar
 from mmengine.runner import priority
 from rich.box import HEAVY_EDGE
 from sympy.physics.wigner import racah
@@ -10,7 +11,7 @@ from textual.binding import Binding
 from textual.reactive import reactive
 
 from backend_new.utils.helper_funcs import read_config, write_config, download_all_dicts
-from backend_new.utils.constants import ENV_FILE, DEFAULT_DICTS_LINK
+from backend_new.utils.constants import ENV_FILE, DEFAULT_DICTS
 
 from backend_new.main import Analyzer
 
@@ -227,8 +228,12 @@ class InitProgress(Screen):
 
                 yield RichLog(id="logs", highlight=True, markup=True)
 
+                yield Static("Finished initial setup, press any key to continue [blink]_[/]", disabled=True, id="continue_static")
+
     def _on_mount(self, event: events.Mount) -> None:
         self.query_one(CenterMiddle).border_title = "Main Setup"
+        self.query_one("#continue_static", Static).display = False
+
         self.init_miraa()
 
     def go_to_next_screen(self) -> None:
@@ -245,6 +250,7 @@ class InitProgress(Screen):
                 logs.write(log)
 
         self.finished_init = True
+        self.query_one("#continue_static", Static).display = True
 
     def _on_key(self, event: events.Key) -> None:
         if self.finished_init:
@@ -450,6 +456,8 @@ You can use these for them:
                 set_key(ENV_FILE, "SPOTIFY_CLIENT_SECRET", self.spot_cli_sec, quote_mode="never")
                 set_key(ENV_FILE, "SPOTIFY_REDIRECT_URI", self.spot_redir_uri, quote_mode="never")
                 set_key(ENV_FILE, "GENIUS_ACCESS_TOKEN", self.gen_acc_tok, quote_mode="never")
+
+                self.app.switch_screen("init_dicts")
         elif event.button.id == "help_button":
             self.app.push_screen(self.InitEnvHelpScreen())
 
@@ -497,9 +505,9 @@ class InitDownloadDicts(Screen):
                 with CenterMiddle():
                     yield Label("")
                     yield Label("Downloading Dictionaries")
-                    yield ProgressBar(id="progress_bar", total=len(DEFAULT_DICTS_LINK) * 2, show_eta=True)
+                    yield ProgressBar(id="progress_bar", total=len(DEFAULT_DICTS) * 2, show_eta=True)
                     yield RichLog(id="logs")
-                    yield Static("Finished Downloading, press any key to dismiss", disabled=True, id="finished")
+                    yield Static("Finished Downloading, press any key to continue [blink]_[/]", disabled=True, id="finished")
 
         def _on_mount(self, event: events.Mount) -> None:
             self.query_one(CenterMiddle).border_title = "Auto Download Dictionaries"
@@ -508,6 +516,7 @@ class InitDownloadDicts(Screen):
         @work(thread=True)
         def download_dicts(self):
             try:
+                self.query_one("#finished", Static).display = False
                 for log in download_all_dicts():
                     self.query_one(ProgressBar).advance(1)
                     self.query_one(RichLog).write(log)
@@ -533,9 +542,9 @@ class InitDownloadDicts(Screen):
     #! TODO fix the message it doesnt work
     class ManualDownloadHelp(ModalScreen):
         HELP_MESSAGE = """Please download these .zip files and move them to src/dicts directory"""
-        for k, v in DEFAULT_DICTS_LINK.items():
-            safe_key = escape(k)
-            HELP_MESSAGE += f"\n    - [@click=\"app.open_url('{v}')\"]{safe_key}[/]"
+        # for k, v in DEFAULT_DICTS_LINK.items():
+        #     safe_key = escape(k)
+        #     HELP_MESSAGE += f"\n    - [@click=\"app.open_url('{v}')\"]{safe_key}[/]"
 
         DEFAULT_CSS = """
         #vert_group {
@@ -589,13 +598,17 @@ class InitDownloadDicts(Screen):
 
         def on_button_pressed(self, event: Button.Pressed) -> None:
             if event.button.id == "exit":
-                self.dismiss()
+                self.dismiss(True)
 
         def _on_mount(self, event: events.Mount) -> None:
             self.query_one(Center).border_title = "Manual Download Links"
 
+    #! TODO add the extract thing
+    class ExtractDicts(ModalScreen):
+        ...
+
     DEFAULT_CSS = """
-    CenterMiddle {
+    #pop_up {
         width: auto;
         height: auto;
     
@@ -605,7 +618,7 @@ class InitDownloadDicts(Screen):
         border-title-align: center;
     }
     
-    Container {
+    #main {
         align: center middle;
         content-align: center middle;
         
@@ -615,55 +628,78 @@ class InitDownloadDicts(Screen):
     Label {
         width: auto;
     
-        border: solid $secondary;
+        margin: 1 2;
         
         text-align: center;
     }
     
-    HorizontalGroup {
-        border: solid $secondary;
-        
+    Button {
+        width: auto;
+    }
+    
+    #hor_group {
         align: center middle;
         content-align: center middle;
+        
+        width: auto;
     }
     
     #button_con {
-        width: auto;
         height: auto;
+        width: 100%;
+        
+        align: center middle;
+        content-align: center middle;
+        
+        margin: 1;
     }
     """
+
+    finished_downloading = False
 
     def compose(self) -> ComposeResult:
         yield Header()
 
-        with Container():
-            with CenterMiddle():
+        with Container(id="main"):
+            with CenterMiddle(id="pop_up"):
                 yield Label("Please download these JP dictionaries for the app to work!")
 
                 with Container(id="button_con"):
-                    with HorizontalGroup():
+                    with HorizontalGroup(id="hor_group"):
                         yield Button(variant="success", id="download", label="Download All")
                         yield Button(variant="warning", id="manual", label="Manually Download All")
 
+                yield Static("Finished downloading, press any key to continue [blink]_[/]", id="continue_static")
+
     def _on_mount(self, event: events.Mount) -> None:
         self.query_one(CenterMiddle).border_title = "Download Dictionaries"
+        self.query_one("#continue_static", Static).display = False
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "download":
-            self.app.push_screen(self.AutoDownloadDicts(), callback=self.download_failed)
+            self.app.push_screen(self.AutoDownloadDicts(), callback=self.auto_download_callback)
         elif event.button.id == "manual":
-            self.app.push_screen(self.ManualDownloadHelp())
+            self.app.push_screen(self.ManualDownloadHelp(), callback=self.manual_download_callback)
 
-    def download_failed(self, value: bool) -> None:
+    def auto_download_callback(self, value: bool) -> None:
         if value:
-            ...
-            #! TODO go to next screen
+            self.finished_downloading = True
+            self.query_one("#continue_static", Static).display = True
         else:
             self.query_one("#download", Button).disabled = True
 
+    def manual_download_callback(self, value: bool) -> None:
+        if value:
+            self.finished_downloading = True
+            self.query_one("#manual", Button).disabled = True
+            self.query_one("#continue_static", Static).display = True
 
-class InitExtractDicts(Screen):
-    ...
+    def _on_key(self, event: events.Key) -> None:
+        if self.finished_downloading:
+            # TODO go to next screen
+            self.app.pop_screen()
+
+            event.stop()
 
 
 class FirstTimeInit(Screen):

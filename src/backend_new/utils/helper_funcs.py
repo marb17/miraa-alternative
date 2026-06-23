@@ -12,7 +12,7 @@ import gdown
 from collections.abc import Generator
 
 # CONSTANTS
-from backend_new.utils.constants import ENV_FILE, TEMP_DIR, DEFAULT_ENV_VARS, CONFIG_FILE, DEFAULT_DICTS_LINK, DICTS_DIR
+from backend_new.utils.constants import ENV_FILE, TEMP_DIR, DEFAULT_ENV_VARS, CONFIG_FILE, DEFAULT_DICTS_FOLDER_LINK, DICTS_DIR, DEFAULT_DICTS
 
 # LOGGER
 from backend_new.utils.logger import Logger
@@ -234,14 +234,14 @@ def download_google_drive(link: str, output_path: Path) -> None:
 # region download dicts
 def download_all_dicts() -> Generator[str, None, None]:
     try:
-        for k, v in DEFAULT_DICTS_LINK.items():
-            yield f"Downloading: {k}"
+        files = gdown.download_folder(DEFAULT_DICTS_FOLDER_LINK, skip_download=True)
+        re_dicts_search = [re.compile(f".*{item}.*") for item in DEFAULT_DICTS]
 
-            if Path(DICTS_DIR / k).exists():
-                yield "File already exists, skipping"
-            else:
-                download_google_drive(v, DICTS_DIR)
-                yield f"Finished downloading: {k}"
+        for file_info in files:
+            if any([complied.match(file_info.path) for complied in re_dicts_search]):
+                yield f"Downloading: {file_info.path}"
+                gdown.download(id=file_info.id, output=DICTS_DIR, use_cookies=False)
+                yield f"Finished Downloading: {file_info.path}"
     except Exception as e:
         raise e
 

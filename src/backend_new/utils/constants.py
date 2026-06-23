@@ -1,3 +1,5 @@
+import re
+
 #===================================================
 #      DIRECTORIES
 #===================================================
@@ -135,13 +137,15 @@ DEFAULT_DICTS_MESSAGE = """# Please download these recommended dictionaries:
 - The app will automatically extract the .zip files if not yet done and automatically detect each dictionary each run
 """
 
-DEFAULT_DICTS_LINK = {"[JA-JA Encyclopedia] PixivLight_2026-05-30": "https://drive.google.com/file/d/1ilztEQA6gSY6XSUai3N7a8fqpw8hMDSq/view",
-                      "[JA-JA Names] JMnedict (2026-05-29)": "https://drive.google.com/file/d/1YHR3p1n1V-X8TUc_COrPi7p_kXBsBpw5/view",
-                      "[JA-EN] jitendex-yomitan (2026-05-05)": "https://drive.google.com/file/d/1IOf4tQTGhCuwemWPqRTyKRRj7EUMwWoU/view",
-                      "[JA-JA Onomatopoeia] 擬音語・擬態語辞典": "https://drive.google.com/file/d/1aO04WwJLkykTMlqCjuvS55Bchc-gUQ5W/view",
-                      "[JA-JA Yoji] 四字熟語の百科事典 [2024-06-30]": "https://drive.google.com/file/d/15Z2yW4E5cI7MBht3uBVtrue-bH0wdtGh/view",
-                      "[JA-JA] ことわざ・慣用句の百科事典": "https://drive.google.com/file/d/15_bdaHA1-l4munKpZ6a6zF5bg-CwDHkp/view",
-                      "[JA-JA] 大辞林　第四版": "https://drive.google.com/file/d/13C1OX9ZvdJieFm9KT8xDRbbgWK29U4oT/view"}
+DEFAULT_DICTS = ["PixivLight",
+              "JMnedict",
+              "jitendex-yomitan",
+              "擬音語・擬態語辞典",
+              "四字熟語の百科事典",
+              "ことわざ・慣用句の百科事典",
+              "大辞林　第四版"]
+
+DEFAULT_DICTS_FOLDER_LINK = 'https://drive.google.com/drive/folders/1xURpMJN7HTtSLuVs9ZtIbE7MDRCdoU29?usp=drive_link'
 
 TEST_DRIVE = {"1": "https://drive.google.com/file/d/1XwS1zZPz9Q9SVM-s_SZaVifa6MWSxaZD/view?usp=drive_link",
               "2": "https://drive.google.com/file/d/1PFE3ahf-uMzB7EXSmIzGZJFNCX92OgQB/view?usp=drive_link",

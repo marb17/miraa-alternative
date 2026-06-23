@@ -23,9 +23,8 @@ class MiraaInterface(App):
                      show_clock=True)
 
     def on_mount(self) -> None:
-        self.push_screen("init_dicts")
-        # if not self.check_if_init():
-        #     self.push_screen("init_screen")
+        if not self.check_if_init():
+            self.push_screen("init_screen")
 
     @staticmethod
     def check_if_init() -> bool:
