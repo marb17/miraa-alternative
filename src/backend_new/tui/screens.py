@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fontTools.varLib import avar
 from mmengine.runner import priority
 from rich.box import HEAVY_EDGE
@@ -20,6 +22,9 @@ from dotenv import set_key, load_dotenv
 from rich.markup import escape
 import os
 
+from backend_new.utils.logger import Logger
+logger = Logger(__name__)
+
 # region config menu
 
 # default stuff prob like template
@@ -41,8 +46,37 @@ DEFAULT_CSS = '''
 """
 
 class SaveConfirmationModal(ModalScreen):
+    DEFAULT_CSS = """
+    #dialog_card {
+        width: auto; 
+        height: auto;
+        
+        border: solid $secondary;
+        border-title-style: bold;
+        border-title-color: $primary;
+        border-title-align: center;
+    }
+    
+    #dialog_msg {
+        width: 100%;
+        margin: 1 0;
+        text-align: center;
+    }
+    
+    #dialog_buttons {
+        height: auto;
+        width: auto;
+        
+        margin: 0 2 1 2;
+    }
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.styles.align = ("center", "middle")
+
     def compose(self) -> ComposeResult:
-        with Vertical(id="dialog_card"):
+        with CenterMiddle(id="dialog_card"):
             yield Label("⚠️ You have unsaved changes!\nWould you like to save before switching?", id="dialog_msg")
             with Horizontal(id="dialog_buttons"):
                 yield Button("Save", variant="success", id="modal_save")
@@ -56,6 +90,9 @@ class SaveConfirmationModal(ModalScreen):
             self.dismiss("discard")
         elif event.button.id == "modal_cancel":
             self.dismiss("cancel")
+
+    def _on_mount(self, event: events.Mount) -> None:
+        self.query_one("#dialog_card", CenterMiddle).border_title = "Unsaved Changes"
 
 
 class DownloadMenu(Horizontal):
@@ -186,12 +223,9 @@ class EnvironmentVariablesMenu(Horizontal):
 
     hide_keys = True
     anything_changed = False
+    last_modal_decision = None
 
     load_dotenv(ENV_FILE)
-    spot_cli_id = os.getenv("SPOTIFY_CLIENT_ID")
-    spot_cli_sec = os.getenv("SPOTIFY_CLIENT_SECRET")
-    spot_redir_uri = os.getenv("SPOTIFY_REDIRECT_URI")
-    gen_acc_tok = os.getenv("GENIUS_ACCESS_TOKEN")
 
     def compose(self) -> ComposeResult:
         with VerticalGroup(classes="option_sections"):
@@ -216,6 +250,7 @@ class EnvironmentVariablesMenu(Horizontal):
                 yield Button(variant="warning", id="show", label="Show")
                 yield Button(variant="success", id="save", label="Save")
 
+
     def _on_mount(self, event: events.Mount) -> None:
         self.query_one("#spotify", Container).border_title = "Spotify"
         self.query_one("#genius", Container).border_title = "Genius"
@@ -223,10 +258,9 @@ class EnvironmentVariablesMenu(Horizontal):
         for widget in self.query(Input):
             widget.password = self.hide_keys
 
-        self.query_one("#in1", Input).value = self.spot_cli_id
-        self.query_one("#in2", Input).value = self.spot_cli_sec
-        self.query_one("#in3", Input).value = self.spot_redir_uri
-        self.query_one("#in4", Input).value = self.gen_acc_tok
+        self.write_default_values()
+
+        self.anything_changed = False
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == "in1":
@@ -249,12 +283,41 @@ class EnvironmentVariablesMenu(Horizontal):
             for widget in self.query(Input):
                 widget.password = self.hide_keys
         elif event.button.id == "save":
-            set_key(ENV_FILE, "SPOTIFY_CLIENT_ID", self.spot_cli_id, quote_mode="never")
-            set_key(ENV_FILE, "SPOTIFY_CLIENT_SECRET", self.spot_cli_sec, quote_mode="never")
-            set_key(ENV_FILE, "SPOTIFY_REDIRECT_URI", self.spot_redir_uri, quote_mode="never")
-            set_key(ENV_FILE, "GENIUS_ACCESS_TOKEN", self.gen_acc_tok, quote_mode="never")
-
+            self.save_config()
             self.anything_changed = False
+
+    def save_config(self) -> None:
+        set_key(ENV_FILE, "SPOTIFY_CLIENT_ID", self.spot_cli_id, quote_mode="never")
+        set_key(ENV_FILE, "SPOTIFY_CLIENT_SECRET", self.spot_cli_sec, quote_mode="never")
+        set_key(ENV_FILE, "SPOTIFY_REDIRECT_URI", self.spot_redir_uri, quote_mode="never")
+        set_key(ENV_FILE, "GENIUS_ACCESS_TOKEN", self.gen_acc_tok, quote_mode="never")
+
+    def write_default_values(self):
+        self.spot_cli_id = os.getenv("SPOTIFY_CLIENT_ID")
+        self.spot_cli_sec = os.getenv("SPOTIFY_CLIENT_SECRET")
+        self.spot_redir_uri = os.getenv("SPOTIFY_REDIRECT_URI")
+        self.gen_acc_tok = os.getenv("GENIUS_ACCESS_TOKEN")
+
+        with self.prevent(Input.Changed):
+            self.query_one("#in1", Input).value = self.spot_cli_id
+            self.query_one("#in2", Input).value = self.spot_cli_sec
+            self.query_one("#in3", Input).value = self.spot_redir_uri
+            self.query_one("#in4", Input).value = self.gen_acc_tok
+
+    def pane_switch_handler(self) -> None:
+        if self.anything_changed:
+            self.app.push_screen(SaveConfirmationModal(), callback=self.save_screen_handler)
+
+    def save_screen_handler(self, value: str) -> None:
+        if value == "save":
+            self.save_config()
+            self.last_modal_decision = value
+        elif value == "discard":
+            self.write_default_values()
+            self.anything_changed = False
+            self.last_modal_decision = value
+        elif value == "cancel":
+            self.last_modal_decision = value
 
 
 class ConfigMenu(Screen):
@@ -262,17 +325,58 @@ class ConfigMenu(Screen):
         Binding("ctrl+x", "app.pop_screen", "Exit Menu", priority=True)
     ]
 
+    _switching_internally = False
+    current_pane_id = "processes"
+
     def compose(self) -> ComposeResult:
         yield Header()
         yield Footer()
 
         with TabbedContent():
-            with TabPane("Processes"):
+            with TabPane("Processes", id="processes"):
                 yield ProcessesMenu()
-            with TabPane("Downloader"):
+            with TabPane("Downloader", id="download"):
                 yield DownloadMenu()
-            with TabPane(".env"):
+            with TabPane(".env", id="env"):
                 yield EnvironmentVariablesMenu()
+
+    def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        if self._switching_internally:
+            return
+
+        if event.pane.id == "processes":
+            ...
+        elif event.pane.id == "download":
+            ...
+        elif event.pane.id == "env":
+            ...
+
+        if self.current_pane_id == "processes":
+            ...
+        elif self.current_pane_id == "download":
+            ...
+        elif self.current_pane_id == "env":
+            current_widget = self.query_one(EnvironmentVariablesMenu)
+            if current_widget.anything_changed:
+                self._switching_internally = True
+                event.tabbed_content.active = "env"
+                self._switching_internally = False
+
+                current_widget.pane_switch_handler()
+
+                if current_widget.last_modal_decision == "save":
+                    self._switching_internally = True
+                    event.tabbed_content.active = event.pane.id
+                    self._switching_internally = False
+                elif current_widget.last_modal_decision == "discard":
+                    self._switching_internally = True
+                    event.tabbed_content.active = event.pane.id
+                    self._switching_internally = False
+                elif current_widget.last_modal_decision == "cancel":
+                    pass
+
+        self.current_pane_id = event.pane.id
+
 
 # endregion
 
