@@ -16,8 +16,9 @@ from backend_new.utils.constants import ENV_FILE, DEFAULT_DICTS
 from backend_new.main import Analyzer
 
 import time
-from dotenv import set_key
+from dotenv import set_key, load_dotenv
 from rich.markup import escape
+import os
 
 # region config menu
 
@@ -67,13 +68,12 @@ class DownloadMenu(Horizontal):
         }
 
         .section_container Label {
-        padding: 1;
+            padding: 1;
         }
 
         .option_sections {
             padding: 0 1;
             align: center top;
-            border: heavy $primary;
         }  
         """
 
@@ -82,7 +82,7 @@ class DownloadMenu(Horizontal):
 
     def compose(self) -> ComposeResult:
         with Horizontal():
-            with Vertical():
+            with Vertical(classes="option_sections"):
                 with containers.HorizontalGroup(classes="section_container", id="downloader"):
                     yield Switch(id="downloader_cookies_switch")
                     yield Label("Use cookies for YouTube Downloader?")
@@ -121,7 +121,6 @@ class ProcessesMenu(Horizontal):
     .option_sections {
         padding: 0 1;
         align: center top;
-        border: heavy $primary;
     }
     """
 
@@ -155,6 +154,109 @@ class ProcessesMenu(Horizontal):
         translate_lyrics_checkbox.value = initial_skip_processes["translate_lyrics"]
 
 
+class EnvironmentVariablesMenu(Horizontal):
+    DEFAULT_CSS = """
+    .section_container {
+        height: auto;
+        border: solid $secondary;
+        border-title-style: bold;
+        border-title-color: $primary;
+    }
+    
+    .option_sections {
+        padding: 0 1;
+        align: center top;
+    }
+    
+    #buttons {
+        align: right middle;
+        content-align: right middle;
+        margin: 0 1;
+    }
+    
+    .option {
+        height: auto;
+        margin: 1 0;
+    }
+    
+    .option Label {
+        margin: 0 1;
+    }
+    """
+
+    hide_keys = True
+    anything_changed = False
+
+    load_dotenv(ENV_FILE)
+    spot_cli_id = os.getenv("SPOTIFY_CLIENT_ID")
+    spot_cli_sec = os.getenv("SPOTIFY_CLIENT_SECRET")
+    spot_redir_uri = os.getenv("SPOTIFY_REDIRECT_URI")
+    gen_acc_tok = os.getenv("GENIUS_ACCESS_TOKEN")
+
+    def compose(self) -> ComposeResult:
+        with VerticalGroup(classes="option_sections"):
+            with Container(classes="section_container", id="spotify"):
+                with Container(classes="option"):
+                    yield Label("SPOTIFY_CLIENT_ID")
+                    yield Input(placeholder="SPOTIFY_CLIENT_ID", id="in1")
+
+                with Container(classes="option"):
+                    yield Label("SPOTIFY_CLIENT_SECRET")
+                    yield Input(placeholder="SPOTIFY_CLIENT_SECRET", id="in2")
+
+                with Container(classes="option"):
+                    yield Label("SPOTIFY_REDIRECT_URI")
+                    yield Input(placeholder="SPOTIFY_REDIRECT_URI", id="in3")
+            with Container(classes="section_container", id="genius"):
+                with Container(classes="option"):
+                    yield Label("GENIUS_ACCESS_TOKEN")
+                    yield Input(placeholder="GENIUS_ACCESS_TOKEN", id="in4")
+
+            with HorizontalGroup(id="buttons"):
+                yield Button(variant="warning", id="show", label="Show")
+                yield Button(variant="success", id="save", label="Save")
+
+    def _on_mount(self, event: events.Mount) -> None:
+        self.query_one("#spotify", Container).border_title = "Spotify"
+        self.query_one("#genius", Container).border_title = "Genius"
+
+        for widget in self.query(Input):
+            widget.password = self.hide_keys
+
+        self.query_one("#in1", Input).value = self.spot_cli_id
+        self.query_one("#in2", Input).value = self.spot_cli_sec
+        self.query_one("#in3", Input).value = self.spot_redir_uri
+        self.query_one("#in4", Input).value = self.gen_acc_tok
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "in1":
+            self.spot_cli_id = event.input.value
+            self.anything_changed = True
+        elif event.input.id == "in2":
+            self.anything_changed = True
+            self.spot_cli_sec = event.input.value
+        elif event.input.id == "in3":
+            self.spot_redir_uri = event.input.value
+            self.anything_changed = True
+        elif event.input.id == "in4":
+            self.gen_acc_tok = event.input.value
+            self.anything_changed = True
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "show":
+            self.hide_keys = False if self.hide_keys else True
+
+            for widget in self.query(Input):
+                widget.password = self.hide_keys
+        elif event.button.id == "save":
+            set_key(ENV_FILE, "SPOTIFY_CLIENT_ID", self.spot_cli_id, quote_mode="never")
+            set_key(ENV_FILE, "SPOTIFY_CLIENT_SECRET", self.spot_cli_sec, quote_mode="never")
+            set_key(ENV_FILE, "SPOTIFY_REDIRECT_URI", self.spot_redir_uri, quote_mode="never")
+            set_key(ENV_FILE, "GENIUS_ACCESS_TOKEN", self.gen_acc_tok, quote_mode="never")
+
+            self.anything_changed = False
+
+
 class ConfigMenu(Screen):
     BINDINGS = [
         Binding("ctrl+x", "app.pop_screen", "Exit Menu", priority=True)
@@ -169,6 +271,8 @@ class ConfigMenu(Screen):
                 yield ProcessesMenu()
             with TabPane("Downloader"):
                 yield DownloadMenu()
+            with TabPane(".env"):
+                yield EnvironmentVariablesMenu()
 
 # endregion
 
