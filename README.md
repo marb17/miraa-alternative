@@ -1,39 +1,25 @@
 # Miraa Alternative
 An open-source alternative to **Miraa**, a Japanese transcription and translation app.
 Multilingual audio analysis and alignment system for transcription, translation, and visualization.
+Main TUI uses [Textual](https://github.com/Textualize/textual)
 
-## 🚀 What it does
-- Processes music into aligned, translated text and explained using a LLM
-- Supports en-jp transcription and translation
-- Visualizes timing, confidence, and alignment results
-- Searches through Japanese dictionaries to find definitons of words
-- Separates audio using demucs and masks for better separation
-- Auto downloading from YouTube for better input
-
-## 🧠 How it works
-- Splits audio into stems (vocal & instrumental)
-- Audio preprocessing & segmentation (VAD-based)
-- Speech recognition & translation using pretrained models
-- Using Genius API to get lyrics
-- Saves data to a .json file for easy viewing (debugging)
-- HTML-based interactive visualization (soon)
+## 🚀 How it works
+- Automatically queries songs using Spotify API, uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) to download songs
+- Can auto-detect what song is currently playing in Spotify
+- Lyrics and metadata are pulled using Genius API and Spotify API
+- The song is separated into stems of varying models using [python-audio-separator](https://github.com/streichgeorg/python-audio-separator)
+- Song lyrics are automatically translated using a LLM [Shisa v2.1 8B Qwen](https://huggingface.co/shisa-ai/shisa-v2.1-qwen3-8b)
+- WIP
 
 ## 🛠 Tech Stack
 - Python
 - PyTorch / torchaudio
-- Speech & translation models
-- Transformers
-- HTML / JS for dashboards
+- [LMDeploy](https://github.com/internlm/lmdeploy)
+- Textual for dashboards
 - External APIs & web scraping
 
-## 📊 Results
-- Improved alignment accuracy through iterative refinement (fine-tuning)
-- Explanation of Japanese songs and their meaning (for studying the language)
-- Robust handling of noisy real-world audio (actual songs)
-- Scalable pipeline design (soon)
-
 ## 🧪 Status
-Actively iterating and experimenting
+Actively iterating and experimenting, actively working on new features
 
 ---
 
