@@ -3,9 +3,8 @@ from typing import Iterable
 from textual.app import App, ComposeResult, SystemCommand
 from textual.screen import Screen
 from textual.widgets import Footer, Header
-from textual import work
 
-from backend_new.tui.screens import ConfigMenu, FirstTimeInit, InitProgress, InitEnvKeys, InitDownloadDicts
+from tui.screens.screens import ConfigMenu, FirstTimeInit, InitProgress, InitEnvKeys, InitDownloadDicts
 
 from backend_new.utils.helper_funcs import read_config
 

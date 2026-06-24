@@ -3,6 +3,7 @@ from pathlib import Path
 from time import sleep, time
 import json
 from typing import Any
+from collections.abc import Generator
 
 # HELPER LIBRARIES
 from backend_new.utils.helper_funcs import questionary_select, load_env_file, read_json_file
@@ -17,7 +18,7 @@ import yt_dlp
 from yt_dlp.utils import DownloadError, ExtractorError
 
 # CONSTANTS
-from backend_new.utils.constants import TEMP_DIR, CONFIG_FILE
+from backend_new.utils.constants import TEMP_DIR, CONFIG_FILE, UIPromptRequest
 
 
 from backend_new.utils.logger import Logger
@@ -54,239 +55,118 @@ class Downloader:
 
         self._sp = spotipy.Spotify(auth_manager=auth_manager)
 
-    # region helper functions
-
-    @staticmethod
-    def _extract_title_artist(dict_metadata: dict) -> str:
-        return f"{dict_metadata["name"]} - {dict_metadata["artists"][0]["name"]}"
-
-    # endregion
-
-    def search_song_metadata(self, query: str = '') -> dict:
+    def spotify_search_song_metadata_by_id(self, query: str) -> dict:
         """
         Searches for a song on Spotify and returns the metadata
-        :param query: Query to be searched for
+        :param query: ID of spotify track
         :type query: str
         :return: metadata of the song
         :rtype: dict[str, Any]
         """
-        if query == '':
-            raise Exception('Spotify query is required')
+        return self._sp.track(query)
 
-        track_url = query
-        return self._sp.track(track_url)
+    @staticmethod
+    def milliseconds_to_minutes_and_seconds(milliseconds: int) -> str:
+        seconds = milliseconds // 1000
+        minutes, seconds = divmod(seconds, 60)
+        return f"{minutes:02d}:{seconds:02d}"
 
-    def get_title_artist(self, query: str | None = None, metadata: dict | None = None) -> str:
+    @staticmethod
+    def get_title_artist(dict_metadata: dict) -> dict[str, str]:
         """
-        Returns the title and artist given a query or metadata, only returns the featured artist
-        :param query: A query of a spotify song, a URL
-        :type query: str | None
-        :param metadata: A dict from a song metadata, from search_song_metadata
-        :type metadata: dict[str, Any]
-        :return: a str in the form of "TITLE - ARTIST"
+        Returns the title and artist given a metadata, only returns the featured artist
+        :param dict_metadata: A dict from a song metadata, from search_song_metadata
+        :type dict_metadata: dict[str, Any]
+        :return: a dict in the form of "TITLE - ARTIST"
         :rtype: str
         """
-        if query is not None and metadata is not None:
-            raise Exception('Spotify query and metadata are mutually exclusive')
-        if query is None and metadata is None:
-            raise Exception('Spotify query or metadata is required')
+        return {"title": dict_metadata["name"],
+                "artist": dict_metadata["artists"][0]["name"]}
 
-        if query is not None:
-            track_data = self.search_song_metadata(query)
-            return self._extract_title_artist(track_data)
-        elif metadata is not None:
-            return self._extract_title_artist(metadata)
-        return '' # so my static code checker doesn't get angry at me
+    def download_song(self, limit: int = 10) -> Generator[Any, dict[str, Any], None]:
+        persistent_choices = [{"type": "__nav__", "display": "Next", "value": "__next__"},
+                              {"type": "__nav__", "display": "Previous", "value": "__prev__"},
+                              {"type": "__nav__", "display": "New Query", "value": "__new__"}]
 
-    def cli_search_song(self, limit: int = 10, query: str = '') -> dict[str, Any]: # TODO make limit in config file
-        """
-        Searches a song using spotify querying
-        :param query: A query to search for, defaults to none using CLI interface
-        :type query: str
-        :param limit: How many songs to show at a time
-        :type limit: int
-        :return: A dict of the song metadata (spotify)
-        :rtype: dict[str, Any]
-        """
-        query = ''
+        offset: int = 0
 
-        def _ask_for_query() -> None:
-            nonlocal query
+        query = yield UIPromptRequest(
+            type="input",
+            message="",
+            placeholder="Query to search"
+        )
+        query = query["value"]
 
-            if query != '':
-                query = query
-            else:
-                if questionary_select("Please choose query type", choose_data=["Plain query", "Search by track and artist"]) == "Search by track and artist":
-
-                    user_query = q.form(
-                        user_title=q.text("Enter title of song: ").ask(),
-                        user_artist = q.text("Enter artist of song (optional): ").ask()
-                    ).ask()
-
-                    query = f"track:{user_query['user_title']}"
-                    if user_query['user_artist'] != '':
-                        query += f" artist:{user_query['user_artist']}"
-                else:
-                    query = q.text("Enter the query to search: ").ask()
-
-        _ask_for_query()
-
-        def milliseconds_to_minutes_and_seconds(milliseconds: int) -> str:
-            seconds = milliseconds // 1000
-            minutes, seconds = divmod(seconds, 60)
-            return f"{minutes:02d}:{seconds:02d}"
-
-        def format_name(song_data: dict, duration: bool = True, album: bool = True, popularity: bool = True) -> str:
-            if self._cli_output_format is not None:
-                name = str(self._extract_title_artist(song_data))
-                if duration:
-                    name += f" | {milliseconds_to_minutes_and_seconds(song_data['duration_ms'])}"
-                if album:
-                    name += f" | {song_data['album']['name']} : {song_data['album']['release_date'][:4]}"
-                if popularity:
-                    name += f" | Relevance: {song_data['popularity']}%"
-                return name
-            else:
-                return str(self._extract_title_artist(song_data))
-
-        offset = 0
         while True:
-            song_list = self._sp.search(q=query, limit=limit, offset=offset)
-            if self._cli_output_format is not None:
-                song_list_ask = [{"name": format_name(song, duration=self._cli_output_format.get('duration', False),
-                                                       album=self._cli_output_format.get('album', False),
-                                                       popularity=self._cli_output_format.get('popularity', False)),
-                                   "value": song}
-                                  for song in song_list['tracks']['items']]
-            else:
-                song_list_ask = [{"name": format_name(song), "value": song}
-                                  for song in song_list['tracks']['items']]
+            song_list = self._sp.search(q=query, offset=offset, limit=limit)["tracks"]["items"]
 
-            user_song_choice = questionary_select("Please choose the song: (prefer JP titles)",
-                                                   choose_data=song_list_ask,
-                                                   enable_pages=True,
-                                                   extra_navigation_options=[q.Choice("Retry", value='__retry__', shortcut_key='r')])
+            formatted_choices = []
 
-            if user_song_choice == '__next__':
-                offset += 5
-            elif user_song_choice == '__prev__':
-                if offset < 5:
-                    pass
-                else:
-                    offset -= 5
-            elif user_song_choice == '__retry__':
-                query = ''
-                _ask_for_query()
-            else:
-                break
-
-        return user_song_choice
-
-    def youtube_query(self, query: str = '', limit: int = 10, choose_top_result: bool = False) -> str:
-        """
-        Searches for a song on YouTube and returns the id of the song
-        :param query: Query to search for
-        :type query: str
-        :param limit: How many to search for
-        :type limit: int
-        :param choose_top_result: Will always return the first result without asking the user
-        :type choose_top_result: bool
-        :return: YouTube video id
-        :rtype: str
-        """
-
-        limit = 1 if choose_top_result else limit
-        search_query = f"ytsearch{limit}:{query}"
-
-        ydl_opts = {'quiet': True,
-                    'no_warnings': True,
-                    'extract_flat': True}
-        if self._env_data.get("YOUTUBE_COOKIE_PATH", "") != "":
-            ydl_opts["cookiefile"] = self._env_data["YOUTUBE_COOKIE_PATH"]
-            ydl_opts['remote_components'] = ['ejs:github']
-            ydl_opts['compat_opts'] = ['no-external-interpreter']
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(search_query, download=False)
-            info = ydl.sanitize_info(info)
-            if info is None:
-                raise Exception("No results found")
-            results = info.get("entries", [])
-
-            formatted_results = []
-            for track in results:
-                formatted_results.append({
-                    "id": track.get("id"),
-                    "title": track.get("title"),
-                    "channel": track.get("uploader"),
-                    "duration": track.get("duration"),
-                    "view_count": track.get("view_count")
+            for idx, song in enumerate(song_list):
+                formatted_choices.append({
+                    "type": "__option__",
+                    "title": self.get_title_artist(song)["title"],
+                    "artist": self.get_title_artist(song)["artist"],
+                    "duration": self.milliseconds_to_minutes_and_seconds(song["duration_ms"]),
+                    "album": song["album"]["name"],
+                    "relevance": song["popularity"],
+                    "value": idx,
+                    "metadata": song
                 })
+            for per_choice in persistent_choices: formatted_choices.append(per_choice)
 
-        def format_to_minutes_and_seconds(seconds: int) -> str:
-            minutes, seconds = divmod(int(seconds), 60)
-            return f"{minutes:02d}:{seconds:02d}"
+            user_choice: dict[str, Any] = yield UIPromptRequest(
+                type="select",
+                message="",
+                choices=formatted_choices)
 
-        if choose_top_result:
-            return formatted_results[0]["id"]
-        else:
-            choices = [{"name": f"{song['title']} | {song['channel']} | {format_to_minutes_and_seconds(song['duration'])} | {song['view_count']} | {song['id']}", "value": index} for index, song in enumerate(formatted_results)]
-            user_song_choice = questionary_select(f"Please choose the song: (prefer JP titles)", choose_data=choices)
-            return formatted_results[int(user_song_choice)]["id"]
+            match user_choice["value"]:
+                case "__next__":
+                    offset += limit
+                case "__prev__":
+                    if offset == 0:
+                        continue
+                    offset -= limit
+                case "__new__":
+                    query = yield UIPromptRequest(
+                        type="input",
+                        message="",
+                        placeholder="Query to search"
+                    )
+                    query = query["value"]
+                case _:
+                    ...
 
-    def download_youtube_video(self, url: str = '', sleep_time_if_fail: float = 5, retry_count: int = 5) -> None:
-        """
-        Downloads a YouTube video to .temp
-        :param retry_count: How many times to retry downloading the video
-        :type retry_count: int
-        :param sleep_time_if_fail: How long to wait before retrying to download the video if a fail occurs
-        :type sleep_time_if_fail: float
-        :param url: A url to the video ID
-        :type url: str
-        """
-        now = time()
 
-        if url == '':
-            raise Exception('YouTube URL is required')
+if __name__ == "__main__":
+    dl = Downloader()
+    # 1. Initialize the generator pipeline
+    pipeline = dl.download_song(limit=3)
 
-        ydl_opts = {'format': 'm4a/bestaudio/best',
-                    'paths': {'home': f'{str(self._base_dir / ".temp")}'},
-                    'outtmpl': '%(id)s.%(ext)s',
-                    'postprocessors': [{
-                        'key': 'FFmpegExtractAudio',
-                        'preferredcodec': 'wav',
-                    }]}
-        # TODO add option for macOS since idk if ffmpeg works for macOS
+    # 2. Start the pipeline and catch the first yield (The initial Query Input)
+    prompt = next(pipeline)
 
-        if self._env_data.get("YOUTUBE_COOKIE_PATH", "") != "":
-            ydl_opts["cookiefile"] = self._env_data["YOUTUBE_COOKIE_PATH"]
-            ydl_opts['remote_components'] = ['ejs:github']
-            ydl_opts['compat_opts'] = ['no-external-interpreter']
+    while True:
+        if prompt.type == "input":
+            user_input = input("Search for a song: ")
+            # Send the dictionary back matching the shape your code expects: query["value"]
+            prompt = pipeline.send({"value": user_input})
 
-        counter = 0
-        while True:
-            if counter >= retry_count:
-                raise Exception("Failed to download video")
-            counter += 1
+        elif prompt.type == "select":
+            print(f"\n--- Select an Option ---")
+            for i, choice in enumerate(prompt.choices):
+                if choice["type"] == "__nav__":
+                    print(f" [{i}] Navigation -> {choice['display']}")
+                else:
+                    print(f" [{i}] {choice['title']} - {choice['artist']}")
+
+            idx = int(input("\nChoose a number: "))
+            selected_choice = prompt.choices[idx]
 
             try:
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([url])
-                    break
-            except (DownloadError, ExtractorError):
-                sleep(sleep_time_if_fail)
-        logger.debug(f"Finished downloading video in {(time() - now):.2f} seconds")
-        
-    def query_song_spotify(self) -> None:
-        """
-        query a song from spotify and save it to a JSON file with all data needed
-        """
-        data = self.cli_search_song()
-        view_name = self.get_title_artist(metadata=data)
-        youtube_id = self.youtube_query(query=view_name)
-        json_data = json.dumps(
-            {"pre_processing": {"youtube_id": youtube_id, "view_name": view_name, "raw_metadata": data}}, indent=4)
-        file_path = TEMP_DIR / f"{view_name}.json"
-
-        file_path.write_text(json_data)
-        logger.info(f"Saved song data: {view_name} -> {file_path}")
+                # Send the selected choice dictionary back to the generator
+                prompt = pipeline.send(selected_choice)
+            except StopIteration:
+                # The generator returns (exits) once a non-navigation song is chosen
+                print("\n🎉 Song selection complete! Generator exited cleanly.")
+                break

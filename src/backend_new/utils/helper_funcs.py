@@ -3,7 +3,7 @@ from pathlib import Path
 from questionary import Choice
 import questionary as q
 from itertools import batched
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
 import json
 import base58
 import os
@@ -158,6 +158,11 @@ def write_config(payload: Any, keys: list[str] = None) -> None:
     """
     write_json_file(CONFIG_FILE, payload, keys)
 # endregion
+
+# region env keys
+def write_env_key(value: str, key: str) -> None:
+    set_key(dotenv_path=ENV_FILE, key_to_set=key, value_to_set=value, quote_mode="never")
+# end region
 
 # region base 58 conv
 def str_to_base58(string: str) -> str:

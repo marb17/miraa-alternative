@@ -1,5 +1,6 @@
 # STANDARD LIBRARIES
 from concurrent.futures.thread import ThreadPoolExecutor
+from collections.abc import Generator
 
 # PYPI LIBRARIES
 from pathlib import Path
@@ -15,6 +16,33 @@ from backend_new.utils.logger import Logger
 logger = Logger(__name__)
 
 class WorkflowManager:
+    def __init__(self, song_ctx: SongContext) -> None:
+        """
+        Loads the WorkflowManager for a specific song
+        :param song_ctx: Song to be processed
+        :type song_ctx: SongContext
+        """
+        self._env_data = load_env_file()
+        self._song_ctx = song_ctx
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._cleanup()
+        return False
+
+    @staticmethod
+    def _cleanup() -> None:
+        import gc
+        gc.collect()
+
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
+
+class OldWorkflowManager:
     def __init__(self, song_ctx: SongContext) -> None:
         """
         Loads the WorkflowManager for a specific song

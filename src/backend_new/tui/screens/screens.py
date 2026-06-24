@@ -473,8 +473,8 @@ class InitProgress(Screen):
 
         with Analyzer() as a:
             for log in a.init():
-                prog_bar.advance(1)
-                logs.write(log)
+                self.app.call_from_thread(prog_bar.advance, 1)
+                self.app.call_from_thread(logs.write, log)
 
         self.finished_init = True
         self.query_one("#continue_static", Static).display = True
@@ -759,8 +759,8 @@ class InitDownloadDicts(Screen):
             try:
                 self.query_one("#finished", Static).display = False
                 for log in download_all_dicts():
-                    self.query_one(ProgressBar).advance(1)
-                    self.query_one(RichLog).write(log)
+                    self.app.call_from_thread(self.query_one(ProgressBar).advance, 1)
+                    self.app.call_from_thread(self.query_one(RichLog).write, log)
             except Exception as e:
                 self.query_one(RichLog).write(e)
                 self.query_one("#finished", Static).content = "Failed to download, press any key to dismiss"

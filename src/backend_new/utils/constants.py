@@ -6,8 +6,9 @@ import re
 
 # BASE DIR
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from backend_new.utils.logger import Logger
+from typing import Literal, Any
 
 #! Adjust based on exact depth
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -38,6 +39,16 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 class SongContext:
     json_song_data: dict
     json_file_path: Path
+
+@dataclass
+class UIPromptRequest:
+    type: Literal["select", "input", "confirm"]
+    message: str
+    choices: list[Any] | None = None
+    persistent_choices: list[Any] | None = None
+    default: Any = None
+    password: bool = False
+    placeholder: str = ""
 
 #===================================================
 #       ERRORS / EXCEPTIONS
