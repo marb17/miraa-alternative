@@ -139,11 +139,7 @@ class DownloadMenu(Horizontal):
         self.anything_changed = True
 
         if event.control.id == "downloader_cookies_switch":
-            self.config_file_data["youtube_downloader"]["use_cookies"] = event.value
-
-    @work(thread=True)
-    def action_update_config(self):
-        write_config(self.config_file_data)
+            write_config(event.value, ["youtube_downloader", "use_cookies"])
 
 
 class ProcessesMenu(Horizontal):
@@ -190,6 +186,19 @@ class ProcessesMenu(Horizontal):
         split_and_tag_checkbox.value = initial_skip_processes["split_and_tag"]
         translate_lyrics_checkbox.value = initial_skip_processes["translate_lyrics"]
 
+    @staticmethod
+    def on_checkbox_changed(event: Checkbox.Changed):
+        if event.checkbox.id == "download_song_checkbox":
+            write_config(event.value, ["skip_processes", "download_song"])
+        elif event.checkbox.id == "genius_metadata_checkbox":
+            write_config(event.value, ["skip_processes", "genius_metadata"])
+        elif event.checkbox.id == "separate_stems_checkbox":
+            write_config(event.value, ["skip_processes", "vocal_separation"])
+        elif event.checkbox.id == "split_and_tag_checkbox":
+            write_config(event.value, ["skip_processes", "split_and_tag"])
+        elif event.checkbox.id == "translate_lyrics_checkbox":
+            write_config(event.value, ["skip_processes", "translate_lyrics"])
+
 
 class EnvironmentVariablesMenu(Horizontal):
     DEFAULT_CSS = """
@@ -223,9 +232,11 @@ class EnvironmentVariablesMenu(Horizontal):
 
     hide_keys = True
     anything_changed = False
-    last_modal_decision = None
 
-    load_dotenv(ENV_FILE)
+    spot_cli_id = None
+    spot_cli_sec = None
+    spot_redir_uri = None
+    gen_acc_tok = None
 
     def compose(self) -> ComposeResult:
         with VerticalGroup(classes="option_sections"):
@@ -293,10 +304,12 @@ class EnvironmentVariablesMenu(Horizontal):
         set_key(ENV_FILE, "GENIUS_ACCESS_TOKEN", self.gen_acc_tok, quote_mode="never")
 
     def write_default_values(self):
-        self.spot_cli_id = os.getenv("SPOTIFY_CLIENT_ID")
-        self.spot_cli_sec = os.getenv("SPOTIFY_CLIENT_SECRET")
-        self.spot_redir_uri = os.getenv("SPOTIFY_REDIRECT_URI")
-        self.gen_acc_tok = os.getenv("GENIUS_ACCESS_TOKEN")
+        load_dotenv(ENV_FILE)
+
+        self.spot_cli_id = os.getenv("SPOTIFY_CLIENT_ID", "")
+        self.spot_cli_sec = os.getenv("SPOTIFY_CLIENT_SECRET", "")
+        self.spot_redir_uri = os.getenv("SPOTIFY_REDIRECT_URI", "")
+        self.gen_acc_tok = os.getenv("GENIUS_ACCESS_TOKEN", "")
 
         with self.prevent(Input.Changed):
             self.query_one("#in1", Input).value = self.spot_cli_id
@@ -304,20 +317,25 @@ class EnvironmentVariablesMenu(Horizontal):
             self.query_one("#in3", Input).value = self.spot_redir_uri
             self.query_one("#in4", Input).value = self.gen_acc_tok
 
-    def pane_switch_handler(self) -> None:
+    def pane_switch_handler(self, ready_to_move_callback) -> None:
         if self.anything_changed:
-            self.app.push_screen(SaveConfirmationModal(), callback=self.save_screen_handler)
+            self.app.push_screen(
+                SaveConfirmationModal(),
+                callback=lambda choice: self.save_screen_handler(choice, ready_to_move_callback)
+            )
+        else:
+            ready_to_move_callback(False)
 
-    def save_screen_handler(self, value: str) -> None:
+    def save_screen_handler(self, value: str, ready_to_move_callback) -> None:
         if value == "save":
             self.save_config()
-            self.last_modal_decision = value
+            ready_to_move_callback(True)
         elif value == "discard":
             self.write_default_values()
             self.anything_changed = False
-            self.last_modal_decision = value
+            ready_to_move_callback(True)
         elif value == "cancel":
-            self.last_modal_decision = value
+            ready_to_move_callback(False)
 
 
 class ConfigMenu(Screen):
@@ -351,29 +369,27 @@ class ConfigMenu(Screen):
         elif event.pane.id == "env":
             ...
 
-        if self.current_pane_id == "processes":
+        if self.current_pane_id == "processes" and event.pane.id != "download":
             ...
-        elif self.current_pane_id == "download":
+        elif self.current_pane_id == "download" and event.pane.id != "env":
             ...
-        elif self.current_pane_id == "env":
+        elif self.current_pane_id == "env" and event.pane.id != "env":
             current_widget = self.query_one(EnvironmentVariablesMenu)
             if current_widget.anything_changed:
                 self._switching_internally = True
                 event.tabbed_content.active = "env"
                 self._switching_internally = False
 
-                current_widget.pane_switch_handler()
+                def handle_navigation(allowed_to_move: bool):
+                    if allowed_to_move:
+                        self._switching_internally = True
+                        event.tabbed_content.active = event.pane.id
+                        self._switching_internally = False
 
-                if current_widget.last_modal_decision == "save":
-                    self._switching_internally = True
-                    event.tabbed_content.active = event.pane.id
-                    self._switching_internally = False
-                elif current_widget.last_modal_decision == "discard":
-                    self._switching_internally = True
-                    event.tabbed_content.active = event.pane.id
-                    self._switching_internally = False
-                elif current_widget.last_modal_decision == "cancel":
-                    pass
+                        self.current_pane_id = event.pane.id
+
+                current_widget.pane_switch_handler(handle_navigation)
+                return
 
         self.current_pane_id = event.pane.id
 
@@ -383,7 +399,10 @@ class ConfigMenu(Screen):
 # region first time init screeen
 
 class InitProgress(Screen):
-    BINDINGS = []
+    BINDINGS = [
+        Binding("ctrl+o", "no_action", "No Action", show=False)
+    ]
+
     DEFAULT_CSS = """
     #progress {
         height: auto;
@@ -465,8 +484,15 @@ class InitProgress(Screen):
             event.stop()
             self.go_to_next_screen()
 
+    def action_no_action(self) -> None:
+        pass
+
 
 class InitEnvKeys(Screen):
+    BINDINGS = [
+        Binding("ctrl+o", "no_action", "No Action", show=False)
+    ]
+
     class InitEnvHelpScreen(ModalScreen):
         HELP_MESSAGE = """To get your Tokens from Spotify and Genius, please open these links:
     - [@click="app.open_url('https://developer.spotify.com/dashboard')"]Spotify Dashboard[/]
@@ -669,8 +695,15 @@ You can use these for them:
         elif event.button.id == "help_button":
             self.app.push_screen(self.InitEnvHelpScreen())
 
+    def action_no_action(self) -> None:
+        pass
+
 
 class InitDownloadDicts(Screen):
+    BINDINGS = [
+        Binding("ctrl+o", "no_action", "No Action", show=False)
+    ]
+
     class AutoDownloadDicts(ModalScreen):
         DEFAULT_CSS = """
         CenterMiddle {
@@ -909,9 +942,14 @@ class InitDownloadDicts(Screen):
 
             event.stop()
 
+    def action_no_action(self) -> None:
+        pass
+
 
 class FirstTimeInit(Screen):
-    BINDINGS = []
+    BINDINGS = [
+        Binding("ctrl+o", "no_action", "No Action", show=False)
+    ]
 
     DEFAULT_CSS = """
     #confirm_popup {
@@ -965,5 +1003,8 @@ class FirstTimeInit(Screen):
             self.app.switch_screen("init_prog")
         elif event.button.id == "deny":
             self.app.exit()
+
+    def action_no_action(self) -> None:
+        pass
 
 # endregion
