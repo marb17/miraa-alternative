@@ -5,6 +5,8 @@ import json
 from typing import Any
 from collections.abc import Generator
 
+import requests.exceptions
+
 # HELPER LIBRARIES
 from backend_new.utils.helper_funcs import questionary_select, load_env_file, read_json_file
 
@@ -66,7 +68,10 @@ class Downloader:
         return self._sp.track(query)
 
     @staticmethod
-    def milliseconds_to_minutes_and_seconds(milliseconds: int) -> str:
+    def milliseconds_to_minutes_and_seconds(milliseconds: int | float) -> str:
+        if isinstance(milliseconds, float):
+            milliseconds = int(milliseconds)
+
         seconds = milliseconds // 1000
         minutes, seconds = divmod(seconds, 60)
         return f"{minutes:02d}:{seconds:02d}"
@@ -83,12 +88,17 @@ class Downloader:
         return {"title": dict_metadata["name"],
                 "artist": dict_metadata["artists"][0]["name"]}
 
-    def download_song(self, limit: int = 10) -> Generator[Any, dict[str, Any], None]:
+    def download_song(self, limit: int = 10,
+                      retry_count: int = 3,
+                      retry_sleep: float = 5) -> Generator[Any, dict[str, Any], None]:
+        # SPOTIFY SECTION
         persistent_choices = [{"type": "__nav__", "display": "Next", "value": "__next__"},
                               {"type": "__nav__", "display": "Previous", "value": "__prev__"},
                               {"type": "__nav__", "display": "New Query", "value": "__new__"}]
 
         offset: int = 0
+        youtube_query: str = ""
+        song_list = None
 
         query = yield UIPromptRequest(
             type="input",
@@ -98,11 +108,20 @@ class Downloader:
         query = query["value"]
 
         while True:
-            song_list = self._sp.search(q=query, offset=offset, limit=limit)["tracks"]["items"]
+            for _ in range(retry_count):
+                try:
+                    song_list = self._sp.search(q=query, offset=offset, limit=limit)["tracks"]["items"]
+                except Exception as e:
+                    # TODO add exception handling
+                    sleep(retry_sleep)
+                    song_list = None
+            if song_list is None:
+                # TODO add exception handling
+                raise Exception(f"Could not retrieve songs from {query}")
 
-            formatted_choices = []
+            formatted_choices: list[dict[str, Any]] = []
 
-            for idx, song in enumerate(song_list):
+            for list_idx, song in enumerate(song_list):
                 formatted_choices.append({
                     "type": "__option__",
                     "title": self.get_title_artist(song)["title"],
@@ -110,10 +129,10 @@ class Downloader:
                     "duration": self.milliseconds_to_minutes_and_seconds(song["duration_ms"]),
                     "album": song["album"]["name"],
                     "relevance": song["popularity"],
-                    "value": idx,
+                    "value": list_idx,
                     "metadata": song
                 })
-            for per_choice in persistent_choices: formatted_choices.append(per_choice)
+            formatted_choices.extend(persistent_choices)
 
             user_choice: dict[str, Any] = yield UIPromptRequest(
                 type="select",
@@ -135,13 +154,69 @@ class Downloader:
                     )
                     query = query["value"]
                 case _:
-                    ...
+                    song_choice: dict[str, Any] = formatted_choices[user_choice["value"]]
+                    spotify_metadata = song_choice["metadata"]
+                    youtube_query: str = f"ytsearch{limit}:{song_choice['title']} - {song_choice['artist']}"
+                    break
+
+
+        # YOUTUBE SECTION
+        ydl_opts = {'quiet': True,
+                    'no_warnings': True,
+                    'extract_flat': True}
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            for _ in range(retry_count):
+                try:
+                    info = ydl.extract_info(youtube_query, download=False)
+                except Exception as e:
+                    # TODO add exception handling
+                    sleep(retry_sleep)
+                    info = None
+
+            if info is None:
+                # TODO add fall back query
+                raise Exception(f"Could not extract info from {youtube_query}")
+            info = ydl.sanitize_info(info)
+            results = info.get("entries", [])
+
+            persistent_choices = [
+                                  {"type": "__nav__", "display": "New Query", "value": "__new__"}
+            ]
+
+            formatted_choices = []
+            for list_idx, track in enumerate(results):
+                formatted_choices.append({
+                    "type": "__option__",
+                    "id": track.get("id"),
+                    "title": track.get("title"),
+                    "channel": track.get("uploader"),
+                    "duration": self.milliseconds_to_minutes_and_seconds(track.get("duration")),
+                    "view_count": track.get("view_count"),
+                    "value": list_idx,
+                    "metadata": track
+                })
+            formatted_choices.extend(persistent_choices)
+
+            user_choice: dict[str, Any] = yield UIPromptRequest(
+                type="select",
+                message="",
+                choices=formatted_choices
+            )
+
+            user_choice = formatted_choices[user_choice["value"]]
+            youtube_id = user_choice["id"]
+            youtube_metadata = user_choice["metadata"]
+
+            print(youtube_id)
+
+
 
 
 if __name__ == "__main__":
     dl = Downloader()
     # 1. Initialize the generator pipeline
-    pipeline = dl.download_song(limit=3)
+    pipeline = dl.download_song(limit=10)
 
     # 2. Start the pipeline and catch the first yield (The initial Query Input)
     prompt = next(pipeline)
@@ -158,7 +233,7 @@ if __name__ == "__main__":
                 if choice["type"] == "__nav__":
                     print(f" [{i}] Navigation -> {choice['display']}")
                 else:
-                    print(f" [{i}] {choice['title']} - {choice['artist']}")
+                    print(f" [{i}] {choice['title']} - {choice.get("artist")}")
 
             idx = int(input("\nChoose a number: "))
             selected_choice = prompt.choices[idx]
