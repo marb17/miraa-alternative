@@ -2,9 +2,10 @@ from typing import Iterable
 
 from textual.app import App, ComposeResult, SystemCommand
 from textual.screen import Screen
-from textual.widgets import Footer, Header
+from textual.widgets import Footer, Header, Button
 
 from tui.screens.first_init import InitProgress, InitEnvKeys, InitDownloadDicts, FirstTimeInit
+from tui.screens.new_download import DownloadScreen
 from tui.screens.config import ConfigMenu
 
 from backend_new.utils.helper_funcs import read_config
@@ -15,7 +16,9 @@ class MiraaInterface(App):
         "init_screen": FirstTimeInit,
         "init_prog": InitProgress,
         "init_env": InitEnvKeys,
-        "init_dicts": InitDownloadDicts
+        "init_dicts": InitDownloadDicts,
+
+        "new_download": DownloadScreen
     }
 
     BINDINGS = [("ctrl+o", "push_screen('config_menu')", "Config")]
@@ -37,6 +40,8 @@ class MiraaInterface(App):
         yield Header(name="miraa-alternative",
                      show_clock=True)
 
+        yield Button("test", id="download")
+
     def on_mount(self) -> None:
         self.theme = "monokai"
 
@@ -52,6 +57,10 @@ class MiraaInterface(App):
                 return False
         except FileNotFoundError:
             return False
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "download":
+            self.app.push_screen("new_download")
 
 
 if __name__ == '__main__':
