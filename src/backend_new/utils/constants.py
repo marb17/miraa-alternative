@@ -44,6 +44,7 @@ class SongContext:
 class UIPromptRequest:
     type: Literal["select", "input", "confirm"]
     message: str
+    sub_type: str | None = None
     choices: list[Any] | None = None
     persistent_choices: list[Any] | None = None
     default: Any = None
@@ -82,6 +83,12 @@ class DataMismatchError(Exception):
 DEFAULT_CONFIG = {
     "version": "1.0.0",
     "init": True,
+
+    "downloader": {
+        "view_limit": 10,
+        "retry_count": 3,
+        "retry_sleep": 5
+    },
 
     "spotify_downloader": {
         "output_format": {

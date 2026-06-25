@@ -4,7 +4,8 @@ from textual.app import App, ComposeResult, SystemCommand
 from textual.screen import Screen
 from textual.widgets import Footer, Header
 
-from tui.screens.screens import ConfigMenu, FirstTimeInit, InitProgress, InitEnvKeys, InitDownloadDicts
+from tui.screens.first_init import InitProgress, InitEnvKeys, InitDownloadDicts, FirstTimeInit
+from tui.screens.config import ConfigMenu
 
 from backend_new.utils.helper_funcs import read_config
 

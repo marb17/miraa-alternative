@@ -90,7 +90,7 @@ class Downloader:
 
     def download_song(self, limit: int = 10,
                       retry_count: int = 3,
-                      retry_sleep: float = 5) -> Generator[Any, dict[str, Any], None]:
+                      retry_sleep: float = 5) -> Generator[Any, dict[str, Any], bool]:
         # SPOTIFY SECTION
         persistent_choices = [{"type": "__nav__", "display": "Next", "value": "__next__"},
                               {"type": "__nav__", "display": "Previous", "value": "__prev__"},
@@ -103,6 +103,7 @@ class Downloader:
         query = yield UIPromptRequest(
             type="input",
             message="",
+            sub_type="query",
             placeholder="Query to search"
         )
         query = query["value"]
@@ -137,7 +138,9 @@ class Downloader:
             user_choice: dict[str, Any] = yield UIPromptRequest(
                 type="select",
                 message="",
-                choices=formatted_choices)
+                choices=formatted_choices,
+                sub_type="spotify"
+            )
 
             match user_choice["value"]:
                 case "__next__":
@@ -150,12 +153,15 @@ class Downloader:
                     query = yield UIPromptRequest(
                         type="input",
                         message="",
-                        placeholder="Query to search"
+                        placeholder="Query to search",
+                        sub_type="query"
                     )
                     query = query["value"]
                 case _:
                     song_choice: dict[str, Any] = formatted_choices[user_choice["value"]]
                     spotify_metadata = song_choice["metadata"]
+                    title = song_choice["title"]
+                    artist = song_choice["artist"]
                     youtube_query: str = f"ytsearch{limit}:{song_choice['title']} - {song_choice['artist']}"
                     break
 
@@ -201,47 +207,47 @@ class Downloader:
             user_choice: dict[str, Any] = yield UIPromptRequest(
                 type="select",
                 message="",
-                choices=formatted_choices
+                choices=formatted_choices,
+                sub_type="youtube"
             )
 
             user_choice = formatted_choices[user_choice["value"]]
             youtube_id = user_choice["id"]
             youtube_metadata = user_choice["metadata"]
 
-            print(youtube_id)
+        ydl_opts = {'format': 'm4a/bestaudio/best',
+                    'paths': {'home': f'{str(self._base_dir / ".temp")}'},
+                    'outtmpl': '%(id)s.%(ext)s',
+                    'postprocessors': [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'wav',
+                    }]}
 
+        success_downloading = False
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            for _ in range(retry_count):
+                try:
+                    ydl.download([youtube_id])
+                    success_downloading = True
+                except (DownloadError, ExtractorError):
+                    sleep(retry_sleep)
 
+        if not success_downloading:
+            raise Exception(f"Could not download {youtube_id}")
 
+        # FINAL WRITE
 
-if __name__ == "__main__":
-    dl = Downloader()
-    # 1. Initialize the generator pipeline
-    pipeline = dl.download_song(limit=10)
+        final_data = {
+            "pre_processing": {
+                "youtube_id": youtube_id,
+                "view_name": f"{title} - {artist}",
+                "raw_metadata": spotify_metadata,
+                "youtube_metadata": youtube_metadata,
+                "downloaded": True
+            }
+        }
+        file_path = TEMP_DIR / f"{title} - {artist}.json"
+        json_data = json.dumps(final_data, indent=4, ensure_ascii=True)
+        file_path.write_text(json_data)
 
-    # 2. Start the pipeline and catch the first yield (The initial Query Input)
-    prompt = next(pipeline)
-
-    while True:
-        if prompt.type == "input":
-            user_input = input("Search for a song: ")
-            # Send the dictionary back matching the shape your code expects: query["value"]
-            prompt = pipeline.send({"value": user_input})
-
-        elif prompt.type == "select":
-            print(f"\n--- Select an Option ---")
-            for i, choice in enumerate(prompt.choices):
-                if choice["type"] == "__nav__":
-                    print(f" [{i}] Navigation -> {choice['display']}")
-                else:
-                    print(f" [{i}] {choice['title']} - {choice.get("artist")}")
-
-            idx = int(input("\nChoose a number: "))
-            selected_choice = prompt.choices[idx]
-
-            try:
-                # Send the selected choice dictionary back to the generator
-                prompt = pipeline.send(selected_choice)
-            except StopIteration:
-                # The generator returns (exits) once a non-navigation song is chosen
-                print("\n🎉 Song selection complete! Generator exited cleanly.")
-                break
+        return True

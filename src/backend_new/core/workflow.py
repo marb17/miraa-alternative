@@ -1,12 +1,13 @@
 # STANDARD LIBRARIES
 from concurrent.futures.thread import ThreadPoolExecutor
 from collections.abc import Generator
+from typing import Any
 
 # PYPI LIBRARIES
 from pathlib import Path
 
 # HELPER LIBRARIES
-from backend_new.utils.helper_funcs import read_json_file, write_json_file, questionary_select, load_env_file, contains_japanese
+from backend_new.utils.helper_funcs import read_json_file, write_json_file, questionary_select, load_env_file, contains_japanese, read_config
 
 from backend_new.utils.constants import SongContext, DataMismatchError
 from backend_new.utils.constants import TEMP_DIR
@@ -24,6 +25,7 @@ class WorkflowManager:
         """
         self._env_data = load_env_file()
         self._song_ctx = song_ctx
+        self._config = read_config()
 
     def __enter__(self):
         return self
@@ -41,6 +43,19 @@ class WorkflowManager:
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
             torch.cuda.ipc_collect()
+
+    def download_new_song(self) -> Generator[Any, dict[str, Any], bool]:
+        from backend_new.extractors.downloader import Downloader
+
+        with Downloader() as dl:
+            yield from dl.download_song(
+                limit=self._config["downloader"]["view_limit"],
+                retry_count=self._config["downloader"]["retry_count"],
+                retry_sleep=self._config["downloader"]["retry_sleep"]
+            )
+
+        return True
+
 
 class OldWorkflowManager:
     def __init__(self, song_ctx: SongContext) -> None:
