@@ -99,7 +99,12 @@ DEFAULT_CONFIG = {
     },
 
     "youtube_downloader": {
-        "use_cookies": False
+        "use_cookies": False,
+        "output_format": {
+            "duration": True,
+            "uploader": True,
+            "view_count": True
+        }
     },
 
     "skip_processes": {

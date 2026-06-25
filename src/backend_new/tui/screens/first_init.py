@@ -6,9 +6,9 @@ from textual.containers import Container, CenterMiddle, Center, HorizontalGroup
 from textual.screen import Screen, ModalScreen
 from textual.widgets import Header, Label, ProgressBar, RichLog, Static, Button, Input, Footer
 
-from main import Analyzer
-from utils.constants import ENV_FILE, DEFAULT_DICTS
-from utils.helper_funcs import download_all_dicts
+from backend_new.main import Analyzer
+from backend_new.utils.constants import ENV_FILE, DEFAULT_DICTS
+from backend_new.utils.helper_funcs import download_all_dicts
 
 
 class InitProgress(Screen):

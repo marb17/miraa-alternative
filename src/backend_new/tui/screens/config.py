@@ -8,8 +8,8 @@ from textual.containers import CenterMiddle, Horizontal, Vertical, Container, Ve
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Label, Button, Switch, Checkbox, Input, Header, Footer, TabbedContent, TabPane
 
-from utils.constants import ENV_FILE
-from utils.helper_funcs import read_config, write_config
+from backend_new.utils.constants import ENV_FILE
+from backend_new.utils.helper_funcs import read_config, write_config
 
 
 class SaveConfirmationModal(ModalScreen):
@@ -78,8 +78,26 @@ class DownloadMenu(Horizontal):
             margin: 1 0;
         }
         
+        .hor_option {
+            height: auto;
+            margin: 1 0;
+            layout: horizontal;
+        }
+        
+        .hor_option Label {
+            align: left middle;
+            content-align: left middle;
+            
+            width: 100%;
+            height: 100%;
+        }
+        
         .option Label {
             margin: 0 1;
+        }
+        
+        #spotify_query_display_settings, #youtube_query_display_settings {
+            margin: 1 2;
         }
         """
 
@@ -87,27 +105,91 @@ class DownloadMenu(Horizontal):
     anything_changed = False
 
     def compose(self) -> ComposeResult:
-        with VerticalGroup(classes="section_container", id="query_extract_settings"):
-            with Container(classes="option"):
-                yield Label("How many items to view at once when querying")
-                yield Input(id="query_view_limit", placeholder="10", type="integer")
+        with Vertical():
+            with VerticalGroup(classes="section_container", id="query_extract_settings"):
+                with Container(classes="option"):
+                    yield Label("How many items to view at once when querying")
+                    yield Input(id="query_view_limit", placeholder="10", type="integer")
 
-            with Container(classes="option"):
-                yield Label("How many times to retry")
-                yield Input(id="query_retry_count", placeholder="3", type="integer")
+                with Container(classes="option"):
+                    yield Label("How many times to retry")
+                    yield Input(id="query_retry_count", placeholder="3", type="integer")
 
-            with Container(classes="option"):
-                yield Label("How long to wait for each retry (s)")
-                yield Input(id="query_retry_sleep", placeholder="5.0", type="number")
+                with Container(classes="option"):
+                    yield Label("How long to wait for each retry (s)")
+                    yield Input(id="query_retry_sleep", placeholder="5.0", type="number")
+
+            with HorizontalGroup(classes="section_container", id="query_display_settings"):
+                with VerticalGroup(classes="section_container", id="spotify_query_display_settings"):
+                    with Container(classes="hor_option"):
+                        yield Switch(id="spotify_display_duration")
+                        yield Label("Duration")
+
+                    with Container(classes="hor_option"):
+                        yield Switch(id="spotify_display_album")
+                        yield Label("Album")
+
+                    with Container(classes="hor_option"):
+                        yield Switch(id="spotify_display_popularity")
+                        yield Label("Popularity")
+
+                with VerticalGroup(classes="section_container", id="youtube_query_display_settings"):
+                    with Container(classes="hor_option"):
+                        yield Switch(id="youtube_display_duration")
+                        yield Label("Duration")
+
+                    with Container(classes="hor_option"):
+                        yield Switch(id="youtube_display_uploader")
+                        yield Label("Uploader")
+
+                    with Container(classes="hor_option"):
+                        yield Switch(id="youtube_display_view_count")
+                        yield Label("View Count")
+
 
     def _on_mount(self, event: events.Mount) -> None:
-        downloader = self.query_one("#query_extract_settings", VerticalGroup)
-        downloader.border_title = "Query & Extractor Settings"
+        self.query_one("#query_extract_settings", VerticalGroup).border_title = "Query & Extractor Settings"
+
+        self.query_one("#query_display_settings", HorizontalGroup).border_title = "Information Shown while Querying"
+        self.query_one("#spotify_query_display_settings", VerticalGroup).border_title = "Spotify"
+        self.query_one("#youtube_query_display_settings", VerticalGroup).border_title = "Youtube"
 
         self.config_file_data = read_config()
 
+        self.query_one("#query_view_limit", Input).value = str(self.config_file_data["downloader"]["view_limit"])
+        self.query_one("#query_retry_count", Input).value = str(self.config_file_data["downloader"]["retry_count"])
+        self.query_one("#query_retry_sleep", Input).value = str(self.config_file_data["downloader"]["retry_sleep"])
 
+        self.query_one("#spotify_display_duration", Switch).value = self.config_file_data["spotify_downloader"]["output_format"]["duration"]
+        self.query_one("#spotify_display_album", Switch).value = self.config_file_data["spotify_downloader"]["output_format"]["album"]
+        self.query_one("#spotify_display_popularity", Switch).value = self.config_file_data["spotify_downloader"]["output_format"]["popularity"]
 
+        self.query_one("#youtube_display_duration", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["duration"]
+        self.query_one("#youtube_display_uploader", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["uploader"]
+        self.query_one("#youtube_display_view_count", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["view_count"]
+
+    def on_input_changed(self, event: Input.Changed):
+        if event.input.id == "query_view_limit":
+            write_config(int(self.query_one("#query_view_limit", Input).value), ["downloader", "view_limit"])
+        elif event.input.id == "query_retry_count":
+            write_config(int(self.query_one("#query_retry_count", Input).value), ["downloader", "retry_count"])
+        elif event.input.id == "query_retry_sleep":
+            write_config(float(self.query_one("#query_retry_sleep", Input).value), ["downloader", "retry_sleep"])
+
+    def on_switch_changed(self, event: Switch.Changed):
+        if event.switch.id == "spotify_display_duration":
+            write_config(self.query_one("#spotify_display_duration", Switch).value, ["spotify_downloader", "output_format", "duration"])
+        elif event.switch.id == "spotify_display_album":
+            write_config(self.query_one("#spotify_display_album", Switch).value, ["spotify_downloader", "output_format", "album"])
+        elif event.switch.id == "spotify_display_popularity":
+            write_config(self.query_one("#spotify_display_popularity", Switch).value, ["spotify_downloader", "output_format", "popularity"])
+
+        elif event.switch.id == "youtube_display_duration":
+            write_config(self.query_one("#youtube_display_duration", Switch).value, ["youtube_downloader", "output_format", "duration"])
+        elif event.switch.id == "youtube_display_uploader":
+            write_config(self.query_one("#youtube_display_uploader", Switch).value, ["youtube_downloader", "output_format", "uploader"])
+        elif event.switch.id == "youtube_display_view_count":
+            write_config(self.query_one("#youtube_display_view_count", Switch).value, ["youtube_downloader", "output_format", "view_count"])
 
 class ProcessesMenu(Horizontal):
     DEFAULT_CSS = """

@@ -102,7 +102,7 @@ class Downloader:
 
         query = yield UIPromptRequest(
             type="input",
-            message="",
+            message="Please input song to query",
             sub_type="query",
             placeholder="Query to search"
         )
