@@ -1,10 +1,12 @@
 import time
+import threading
 from typing import Any, Generator
 from textual import events, work, on
 from textual.app import App, ComposeResult
 from textual.screen import Screen
 from textual.containers import Vertical, Horizontal, CenterMiddle, Container, HorizontalGroup, HorizontalScroll
-from textual.widgets import Header, Footer, Input, DataTable, Label, Button, ContentSwitcher, Static, LoadingIndicator
+from textual.widgets import Header, Footer, Input, DataTable, Label, Button, ContentSwitcher, Static, LoadingIndicator, \
+    RichLog
 from textual.binding import Binding
 
 from backend_new.extractors.downloader import Downloader
@@ -89,12 +91,20 @@ class DownloadScreen(Screen):
     #input_table {
         height: auto;
     }
+    
+    #nav_buttons {
+        width: 100%;
+        
+        content-align: right middle;
+        align: right middle;
+    }
     """
 
     pipeline = None
     next_ui_response = None
-    has_response = False
-    config_data = read_config()
+    config_data = None
+
+    ui_ready_event = threading.Event()
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -108,6 +118,10 @@ class DownloadScreen(Screen):
 
                     with Container(id="loading_screen"):
                         yield LoadingIndicator()
+
+                    with Container(id="info_screen"):
+                        yield Static(id="info_static")
+                        yield RichLog(id="info_rich_log")
 
                     with Vertical(id="input_pane"):
                         yield Label(id="input_label")
@@ -123,8 +137,18 @@ class DownloadScreen(Screen):
                                 id="input_table"
                             )
 
+                        yield Label(id="table_page_number")
+
+                        with HorizontalGroup(id="nav_buttons"):
+                            yield Button(id="__select__", variant="success", label="Select")
+                            yield Button(id="__new__", variant="warning", label="New")
+                            yield Button(id="__prev__", variant="primary", label="Previous")
+                            yield Button(id="__next__", variant="primary", label="Next")
+
 
     def _on_mount(self, event: events.Mount) -> None:
+        self.config_data = read_config()
+
         self.query_one("#input_pane", Vertical).border_title = "New Download"
         self.query_one("#select_pane", Vertical).border_title = "New Download"
 
@@ -139,27 +163,75 @@ class DownloadScreen(Screen):
             prompt_request = next(self.pipeline)
 
             while True:
+                self.ui_ready_event.clear()
                 user_answer = self.app.call_from_thread(self.update_ui_for_prompt, prompt_request)
-                self._wait_for_ui_response()
+                self.ui_ready_event.wait()
                 prompt_request = self.pipeline.send(self.next_ui_response)
         except StopIteration:
             ...
 
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        switcher = self.query_one("#main_content_switcher", ContentSwitcher)
+
+        if event.button.id == "__new__":
+            switcher.current = "loading_screen"
+
+            val = {"value": "__new__"}
+            self.next_ui_response = val
+            self.ui_ready_event.set()
+        elif event.button.id == "__prev__":
+            switcher.current = "loading_screen"
+
+            val = {"value": "__prev__"}
+            self.next_ui_response = val
+            self.ui_ready_event.set()
+        elif event.button.id == "__next__":
+            switcher.current = "loading_screen"
+
+            val = {"value": "__next__"}
+            self.next_ui_response = val
+            self.ui_ready_event.set()
+
     @on(Button.Pressed, "#submit_input")
     def handle_input_submit(self) -> None:
-        switcher = self.query_one("#main_content_switcher", ContentSwitcher)
-        switcher.current = "loading_screen"
 
         val = {"value": self.query_one("#input_box", Input).value}
-        self.next_ui_response = val
-        self.has_response = True
+
+        if val["value"]:
+            switcher = self.query_one("#main_content_switcher", ContentSwitcher)
+            switcher.current = "loading_screen"
+
+            self.next_ui_response = val
+            self.ui_ready_event.set()
+        else:
+            return
 
     @on(Input.Submitted, "#input_box")
     def handle_submit_input(self) -> None:
         self.handle_input_submit()
 
+    @on(DataTable.RowSelected, "#input_table")
+    def handle_table_select(self) -> None:
+        switcher = self.query_one("#main_content_switcher", ContentSwitcher)
+        switcher.current = "loading_screen"
+
+        val = {"value": self.query_one("#input_table", DataTable).cursor_row}
+        self.next_ui_response = val
+        self.ui_ready_event.set()
+
+    @on(Button.Pressed, "#__select__")
+    def handle_select_pressed(self) -> None:
+        self.handle_table_select()
+
     def update_ui_for_prompt(self, request: UIPromptRequest) -> None:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
+
+        new_button = self.query_one("#__new__", Button)
+        next_button = self.query_one("#__next__", Button)
+        prev_button = self.query_one("#__prev__", Button)
+
+        for button in [new_button, next_button, prev_button]:
+            button.display = False
 
         match request.type:
             case "input":
@@ -170,10 +242,18 @@ class DownloadScreen(Screen):
                 input_widget.placeholder = request.placeholder
 
                 switcher.current = "input_pane"
+
+                input_widget.focus()
             case "select":
                 data_table_widget = self.query_one("#input_table", DataTable)
+                data_table_widget.clear(columns=True)
+
+                data_table_page = self.query_one("#table_page_number", Label)
 
                 if request.sub_type == "spotify":
+                    data_table_page.display = True
+                    data_table_page.content = f"Page: {request.extra_info["page"]}"
+
                     table_rows = [["Title", "Artist"]]
                     if self.config_data["spotify_downloader"]["output_format"]["duration"]: table_rows[0].append("Duration")
                     if self.config_data["spotify_downloader"]["output_format"]["album"]: table_rows[0].append("Album")
@@ -189,15 +269,53 @@ class DownloadScreen(Screen):
 
                             table_rows.append(holding)
                         elif track["type"] == "__nav__":
-                            ...
+                            match track["value"]:
+                                case "__new__": new_button.display = True
+                                case "__next__": next_button.display = True
+                                case "__prev__": prev_button.display = True
+
+                    data_table_widget.add_columns(*table_rows[0])
+                    data_table_widget.add_rows(table_rows[1:])
+                elif request.sub_type == "youtube":
+                    data_table_page.display = False
+
+                    table_rows = [["Title"]]
+                    if self.config_data["youtube_downloader"]["output_format"]["uploader"]: table_rows[0].append("Uploader")
+                    if self.config_data["youtube_downloader"]["output_format"]["duration"]: table_rows[0].append("Duration")
+                    if self.config_data["youtube_downloader"]["output_format"]["view_count"]: table_rows[0].append("View Count")
+                    if self.config_data["youtube_downloader"]["output_format"]["id"]: table_rows[0].append("ID")
+
+                    for track in request.choices:
+                        if track["type"] == "__option__":
+                            holding = [track["title"]]
+
+                            if self.config_data["youtube_downloader"]["output_format"]["uploader"]: holding.append(track["uploader"])
+                            if self.config_data["youtube_downloader"]["output_format"]["duration"]: holding.append(track["duration"])
+                            if self.config_data["youtube_downloader"]["output_format"]["view_count"]: holding.append(track["view_count"])
+                            if self.config_data["youtube_downloader"]["output_format"]["id"]: holding.append(track["id"])
+
+                            table_rows.append(holding)
+                        elif track["type"] == "__nav__":
+                            # match track["value"]:
+                            #     case "__new__": new_button.display = True
+                            pass
 
                     data_table_widget.add_columns(*table_rows[0])
                     data_table_widget.add_rows(table_rows[1:])
 
                 switcher.current = "select_pane"
 
+                data_table_widget.focus()
 
-    def _wait_for_ui_response(self):
-        self.has_response = False
-        while not self.has_response:
-            time.sleep(0.05)
+            case "info":
+                info_widget = self.query_one("#info_static", Static)
+                info_widget.content = request.message
+
+                switcher.current = "info_screen"
+
+                self.ui_ready_event.set()
+
+            case "log":
+                rich_log_widget = self.query_one("#info_rich_log", RichLog)
+                rich_log_widget.write(request.message)
+                self.ui_ready_event.set()

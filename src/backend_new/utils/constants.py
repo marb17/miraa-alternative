@@ -42,7 +42,7 @@ class SongContext:
 
 @dataclass
 class UIPromptRequest:
-    type: Literal["select", "input", "confirm"]
+    type: Literal["select", "input", "confirm", "info", "log"]
     message: str
     sub_type: str | None = None
     choices: list[Any] | None = None
@@ -50,6 +50,7 @@ class UIPromptRequest:
     default: Any = None
     password: bool = False
     placeholder: str = ""
+    extra_info: dict[str, Any] = field(default_factory=dict)
 
 #===================================================
 #       ERRORS / EXCEPTIONS
@@ -103,7 +104,8 @@ DEFAULT_CONFIG = {
         "output_format": {
             "duration": True,
             "uploader": True,
-            "view_count": True
+            "view_count": True,
+            "id": True
         }
     },
 

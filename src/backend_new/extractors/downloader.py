@@ -1,4 +1,6 @@
 # STANDARD LIBRARY
+import queue
+import threading
 from pathlib import Path
 from time import sleep, time
 import json
@@ -104,7 +106,7 @@ class Downloader:
             type="input",
             message="Please input song to query",
             sub_type="query",
-            placeholder="Query to search"
+            placeholder="Query to search",
         )
         query = query["value"]
 
@@ -139,7 +141,8 @@ class Downloader:
                 type="select",
                 message="",
                 choices=formatted_choices,
-                sub_type="spotify"
+                sub_type="spotify",
+                extra_info={"page": (offset // limit) + 1}
             )
 
             match user_choice["value"]:
@@ -196,8 +199,8 @@ class Downloader:
                     "type": "__option__",
                     "id": track.get("id"),
                     "title": track.get("title"),
-                    "channel": track.get("uploader"),
-                    "duration": self.milliseconds_to_minutes_and_seconds(track.get("duration")),
+                    "uploader": track.get("uploader"),
+                    "duration": self.milliseconds_to_minutes_and_seconds(track.get("duration") * 1000),
                     "view_count": track.get("view_count"),
                     "value": list_idx,
                     "metadata": track
@@ -215,7 +218,23 @@ class Downloader:
             youtube_id = user_choice["id"]
             youtube_metadata = user_choice["metadata"]
 
+        class YTInfoLogger():
+            def __init__(self, input_queue: queue.Queue):
+                self.log_queue = input_queue
+
+            def debug(self, msg):
+                self.log_queue.put(("log", msg))
+
+            def info(self, msg):
+                self.log_queue.put(("log", msg))
+
+            def error(self, msg):
+                self.log_queue.put(("log", msg))
+
+        log_queue = queue.Queue()
+
         ydl_opts = {'format': 'm4a/bestaudio/best',
+                    "logger": YTInfoLogger(log_queue),
                     'paths': {'home': f'{str(self._base_dir / ".temp")}'},
                     'outtmpl': '%(id)s.%(ext)s',
                     'postprocessors': [{
@@ -224,17 +243,42 @@ class Downloader:
                     }]}
 
         success_downloading = False
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+
+        yield UIPromptRequest(type="info",
+                              message=f"Downloading {youtube_id}")
+
+        def _target_download():
+            nonlocal success_downloading
             for _ in range(retry_count):
                 try:
-                    ydl.download([youtube_id])
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        ydl.download([youtube_id])
                     success_downloading = True
+                    break
                 except (DownloadError, ExtractorError):
                     sleep(retry_sleep)
 
+            log_queue.put(("__done__", ""))
+
+
+        downloader_thread = threading.Thread(target=_target_download)
+        downloader_thread.start()
+
+        while downloader_thread.is_alive() or not log_queue.empty():
+            try:
+                msg_type, msg_text = log_queue.get(timeout=0.1)
+
+                if msg_type == "__done__":
+                    break
+
+                # Yield the message smoothly straight back up to your Textual screen UI!
+                yield UIPromptRequest(type=msg_type, message=msg_text)
+
+            except queue.Empty:
+                continue
+
         if not success_downloading:
             raise Exception(f"Could not download {youtube_id}")
-
         # FINAL WRITE
 
         final_data = {

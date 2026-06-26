@@ -8,7 +8,7 @@ from textual.containers import CenterMiddle, Horizontal, Vertical, Container, Ve
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Label, Button, Switch, Checkbox, Input, Header, Footer, TabbedContent, TabPane
 
-from backend_new.utils.constants import ENV_FILE
+from backend_new.utils.constants import ENV_FILE, DEFAULT_CONFIG
 from backend_new.utils.helper_funcs import read_config, write_config
 
 
@@ -146,6 +146,10 @@ class DownloadMenu(Horizontal):
                         yield Switch(id="youtube_display_view_count")
                         yield Label("View Count")
 
+                    with Container(classes="hor_option"):
+                        yield Switch(id="youtube_display_id")
+                        yield Label("ID")
+
 
     def _on_mount(self, event: events.Mount) -> None:
         self.query_one("#query_extract_settings", VerticalGroup).border_title = "Query & Extractor Settings"
@@ -167,14 +171,27 @@ class DownloadMenu(Horizontal):
         self.query_one("#youtube_display_duration", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["duration"]
         self.query_one("#youtube_display_uploader", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["uploader"]
         self.query_one("#youtube_display_view_count", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["view_count"]
+        self.query_one("#youtube_display_id", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["id"]
 
     def on_input_changed(self, event: Input.Changed):
         if event.input.id == "query_view_limit":
-            write_config(int(self.query_one("#query_view_limit", Input).value), ["downloader", "view_limit"])
+            if self.query_one("#query_view_limit", Input).value == '':
+                value = DEFAULT_CONFIG["downloader"]["view_limit"]
+            else:
+                value = int(self.query_one("#query_view_limit", Input).value)
+            write_config(value, ["downloader", "view_limit"])
         elif event.input.id == "query_retry_count":
-            write_config(int(self.query_one("#query_retry_count", Input).value), ["downloader", "retry_count"])
+            if self.query_one("#query_retry_count", Input).value == '':
+                value = DEFAULT_CONFIG["downloader"]["retry_count"]
+            else:
+                value = int(self.query_one("#query_retry_count", Input).value)
+            write_config(value, ["downloader", "retry_count"])
         elif event.input.id == "query_retry_sleep":
-            write_config(float(self.query_one("#query_retry_sleep", Input).value), ["downloader", "retry_sleep"])
+            if self.query_one("#query_retry_sleep", Input).value == '':
+                value = DEFAULT_CONFIG["downloader"]["retry_sleep"]
+            else:
+                value = float(self.query_one("#query_retry_sleep", Input).value)
+            write_config(value, ["downloader", "retry_sleep"])
 
     def on_switch_changed(self, event: Switch.Changed):
         if event.switch.id == "spotify_display_duration":
@@ -190,6 +207,8 @@ class DownloadMenu(Horizontal):
             write_config(self.query_one("#youtube_display_uploader", Switch).value, ["youtube_downloader", "output_format", "uploader"])
         elif event.switch.id == "youtube_display_view_count":
             write_config(self.query_one("#youtube_display_view_count", Switch).value, ["youtube_downloader", "output_format", "view_count"])
+        elif event.switch.id == "youtube_display_id":
+            write_config(self.query_one("#youtube_display_id", Switch).value, ["youtube_downloader", "output_format", "id"])
 
 class ProcessesMenu(Horizontal):
     DEFAULT_CSS = """
