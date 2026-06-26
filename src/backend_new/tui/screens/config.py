@@ -4,7 +4,7 @@ from dotenv import set_key, load_dotenv
 from textual import events, containers
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import CenterMiddle, Horizontal, Vertical, Container, VerticalGroup, HorizontalGroup
+from textual.containers import CenterMiddle, Horizontal, Vertical, Container, VerticalGroup, HorizontalGroup, ScrollableContainer
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Label, Button, Switch, Checkbox, Input, Header, Footer, TabbedContent, TabPane
 
@@ -256,7 +256,7 @@ class ProcessesMenu(Horizontal):
 
     def compose(self) -> ComposeResult:
         with Container(id="main_container"):
-            with Vertical(classes="option_sections"):
+            with Container(classes="option_sections"):
                 with Container(classes="section_container", id="skip_processes"):
                     yield Checkbox("Download Song", id="download_song_checkbox")
                     yield Checkbox("Genius Metadata", id="genius_metadata_checkbox")
