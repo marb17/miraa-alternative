@@ -64,6 +64,19 @@ class SaveConfirmationModal(ModalScreen):
 
 class DownloadMenu(Horizontal):
     DEFAULT_CSS = """
+        #main_container {
+        height: 100%;
+        width: 100%;
+        
+        hatch: right $accent 10%;
+        }
+        
+        #option_container {
+            height: auto;
+            
+            hatch: right $accent 10%;
+        }
+    
         .section_container {
             height: auto;
             border: solid $secondary;
@@ -99,56 +112,61 @@ class DownloadMenu(Horizontal):
         #spotify_query_display_settings, #youtube_query_display_settings {
             margin: 1 2;
         }
+        
+        #query_display_settings {
+            hatch: right $accent 10%;
+        }
         """
 
     config_file_data = None
     anything_changed = False
 
     def compose(self) -> ComposeResult:
-        with Vertical():
-            with VerticalGroup(classes="section_container", id="query_extract_settings"):
-                with Container(classes="option"):
-                    yield Label("How many items to view at once when querying")
-                    yield Input(id="query_view_limit", placeholder="10", type="integer")
+        with Container(id="main_container"):
+            with Vertical(id="option_container"):
+                with VerticalGroup(classes="section_container", id="query_extract_settings"):
+                    with Container(classes="option"):
+                        yield Label("How many items to view at once when querying")
+                        yield Input(id="query_view_limit", placeholder="10", type="integer")
 
-                with Container(classes="option"):
-                    yield Label("How many times to retry")
-                    yield Input(id="query_retry_count", placeholder="3", type="integer")
+                    with Container(classes="option"):
+                        yield Label("How many times to retry")
+                        yield Input(id="query_retry_count", placeholder="3", type="integer")
 
-                with Container(classes="option"):
-                    yield Label("How long to wait for each retry (s)")
-                    yield Input(id="query_retry_sleep", placeholder="5.0", type="number")
+                    with Container(classes="option"):
+                        yield Label("How long to wait for each retry (s)")
+                        yield Input(id="query_retry_sleep", placeholder="5.0", type="number")
 
-            with HorizontalGroup(classes="section_container", id="query_display_settings"):
-                with VerticalGroup(classes="section_container", id="spotify_query_display_settings"):
-                    with Container(classes="hor_option"):
-                        yield Switch(id="spotify_display_duration")
-                        yield Label("Duration")
+                with HorizontalGroup(classes="section_container", id="query_display_settings"):
+                    with VerticalGroup(classes="section_container", id="spotify_query_display_settings"):
+                        with Container(classes="hor_option"):
+                            yield Switch(id="spotify_display_duration")
+                            yield Label("Duration")
 
-                    with Container(classes="hor_option"):
-                        yield Switch(id="spotify_display_album")
-                        yield Label("Album")
+                        with Container(classes="hor_option"):
+                            yield Switch(id="spotify_display_album")
+                            yield Label("Album")
 
-                    with Container(classes="hor_option"):
-                        yield Switch(id="spotify_display_popularity")
-                        yield Label("Popularity")
+                        with Container(classes="hor_option"):
+                            yield Switch(id="spotify_display_popularity")
+                            yield Label("Popularity")
 
-                with VerticalGroup(classes="section_container", id="youtube_query_display_settings"):
-                    with Container(classes="hor_option"):
-                        yield Switch(id="youtube_display_duration")
-                        yield Label("Duration")
+                    with VerticalGroup(classes="section_container", id="youtube_query_display_settings"):
+                        with Container(classes="hor_option"):
+                            yield Switch(id="youtube_display_duration")
+                            yield Label("Duration")
 
-                    with Container(classes="hor_option"):
-                        yield Switch(id="youtube_display_uploader")
-                        yield Label("Uploader")
+                        with Container(classes="hor_option"):
+                            yield Switch(id="youtube_display_uploader")
+                            yield Label("Uploader")
 
-                    with Container(classes="hor_option"):
-                        yield Switch(id="youtube_display_view_count")
-                        yield Label("View Count")
+                        with Container(classes="hor_option"):
+                            yield Switch(id="youtube_display_view_count")
+                            yield Label("View Count")
 
-                    with Container(classes="hor_option"):
-                        yield Switch(id="youtube_display_id")
-                        yield Label("ID")
+                        with Container(classes="hor_option"):
+                            yield Switch(id="youtube_display_id")
+                            yield Label("ID")
 
 
     def _on_mount(self, event: events.Mount) -> None:
@@ -212,6 +230,13 @@ class DownloadMenu(Horizontal):
 
 class ProcessesMenu(Horizontal):
     DEFAULT_CSS = """
+    #main_container {
+        height: 100%;
+        width: 100%;
+        
+        hatch: right $accent 10%;
+    }
+    
     .section_container {
         height: auto;
         border: solid $secondary;
@@ -222,11 +247,15 @@ class ProcessesMenu(Horizontal):
     .option_sections {
         padding: 0 1;
         align: center top;
+        
+        hatch: right $accent 10%;
+        
+        height: auto;
     }
     """
 
     def compose(self) -> ComposeResult:
-        with Horizontal():
+        with Container(id="main_container"):
             with Vertical(classes="option_sections"):
                 with Container(classes="section_container", id="skip_processes"):
                     yield Checkbox("Download Song", id="download_song_checkbox")
@@ -270,6 +299,11 @@ class ProcessesMenu(Horizontal):
 
 class EnvironmentVariablesMenu(Horizontal):
     DEFAULT_CSS = """
+    #main_container {
+        height: 100%;
+        width: 100%;
+    }
+    
     .section_container {
         height: auto;
         border: solid $secondary;
@@ -280,12 +314,22 @@ class EnvironmentVariablesMenu(Horizontal):
     .option_sections {
         padding: 0 1;
         align: center top;
+        
+        hatch: right $accent 10%;
+        
+        height: 1fr;
     }
     
     #buttons {
         align: right middle;
         content-align: right middle;
-        margin: 0 1;
+        margin: 1 0;
+        padding: 0 1;
+        
+        hatch: right $accent 10%;
+        
+        dock: bottom;
+        height: 3;
     }
     
     .option {
@@ -307,27 +351,28 @@ class EnvironmentVariablesMenu(Horizontal):
     gen_acc_tok = None
 
     def compose(self) -> ComposeResult:
-        with VerticalGroup(classes="option_sections"):
-            with Container(classes="section_container", id="spotify"):
-                with Container(classes="option"):
-                    yield Label("SPOTIFY_CLIENT_ID")
-                    yield Input(placeholder="SPOTIFY_CLIENT_ID", id="in1")
+        with Container(id="main_container"):
+            with VerticalGroup(classes="option_sections"):
+                with Container(classes="section_container", id="spotify"):
+                    with Container(classes="option"):
+                        yield Label("SPOTIFY_CLIENT_ID")
+                        yield Input(placeholder="SPOTIFY_CLIENT_ID", id="in1")
 
-                with Container(classes="option"):
-                    yield Label("SPOTIFY_CLIENT_SECRET")
-                    yield Input(placeholder="SPOTIFY_CLIENT_SECRET", id="in2")
+                    with Container(classes="option"):
+                        yield Label("SPOTIFY_CLIENT_SECRET")
+                        yield Input(placeholder="SPOTIFY_CLIENT_SECRET", id="in2")
 
-                with Container(classes="option"):
-                    yield Label("SPOTIFY_REDIRECT_URI")
-                    yield Input(placeholder="SPOTIFY_REDIRECT_URI", id="in3")
-            with Container(classes="section_container", id="genius"):
-                with Container(classes="option"):
-                    yield Label("GENIUS_ACCESS_TOKEN")
-                    yield Input(placeholder="GENIUS_ACCESS_TOKEN", id="in4")
+                    with Container(classes="option"):
+                        yield Label("SPOTIFY_REDIRECT_URI")
+                        yield Input(placeholder="SPOTIFY_REDIRECT_URI", id="in3")
+                with Container(classes="section_container", id="genius"):
+                    with Container(classes="option"):
+                        yield Label("GENIUS_ACCESS_TOKEN")
+                        yield Input(placeholder="GENIUS_ACCESS_TOKEN", id="in4")
 
-            with HorizontalGroup(id="buttons"):
-                yield Button(variant="warning", id="show", label="Show")
-                yield Button(variant="success", id="save", label="Save")
+                with HorizontalGroup(id="buttons"):
+                    yield Button(variant="warning", id="show", label="Show")
+                    yield Button(variant="success", id="save", label="Save")
 
 
     def _on_mount(self, event: events.Mount) -> None:

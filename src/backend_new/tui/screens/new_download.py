@@ -20,6 +20,10 @@ class DownloadScreen(Screen):
     ]
 
     DEFAULT_CSS = """
+    #fullscreen {
+        hatch: right $accent 10%;
+    }
+    
     #main_window {
         height: auto;
         width: auto;
@@ -98,6 +102,29 @@ class DownloadScreen(Screen):
         content-align: right middle;
         align: right middle;
     }
+    
+    #nav_buttons Button {
+        margin: 0 1;
+    }
+        
+    #info_rich_log {
+        margin: 1 2;
+    }
+    
+    #finished {
+        border: solid $secondary;
+        border-title-color: $primary;
+        border-title-align: center;
+        border-title-style: bold;
+        padding: 1 2;
+        
+        height: auto;
+        width: auto;
+    }
+    
+    #finished Static {
+        width: auto
+    }
     """
 
     pipeline = None
@@ -145,6 +172,9 @@ class DownloadScreen(Screen):
                             yield Button(id="__prev__", variant="primary", label="Previous")
                             yield Button(id="__next__", variant="primary", label="Next")
 
+                    with Vertical(id="finished"):
+                        yield Static(id="finished_text", content="Finished downloading, press any key to continue[blink]_[/]")
+
 
     def _on_mount(self, event: events.Mount) -> None:
         self.config_data = read_config()
@@ -168,7 +198,7 @@ class DownloadScreen(Screen):
                 self.ui_ready_event.wait()
                 prompt_request = self.pipeline.send(self.next_ui_response)
         except StopIteration:
-            ...
+            self.app.call_from_thread(self.update_ui_for_finished)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
@@ -223,6 +253,15 @@ class DownloadScreen(Screen):
     def handle_select_pressed(self) -> None:
         self.handle_table_select()
 
+    def _on_key(self, event: events.Key) -> None:
+        switcher = self.query_one("#main_content_switcher", ContentSwitcher)
+        if switcher.current == "finished":
+            self.app.pop_screen()
+
+    def update_ui_for_finished(self) -> None:
+        switcher = self.query_one("#main_content_switcher", ContentSwitcher)
+        switcher.current = "finished"
+
     def update_ui_for_prompt(self, request: UIPromptRequest) -> None:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
 
@@ -244,6 +283,7 @@ class DownloadScreen(Screen):
                 switcher.current = "input_pane"
 
                 input_widget.focus()
+
             case "select":
                 data_table_widget = self.query_one("#input_table", DataTable)
                 data_table_widget.clear(columns=True)

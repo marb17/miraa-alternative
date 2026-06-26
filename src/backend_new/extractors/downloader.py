@@ -231,6 +231,9 @@ class Downloader:
             def error(self, msg):
                 self.log_queue.put(("log", msg))
 
+            def warning(self, msg):
+                self.log_queue.put(("log", msg))
+
         log_queue = queue.Queue()
 
         ydl_opts = {'format': 'm4a/bestaudio/best',
@@ -255,7 +258,8 @@ class Downloader:
                         ydl.download([youtube_id])
                     success_downloading = True
                     break
-                except (DownloadError, ExtractorError):
+                except Exception as e:
+                    log_queue.put(("log", e))
                     sleep(retry_sleep)
 
             log_queue.put(("__done__", ""))
