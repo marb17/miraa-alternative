@@ -10,7 +10,7 @@ from collections.abc import Generator
 import requests.exceptions
 
 # HELPER LIBRARIES
-from backend_new.utils.helper_funcs import questionary_select, load_env_file, read_json_file
+from backend_new.utils.functions.filesystem import read_json_file, load_env_file
 
 # PYPI LIBRARIES
 import spotipy
@@ -69,6 +69,9 @@ class Downloader:
         """
         return self._sp.track(query)
 
+    def spotify_search_song(self, query: str, offset: int, limit: int) -> dict:
+        return self._sp.search(q=query, offset=offset, limit=limit)
+
     @staticmethod
     def milliseconds_to_minutes_and_seconds(milliseconds: int | float) -> str:
         if isinstance(milliseconds, float):
@@ -90,9 +93,11 @@ class Downloader:
         return {"title": dict_metadata["name"],
                 "artist": dict_metadata["artists"][0]["name"]}
 
+
     def download_song(self, limit: int = 10,
                       retry_count: int = 3,
-                      retry_sleep: float = 5) -> Generator[Any, dict[str, Any], bool]:
+                      retry_sleep: float = 5,
+                      get_current_playing_song: bool = False) -> Generator[Any, dict[str, Any], bool | str]:
         # SPOTIFY SECTION
         persistent_choices = [{"type": "__nav__", "display": "Next", "value": "__next__"},
                               {"type": "__nav__", "display": "Previous", "value": "__prev__"},
@@ -113,7 +118,7 @@ class Downloader:
         while True:
             for _ in range(retry_count):
                 try:
-                    song_list = self._sp.search(q=query, offset=offset, limit=limit)["tracks"]["items"]
+                    song_list = self.spotify_search_song(query, offset, limit)["tracks"]["items"]
                 except Exception as e:
                     # TODO add exception handling
                     sleep(retry_sleep)
@@ -139,7 +144,7 @@ class Downloader:
 
             user_choice: dict[str, Any] = yield UIPromptRequest(
                 type="select",
-                message="",
+                message="Please choose your song:",
                 choices=formatted_choices,
                 sub_type="spotify",
                 extra_info={"page": (offset // limit) + 1}
@@ -165,6 +170,7 @@ class Downloader:
                     spotify_metadata = song_choice["metadata"]
                     title = song_choice["title"]
                     artist = song_choice["artist"]
+                    duration: str = self.milliseconds_to_minutes_and_seconds(spotify_metadata["duration_ms"])
                     youtube_query: str = f"ytsearch{limit}:{song_choice['title']} - {song_choice['artist']}"
                     break
 
@@ -209,7 +215,7 @@ class Downloader:
 
             user_choice: dict[str, Any] = yield UIPromptRequest(
                 type="select",
-                message="",
+                message=f"Song: {title} | {artist}\nDuration: {duration}\n\nPlease choose the matching song previously: ",
                 choices=formatted_choices,
                 sub_type="youtube"
             )
@@ -217,6 +223,13 @@ class Downloader:
             user_choice = formatted_choices[user_choice["value"]]
             youtube_id = user_choice["id"]
             youtube_metadata = user_choice["metadata"]
+
+        try:
+            file_path = Path(TEMP_DIR / f"{youtube_id}.wav")
+            if file_path.exists():
+                return "File already exists, exiting early."
+        except FileNotFoundError:
+            pass
 
         class YTInfoLogger():
             def __init__(self, input_queue: queue.Queue):

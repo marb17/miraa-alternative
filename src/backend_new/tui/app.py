@@ -10,7 +10,8 @@ from backend_new.tui.screens.new_download import DownloadScreen
 from backend_new.tui.screens.config import ConfigMenu
 from backend_new.tui.screens.process_song import ProcessSong
 
-from backend_new.utils.helper_funcs import read_config
+from backend_new.utils.functions.filesystem import read_config
+
 
 class MiraaInterface(App):
     SCREENS = {

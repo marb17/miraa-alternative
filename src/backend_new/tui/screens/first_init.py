@@ -8,7 +8,7 @@ from textual.widgets import Header, Label, ProgressBar, RichLog, Static, Button,
 
 from backend_new.main import Analyzer
 from backend_new.utils.constants import ENV_FILE, DEFAULT_DICTS
-from backend_new.utils.helper_funcs import download_all_dicts
+from backend_new.utils.functions.download import download_all_dicts
 
 
 class InitProgress(Screen):

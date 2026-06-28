@@ -11,7 +11,7 @@ from textual.binding import Binding
 
 from backend_new.extractors.downloader import Downloader
 from backend_new.utils.constants import UIPromptRequest
-from backend_new.utils.helper_funcs import read_config
+from backend_new.utils.functions.filesystem import read_config
 
 
 class DownloadScreen(Screen):
@@ -111,7 +111,7 @@ class DownloadScreen(Screen):
         margin: 1 2;
     }
     
-    #finished {
+    #finished, #already_exists {
         border: solid $secondary;
         border-title-color: $primary;
         border-title-align: center;
@@ -123,6 +123,10 @@ class DownloadScreen(Screen):
     }
     
     #finished Static {
+        width: auto
+    }
+    
+    #already_exists Static {
         width: auto
     }
     """
@@ -157,6 +161,7 @@ class DownloadScreen(Screen):
                             yield Button("Submit", id="submit_input", variant="success")
 
                     with Vertical(id="select_pane"):
+                        yield Label(id="input_table_header")
                         with HorizontalScroll(classes="horizontal_scroll"):
                             yield DataTable(
                                 cursor_type="row",
@@ -174,6 +179,9 @@ class DownloadScreen(Screen):
 
                     with Vertical(id="finished"):
                         yield Static(id="finished_text", content="Finished downloading, press any key to continue[blink]_[/]")
+
+                    with Vertical(id="already_exists"):
+                        yield Static(id="already_exists_text", content="Data already exists, skipping, press any key to continue[blink]_[/]")
 
 
     def _on_mount(self, event: events.Mount) -> None:
@@ -197,8 +205,12 @@ class DownloadScreen(Screen):
                 user_answer = self.app.call_from_thread(self.update_ui_for_prompt, prompt_request)
                 self.ui_ready_event.wait()
                 prompt_request = self.pipeline.send(self.next_ui_response)
-        except StopIteration:
-            self.app.call_from_thread(self.update_ui_for_finished)
+        except StopIteration as e:
+            if e.value is True:
+                self.app.call_from_thread(self.update_ui_for_finished)
+            elif isinstance(e.value, str):
+                self.app.call_from_thread(self.update_ui_for_already_exists)
+
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
@@ -255,12 +267,16 @@ class DownloadScreen(Screen):
 
     def _on_key(self, event: events.Key) -> None:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
-        if switcher.current == "finished":
+        if switcher.current in ["finished", "already_exists"]:
             self.app.pop_screen()
 
     def update_ui_for_finished(self) -> None:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
         switcher.current = "finished"
+
+    def update_ui_for_already_exists(self) -> None:
+        switcher = self.query_one("#main_content_switcher", ContentSwitcher)
+        switcher.current = "already_exists"
 
     def update_ui_for_prompt(self, request: UIPromptRequest) -> None:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
@@ -287,6 +303,9 @@ class DownloadScreen(Screen):
             case "select":
                 data_table_widget = self.query_one("#input_table", DataTable)
                 data_table_widget.clear(columns=True)
+
+                data_table_header = self.query_one("#input_table_header", Label)
+                data_table_header.content = request.message
 
                 data_table_page = self.query_one("#table_page_number", Label)
 
@@ -317,7 +336,8 @@ class DownloadScreen(Screen):
                     data_table_widget.add_columns(*table_rows[0])
                     data_table_widget.add_rows(table_rows[1:])
                 elif request.sub_type == "youtube":
-                    data_table_page.display = False
+                    data_table_page.display = True
+                    data_table_page.content = ''
 
                     table_rows = [["Title"]]
                     if self.config_data["youtube_downloader"]["output_format"]["uploader"]: table_rows[0].append("Uploader")

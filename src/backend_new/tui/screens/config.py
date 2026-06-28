@@ -9,7 +9,7 @@ from textual.screen import ModalScreen, Screen
 from textual.widgets import Label, Button, Switch, Checkbox, Input, Header, Footer, TabbedContent, TabPane
 
 from backend_new.utils.constants import ENV_FILE, DEFAULT_CONFIG
-from backend_new.utils.helper_funcs import read_config, write_config
+from backend_new.utils.functions.filesystem import read_config, write_config
 
 
 class SaveConfirmationModal(ModalScreen):

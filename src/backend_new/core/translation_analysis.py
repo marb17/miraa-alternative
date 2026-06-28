@@ -8,7 +8,8 @@ from math import ceil
 from pathlib import Path
 
 # HELPER LIBRARIES
-from backend_new.utils.helper_funcs import read_json_file, contains_japanese
+from backend_new.utils.functions.other import contains_japanese
+from backend_new.utils.functions.filesystem import read_json_file
 
 # PYPI LIBRARIES
 from lmdeploy import GenerationConfig

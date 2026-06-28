@@ -7,7 +7,9 @@ from typing import Any
 from pathlib import Path
 
 # HELPER LIBRARIES
-from backend_new.utils.helper_funcs import read_json_file, write_json_file, questionary_select, load_env_file, contains_japanese, read_config
+# from backend_new.utils.helper_funcs import questionary_select
+from backend_new.utils.functions.other import contains_japanese
+from backend_new.utils.functions.filesystem import read_json_file, write_json_file, read_config, load_env_file
 
 from backend_new.utils.constants import SongContext, DataMismatchError
 from backend_new.utils.constants import TEMP_DIR

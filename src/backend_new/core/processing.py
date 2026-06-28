@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 # HELPER LIBRARIES
-from backend_new.utils.helper_funcs import read_json_file
+from backend_new.utils.functions.filesystem import read_json_file
 
 # PYPI LIBRARIES
 from sudachipy.morpheme import Morpheme
