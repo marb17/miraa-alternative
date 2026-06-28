@@ -14,7 +14,7 @@ from backend_new.utils.functions.filesystem import read_json_file, load_env_file
 
 # PYPI LIBRARIES
 import spotipy
-from spotipy.oauth2 import SpotifyClientCredentials
+from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
 
 import questionary as q
 
@@ -33,31 +33,65 @@ class Downloader:
         """
         Initializes the downloader
         """
-        current_dir = Path(__file__).resolve().parent
-        while current_dir.name != "src" and current_dir != current_dir.parent:
-            current_dir = current_dir.parent
-        self._base_dir = current_dir
-
         self._env_data = load_env_file()
-        self._cli_output_format = read_json_file(CONFIG_FILE)["spotify_downloader"]["output_format"]
+        self._sp = None
+        self._sp_token = None
 
-        self._authenticate()
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._sp = None
+        self._sp_token = None
         return False
 
-    def _authenticate(self) -> None:
+    def authenticate(self) -> Generator[UIPromptRequest, None, bool]:
         """
         Initializes the spotipy client
         """
-        auth_manager = SpotifyClientCredentials(client_id=self._env_data["SPOTIFY_CLIENT_ID"],
+        auth_manager_no_token = SpotifyClientCredentials(client_id=self._env_data["SPOTIFY_CLIENT_ID"],
                                                 client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"])
 
-        self._sp = spotipy.Spotify(auth_manager=auth_manager)
+        scope = "user-read-currently-playing user-read-playback-state"
+
+        auth_manager = SpotifyOAuth(
+            client_id=self._env_data["SPOTIFY_CLIENT_ID"],
+            client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"],
+            redirect_uri=self._env_data["SPOTIFY_REDIRECT_URI"],
+            scope=scope,
+            open_browser=True
+        )
+
+        cached_token = auth_manager.validate_token(auth_manager.cache_handler.get_cached_token())
+
+        if not cached_token:
+            url = yield UIPromptRequest(
+                type="input",
+                extra_info={"url": auth_manager.get_authorize_url()},
+                message="",
+            )
+
+            try:
+                code = auth_manager.parse_response_code(url)
+                token_info = auth_manager.get_access_token(code, as_dict=True)
+                access_token = token_info["access_token"]
+            except Exception as e:
+                raise RuntimeError(f"Authentication Handshake Failed: {e}")
+        else:
+            access_token = cached_token["access_token"]
+
+        self._sp_token = spotipy.Spotify(auth=access_token)
+        self._sp = spotipy.Spotify(auth_manager=auth_manager_no_token)
+        return True
+
+    def get_current_playing_song(self):
+        """
+        Gets the current playing song from user's spotify (using the tokens)
+        :return: A dict of the song metadata (spotify)
+        :rtype: dict[str, Any]
+        """
+        return self._sp.current_user_playing_track()
 
     def spotify_search_song_metadata_by_id(self, query: str) -> dict:
         """
@@ -99,81 +133,88 @@ class Downloader:
                       retry_sleep: float = 5,
                       get_current_playing_song: bool = False) -> Generator[Any, dict[str, Any], bool | str]:
         # SPOTIFY SECTION
-        persistent_choices = [{"type": "__nav__", "display": "Next", "value": "__next__"},
-                              {"type": "__nav__", "display": "Previous", "value": "__prev__"},
-                              {"type": "__nav__", "display": "New Query", "value": "__new__"}]
+        if not get_current_playing_song:
+            persistent_choices = [{"type": "__nav__", "display": "Next", "value": "__next__"},
+                                  {"type": "__nav__", "display": "Previous", "value": "__prev__"},
+                                  {"type": "__nav__", "display": "New Query", "value": "__new__"}]
 
-        offset: int = 0
-        youtube_query: str = ""
-        song_list = None
+            offset: int = 0
+            youtube_query: str = ""
+            song_list = None
 
-        query = yield UIPromptRequest(
-            type="input",
-            message="Please input song to query",
-            sub_type="query",
-            placeholder="Query to search",
-        )
-        query = query["value"]
-
-        while True:
-            for _ in range(retry_count):
-                try:
-                    song_list = self.spotify_search_song(query, offset, limit)["tracks"]["items"]
-                except Exception as e:
-                    # TODO add exception handling
-                    sleep(retry_sleep)
-                    song_list = None
-            if song_list is None:
-                # TODO add exception handling
-                raise Exception(f"Could not retrieve songs from {query}")
-
-            formatted_choices: list[dict[str, Any]] = []
-
-            for list_idx, song in enumerate(song_list):
-                formatted_choices.append({
-                    "type": "__option__",
-                    "title": self.get_title_artist(song)["title"],
-                    "artist": self.get_title_artist(song)["artist"],
-                    "duration": self.milliseconds_to_minutes_and_seconds(song["duration_ms"]),
-                    "album": song["album"]["name"],
-                    "relevance": song["popularity"],
-                    "value": list_idx,
-                    "metadata": song
-                })
-            formatted_choices.extend(persistent_choices)
-
-            user_choice: dict[str, Any] = yield UIPromptRequest(
-                type="select",
-                message="Please choose your song:",
-                choices=formatted_choices,
-                sub_type="spotify",
-                extra_info={"page": (offset // limit) + 1}
+            query = yield UIPromptRequest(
+                type="input",
+                message="Please input song to query",
+                sub_type="query",
+                placeholder="Query to search",
             )
+            query = query["value"]
 
-            match user_choice["value"]:
-                case "__next__":
-                    offset += limit
-                case "__prev__":
-                    if offset == 0:
-                        continue
-                    offset -= limit
-                case "__new__":
-                    query = yield UIPromptRequest(
-                        type="input",
-                        message="",
-                        placeholder="Query to search",
-                        sub_type="query"
-                    )
-                    query = query["value"]
-                case _:
-                    song_choice: dict[str, Any] = formatted_choices[user_choice["value"]]
-                    spotify_metadata = song_choice["metadata"]
-                    title = song_choice["title"]
-                    artist = song_choice["artist"]
-                    duration: str = self.milliseconds_to_minutes_and_seconds(spotify_metadata["duration_ms"])
-                    youtube_query: str = f"ytsearch{limit}:{song_choice['title']} - {song_choice['artist']}"
-                    break
+            while True:
+                for _ in range(retry_count):
+                    try:
+                        song_list = self.spotify_search_song(query, offset, limit)["tracks"]["items"]
+                    except Exception as e:
+                        # TODO add exception handling
+                        sleep(retry_sleep)
+                        song_list = None
+                        raise e
+                if song_list is None:
+                    # TODO add exception handling
+                    raise Exception(f"Could not retrieve songs from {query}")
 
+                formatted_choices: list[dict[str, Any]] = []
+
+                for list_idx, song in enumerate(song_list):
+                    formatted_choices.append({
+                        "type": "__option__",
+                        "title": self.get_title_artist(song)["title"],
+                        "artist": self.get_title_artist(song)["artist"],
+                        "duration": self.milliseconds_to_minutes_and_seconds(song["duration_ms"]),
+                        "album": song["album"]["name"],
+                        "relevance": song["popularity"],
+                        "value": list_idx,
+                        "metadata": song
+                    })
+                formatted_choices.extend(persistent_choices)
+
+                user_choice: dict[str, Any] = yield UIPromptRequest(
+                    type="select",
+                    message="Please choose your song:",
+                    choices=formatted_choices,
+                    sub_type="spotify",
+                    extra_info={"page": (offset // limit) + 1}
+                )
+
+                match user_choice["value"]:
+                    case "__next__":
+                        offset += limit
+                    case "__prev__":
+                        if offset == 0:
+                            continue
+                        offset -= limit
+                    case "__new__":
+                        query = yield UIPromptRequest(
+                            type="input",
+                            message="",
+                            placeholder="Query to search",
+                            sub_type="query"
+                        )
+                        query = query["value"]
+                    case _:
+                        song_choice: dict[str, Any] = formatted_choices[user_choice["value"]]
+                        spotify_metadata = song_choice["metadata"]
+                        title = song_choice["title"]
+                        artist = song_choice["artist"]
+                        duration: str = self.milliseconds_to_minutes_and_seconds(spotify_metadata["duration_ms"])
+                        youtube_query: str = f"ytsearch{limit}:{title} - {artist}"
+                        break
+        else:
+            current_track = self.get_current_playing_song()
+            current_track_metadata = current_track["item"]
+            title, artist = self.get_title_artist(current_track_metadata).values()
+            duration: str = self.milliseconds_to_minutes_and_seconds(current_track_metadata["duration_ms"])
+            youtube_query: str = f"ytsearch{limit}:{title} - {artist}"
 
         # YOUTUBE SECTION
         ydl_opts = {'quiet': True,
@@ -251,7 +292,7 @@ class Downloader:
 
         ydl_opts = {'format': 'm4a/bestaudio/best',
                     "logger": YTInfoLogger(log_queue),
-                    'paths': {'home': f'{str(self._base_dir / ".temp")}'},
+                    'paths': {'home': f'{str(TEMP_DIR)}'},
                     'outtmpl': '%(id)s.%(ext)s',
                     'postprocessors': [{
                         'key': 'FFmpegExtractAudio',

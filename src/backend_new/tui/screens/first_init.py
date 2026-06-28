@@ -7,6 +7,7 @@ from textual.screen import Screen, ModalScreen
 from textual.widgets import Header, Label, ProgressBar, RichLog, Static, Button, Input, Footer
 
 from backend_new.main import Analyzer
+from backend_new.tui.modalscreens.info import InfoModalScreen
 from backend_new.utils.constants import ENV_FILE, DEFAULT_DICTS
 from backend_new.utils.functions.download import download_all_dicts
 
@@ -105,77 +106,6 @@ class InitEnvKeys(Screen):
     BINDINGS = [
         Binding("ctrl+o", "no_action", "No Action", show=False)
     ]
-
-    class InitEnvHelpScreen(ModalScreen):
-        HELP_MESSAGE = """To get your Tokens from Spotify and Genius, please open these links:
-    - [@click="app.open_url('https://developer.spotify.com/dashboard')"]Spotify Dashboard[/]
-    - [@click="app.open_url('https://genius.com/api-clients')"]Genius Dashboard[/]
-
-Genius is easy to create an API key
-Just create an app and press | [bold]Generate Access Token[/bold] |
-
-Spotify is also same but just needs the right Redirect URI
-You can use these for them:
-    - https://127.0.0.1:8080
-    - https://localhost:8080
-"""
-
-        DEFAULT_CSS = """
-        #vert_group {
-            width: 65%;
-            height: auto;
-            max-height: 30;
-            
-            background: $surface;
-            border: solid $primary;
-            border-title-align: center;
-            
-            align: center middle; 
-            content-align: center middle;
-        }
-        
-        Container {
-            height: auto;
-            
-            align: center middle;
-            content-align: center middle;
-        }
-        
-        Static {
-            margin: 1 2;
-            padding: 1 2;
-            text-align: left;
-            text-overflow: fold;
-        }
-        
-        #text_con {
-            margin: 0 1;
-            width: 100%;
-        }
-        
-        #button_con {
-            width: 100%;
-            margin: 0 0 1 0;
-        }
-        """
-
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            self.styles.align = ("center", "middle")
-
-        def compose(self) -> ComposeResult:
-            with Center(id="vert_group"):
-                with Container(id="text_con"):
-                    yield Static(self.HELP_MESSAGE)
-                with Container(id="button_con"):
-                    yield Button("Exit", variant="error", id="exit")
-
-        def on_button_pressed(self, event: Button.Pressed) -> None:
-            if event.button.id == "exit":
-                self.dismiss()
-
-        def _on_mount(self, event: events.Mount) -> None:
-            self.query_one(Center).border_title = "Environment Variable Help"
 
     DEFAULT_CSS = """
     CenterMiddle {
@@ -306,7 +236,17 @@ You can use these for them:
 
                 self.app.switch_screen("init_dicts")
         elif event.button.id == "help_button":
-            self.app.push_screen(self.InitEnvHelpScreen())
+            self.app.push_screen(InfoModalScreen(message="""To get your Tokens from Spotify and Genius, please open these links:
+    - [@click="app.open_url('https://developer.spotify.com/dashboard')"]Spotify Dashboard[/]
+    - [@click="app.open_url('https://genius.com/api-clients')"]Genius Dashboard[/]
+
+Genius is easy to create an API key
+Just create an app and press | [bold]Generate Access Token[/bold] |
+
+Spotify is also same but just needs the right Redirect URI
+You can use these for them:
+    - https://127.0.0.1:8080
+    - https://localhost:8080""", border_title="Environment Variables Help"))
 
     def action_no_action(self) -> None:
         pass
@@ -393,70 +333,6 @@ class InitDownloadDicts(Screen):
                 event.stop()
                 self.dismiss(False)
 
-    #! TODO fix the message it doesnt work
-    class ManualDownloadHelp(ModalScreen):
-        HELP_MESSAGE = """Please download these .zip files and move them to src/dicts directory"""
-        # for k, v in DEFAULT_DICTS_LINK.items():
-        #     safe_key = escape(k)
-        #     HELP_MESSAGE += f"\n    - [@click=\"app.open_url('{v}')\"]{safe_key}[/]"
-
-        DEFAULT_CSS = """
-        #vert_group {
-            width: 85%;
-            height: auto;
-            max-height: 30;
-
-            background: $surface;
-            border: solid $primary;
-            border-title-align: center;
-
-            align: center middle; 
-            content-align: center middle;
-        }
-
-        Container {
-            height: auto;
-
-            align: center middle;
-            content-align: center middle;
-        }
-
-        Static {
-            margin: 1 2;
-            padding: 1 2;
-            text-align: left;
-            text-overflow: fold;
-        }
-
-        #text_con {
-            margin: 0 1;
-            width: 100%;
-        }
-
-        #button_con {
-            width: 100%;
-            margin: 0 0 1 0;
-        }
-        """
-
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            self.styles.align = ("center", "middle")
-
-        def compose(self) -> ComposeResult:
-            with Center(id="vert_group"):
-                with Container(id="text_con"):
-                    yield Static(self.HELP_MESSAGE)
-                with Container(id="button_con"):
-                    yield Button("Exit", variant="error", id="exit")
-
-        def on_button_pressed(self, event: Button.Pressed) -> None:
-            if event.button.id == "exit":
-                self.dismiss(True)
-
-        def _on_mount(self, event: events.Mount) -> None:
-            self.query_one(Center).border_title = "Manual Download Links"
-
     #! TODO add the extract thing
     class ExtractDicts(ModalScreen):
         ...
@@ -533,7 +409,9 @@ class InitDownloadDicts(Screen):
         if event.button.id == "download":
             self.app.push_screen(self.AutoDownloadDicts(), callback=self.auto_download_callback)
         elif event.button.id == "manual":
-            self.app.push_screen(self.ManualDownloadHelp(), callback=self.manual_download_callback)
+            self.app.push_screen(InfoModalScreen(message="Please download these dicts and move them to src/dicts.",
+                                                 border_title="Manual Download Links",
+                                                 window_width=85), callback=self.manual_download_callback)
 
     def auto_download_callback(self, value: bool) -> None:
         if value:

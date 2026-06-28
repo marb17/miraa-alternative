@@ -1,17 +1,86 @@
-from typing import Iterable
+from typing import Iterable, Any
+import threading
 
+from textual import work, events, on
 from textual.app import App, ComposeResult, SystemCommand
-from textual.screen import Screen
-from textual.widgets import Footer, Header, Button
-from textual.containers import Container, Horizontal, HorizontalGroup
+from textual.screen import Screen, ModalScreen
+from textual.widgets import Footer, Header, Button, Static, Link
+from textual.containers import Container, Horizontal, HorizontalGroup, CenterMiddle
+
+from backend_new.extractors.downloader import Downloader
+from backend_new.tui.modalscreens.info import InfoModalScreen
 
 from backend_new.tui.screens.first_init import InitProgress, InitEnvKeys, InitDownloadDicts, FirstTimeInit
 from backend_new.tui.screens.new_download import DownloadScreen
 from backend_new.tui.screens.config import ConfigMenu
 from backend_new.tui.screens.process_song import ProcessSong
+from backend_new.tui.widgets.interactive import InputSubmit
 
+from backend_new.tui.widgets.static import SpotifyCurrentlyPlayingWidget
 from backend_new.utils.functions.filesystem import read_config
 
+
+class SpotifyAuthenticateScreen(ModalScreen):
+    DEFAULT_CSS = """
+    #fullscreen {
+        width: 100%;
+        height: 100%;
+        
+        align: center middle;
+        content-align: center middle;
+    }
+    
+    #main_box {
+        border: solid $secondary;
+        border-title-color: $primary;
+        border-title-style: bold;
+        border-title-align: center;
+    
+        width: 85%;
+        height: auto;
+        
+        align: center middle;
+        content-align: center middle;
+        
+        padding: 1 2;
+    }
+    
+    #main_box Static {
+        
+    }
+    
+    #main_box InputSubmit {
+        height: auto;
+        width: 100%;
+    }
+    """
+
+    def __init__(self, url: str):
+        super().__init__()
+        self.url = url
+
+    def compose(self) -> ComposeResult:
+        with Container(id="fullscreen"):
+            with CenterMiddle(id="main_box"):
+                yield Static("This is probably your first time logging in to miraa-alternative.\nWe require you to link your spotify account to ensure all features work.\nPlease click the link below to authorize your spotify account.")
+                yield Static()
+                yield Link(
+                    url=self.url,
+                    text="Open Me!"
+                )
+                yield Static()
+                yield Static("Don't worry if the website can't be reached, all services are ran locally on your machine, so there is no website to redirect to.\n\nPlease copy the link you have been redirected to after following the instructions below.\n")
+                yield InputSubmit(
+                    placeholder="Enter Link Address",
+                    id="input_box"
+                )
+
+    def _on_mount(self, event: events.Mount) -> None:
+        self.query_one("#main_box", CenterMiddle).border_title = "Spotify Authentication"
+
+    @on(InputSubmit.Submitted, "#input_box")
+    def handle_submit(self, event: InputSubmit.Submitted) -> None:
+        self.dismiss(event.value)
 
 class MiraaInterface(App):
     SCREENS = {
@@ -52,6 +121,9 @@ class MiraaInterface(App):
     }
     """
 
+    spotify_client = Downloader()
+    next_ui_response = None
+
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
         yield from super().get_system_commands(screen)
 
@@ -87,17 +159,68 @@ class MiraaInterface(App):
                      show_clock=True)
 
         with Container(id="fullscreen"):
+            yield SpotifyCurrentlyPlayingWidget()
+
             with HorizontalGroup(id="quick_menu"):
                 yield Button("Download New", id="download", variant="success")
                 yield Button("Process Song", id="process", variant="primary")
 
     def on_mount(self) -> None:
         self.theme = "monokai"
+        self.query_one("#quick_menu", HorizontalGroup).border_title = "Quick Menu"
 
         if not self.check_if_init():
-            self.push_screen("init_screen")
+            self.push_screen("init_screen", callback=self.after_init_finished)
+        else:
+            self.start_app()
 
-        self.query_one("#quick_menu", HorizontalGroup).border_title = "Quick Menu"
+    def after_init_finished(self, result: Any = None) -> None:
+        self.start_app()
+
+    def start_app(self) -> None:
+        self.authenticate_spotify()
+
+    @work(thread=True)
+    def authenticate_spotify(self) -> None:
+        screen_closed_event = threading.Event()
+
+        pipeline = self.spotify_client.authenticate()
+
+        try:
+            message = next(pipeline)
+        except StopIteration as e:
+            if not e.value: raise Exception("Authentication failed")
+            return
+
+        while True:
+            try:
+                if message.type == "input":
+                    screen_closed_event.clear()
+
+                    self.app.call_from_thread(
+                        self.display_spotify_auth_message,
+                        screen_closed_event,
+                        message.extra_info["url"]
+                    )
+
+                    screen_closed_event.wait()
+
+                    message = pipeline.send(self.next_ui_response)
+                else:
+                    message = next(pipeline)
+
+            except StopIteration as e:
+                if not e.value:
+                    raise Exception("Authentication failed")
+                break
+
+    def display_spotify_auth_message(self, event: threading.Event, url_to_auth: str) -> None:
+        def on_modal_closed(result: str | None = None) -> None:
+            self.next_ui_response = result
+            event.set()
+
+        self.app.push_screen(SpotifyAuthenticateScreen(url_to_auth), callback=on_modal_closed)
+
 
     @staticmethod
     def check_if_init() -> bool:

@@ -10,6 +10,7 @@ from textual.widgets import Header, Footer, Input, DataTable, Label, Button, Con
 from textual.binding import Binding
 
 from backend_new.extractors.downloader import Downloader
+from backend_new.tui.widgets.interactive import InputSubmit
 from backend_new.utils.constants import UIPromptRequest
 from backend_new.utils.functions.filesystem import read_config
 
@@ -32,6 +33,11 @@ class DownloadScreen(Screen):
     #main_content_switcher {
         height: auto;
         width: auto;
+    }
+    
+    InputSubmit {
+        height: auto;
+        padding: 1 2;
     }
     
     #fullscreen {
@@ -57,18 +63,8 @@ class DownloadScreen(Screen):
         border-title-color: $primary;
         border-title-align: center;
         border-title-style: bold;
-        padding: 1 2;
-        
     
         height: auto;
-    }
-    
-    #input_box {
-        width: 1fr;
-    }
-    
-    #submit_input {
-        width: auto;
     }
     
     #select_pane {
@@ -78,7 +74,6 @@ class DownloadScreen(Screen):
         border-title-style: bold;
         padding: 1 2;
         
-    
         height: auto;
     }
     
@@ -155,10 +150,7 @@ class DownloadScreen(Screen):
                         yield RichLog(id="info_rich_log")
 
                     with Vertical(id="input_pane"):
-                        yield Label(id="input_label")
-                        with HorizontalGroup(id="input_container"):
-                            yield Input(id="input_box")
-                            yield Button("Submit", id="submit_input", variant="success")
+                        yield InputSubmit(id="input_widget")
 
                     with Vertical(id="select_pane"):
                         yield Label(id="input_table_header")
@@ -195,6 +187,7 @@ class DownloadScreen(Screen):
     @work(thread=True)
     def run_downloader_pipeline(self) -> None:
         dl = Downloader()
+        is_auth = next((False for _ in dl.authenticate()), True)
         self.pipeline = dl.download_song()
 
         try:
@@ -234,10 +227,9 @@ class DownloadScreen(Screen):
             self.next_ui_response = val
             self.ui_ready_event.set()
 
-    @on(Button.Pressed, "#submit_input")
+    @on(InputSubmit.Submitted, "#input_widget")
     def handle_input_submit(self) -> None:
-
-        val = {"value": self.query_one("#input_box", Input).value}
+        val = {"value": self.query_one("#input_widget", InputSubmit).value}
 
         if val["value"]:
             switcher = self.query_one("#main_content_switcher", ContentSwitcher)
@@ -247,10 +239,6 @@ class DownloadScreen(Screen):
             self.ui_ready_event.set()
         else:
             return
-
-    @on(Input.Submitted, "#input_box")
-    def handle_submit_input(self) -> None:
-        self.handle_input_submit()
 
     @on(DataTable.RowSelected, "#input_table")
     def handle_table_select(self) -> None:
@@ -290,11 +278,11 @@ class DownloadScreen(Screen):
 
         match request.type:
             case "input":
-                input_widget = self.query_one("#input_box", Input)
-                input_label = self.query_one("#input_label", Label)
+                input_widget = self.query_one("#input_widget", InputSubmit)
 
-                input_label.content = request.message
-                input_widget.placeholder = request.placeholder
+                input_widget.update_prompt(placeholder=request.placeholder,
+                                           label=request.message,
+                                           )
 
                 switcher.current = "input_pane"
 

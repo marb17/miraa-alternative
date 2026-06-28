@@ -93,7 +93,7 @@ def load_env_file(safe_empty: bool = True) -> dict[Any, str | None]:
             raise FileNotFoundError(".env file not found, creating one. Please add your credentials to the .env file.")
 
     load_dotenv()
-    return dict([(var, os.getenv(var))for var in DEFAULT_ENV_VARS])
+    return dict([(var, os.getenv(var)) for var in DEFAULT_ENV_VARS])
 
 
 def clear_temp_dir() -> None:
