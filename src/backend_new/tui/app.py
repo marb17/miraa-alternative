@@ -190,6 +190,8 @@ class MiraaInterface(App):
         else:
             self.start_app()
 
+        self.set_interval(5, self.update_spotify_widget)
+
     def after_init_finished(self, result: Any = None) -> None:
         self.start_app()
 
@@ -206,6 +208,7 @@ class MiraaInterface(App):
             message = next(pipeline)
         except StopIteration as e:
             if not e.value: raise Exception("Authentication failed")
+            self.app.call_from_thread(self.authenticate_spotify_widget)
             return
 
         while True:
@@ -231,7 +234,7 @@ class MiraaInterface(App):
                 break
 
         self.app.call_from_thread(self.authenticate_spotify_widget)
-        self.set_interval(5, self.update_spotify_widget)
+
 
     def authenticate_spotify_widget(self):
         self.query_one("#spotify_currently_playing", SpotifyCurrentlyPlayingWidget).action_authenticate()

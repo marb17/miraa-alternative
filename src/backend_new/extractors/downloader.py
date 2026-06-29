@@ -38,7 +38,7 @@ class Downloader:
         self._sp_token = None
 
         self._cache_handler = CacheFileHandler(
-            cache_path=CACHE_DIR,
+            cache_path=CACHE_DIR / ".spotify_cache",
             username="spotipy"
         )
 
@@ -51,10 +51,14 @@ class Downloader:
         self._sp_token = None
         return False
 
+    #TODO fix dup lines
     def authenticate(self, force_cache: bool = False) -> Generator[UIPromptRequest, None, bool]:
         """
         Initializes the spotipy client
         """
+        if self._sp and self._sp_token:
+            return
+
         auth_manager_no_token = SpotifyClientCredentials(client_id=self._env_data["SPOTIFY_CLIENT_ID"],
                                                 client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"])
 
@@ -92,6 +96,9 @@ class Downloader:
         return True
 
     def cache_authenticate(self) -> None:
+        if self._sp and self._sp_token:
+            return
+
         auth_manager_no_token = SpotifyClientCredentials(client_id=self._env_data["SPOTIFY_CLIENT_ID"],
                                                          client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"])
 
@@ -106,10 +113,10 @@ class Downloader:
             cache_handler=self._cache_handler
         )
         cached_token = auth_manager.validate_token(auth_manager.cache_handler.get_cached_token())
-        access_token = cached_token["access_token"]
-
         if not cached_token:
             raise Exception("No cached token is available")
+        access_token = cached_token["access_token"]
+
 
         self._sp_token = spotipy.Spotify(auth=access_token)
         self._sp = spotipy.Spotify(auth_manager=auth_manager_no_token)
