@@ -1,6 +1,8 @@
 # STANDARD LIBRARY
+import functools
 import queue
 import threading
+import types
 from pathlib import Path
 from time import sleep, time
 import json
@@ -11,7 +13,7 @@ import requests.exceptions
 from spotipy import cache_handler, CacheFileHandler
 
 # HELPER LIBRARIES
-from backend_new.utils.functions.filesystem import read_json_file, load_env_file
+from backend_new.utils.functions.filesystem import read_json_file, load_env_file, read_config
 
 # PYPI LIBRARIES
 import spotipy
@@ -28,12 +30,51 @@ from backend_new.utils.constants import TEMP_DIR, CONFIG_FILE, UIPromptRequest, 
 from backend_new.utils.logger import Logger
 logger = Logger(__name__)
 
+def handle_spotify_token_errors(func):
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        try:
+            result = func(self, *args, **kwargs)
+
+            if isinstance(result, types.GeneratorType):
+                try:
+                    yield from result
+                except spotipy.SpotifyException as e:
+                    if e.http_status == 401:
+                        resolved = yield UIPromptRequest(
+                            type="hidden_request",
+                            message=401
+                        )
+
+                        if resolved:
+                            return self._sp_token.current_user_playing_track()
+                    else:
+                        raise e
+            else:
+                return result
+        except spotipy.SpotifyException as e:
+            if e.http_status == 401:
+                resolved = yield UIPromptRequest(
+                    type="hidden_request",
+                    message=401
+                )
+
+                if resolved:
+                    return self._sp_token.current_user_playing_track()
+            else:
+                raise e
+
+    return wrapper
+
+
+
 class Downloader:
     def __init__(self) -> None:
         """
         Initializes the downloader
         """
         self._env_data = load_env_file()
+        self._use_token = read_config()['spotify_downloader']["token"]
         self._sp = None
         self._sp_token = None
 
@@ -62,36 +103,38 @@ class Downloader:
         auth_manager_no_token = SpotifyClientCredentials(client_id=self._env_data["SPOTIFY_CLIENT_ID"],
                                                 client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"])
 
-        scope = "user-read-currently-playing user-read-playback-state"
+        if self._use_token:
+            scope = "user-read-currently-playing user-read-playback-state"
 
-        auth_manager = SpotifyOAuth(
-            client_id=self._env_data["SPOTIFY_CLIENT_ID"],
-            client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"],
-            redirect_uri=self._env_data["SPOTIFY_REDIRECT_URI"],
-            scope=scope,
-            open_browser=True,
-            cache_handler=self._cache_handler
-        )
-
-        cached_token = auth_manager.validate_token(auth_manager.cache_handler.get_cached_token())
-
-        if cached_token or force_cache:
-            access_token = cached_token["access_token"]
-        else:
-            url = yield UIPromptRequest(
-                type="input",
-                extra_info={"url": auth_manager.get_authorize_url()},
-                message="",
+            auth_manager = SpotifyOAuth(
+                client_id=self._env_data["SPOTIFY_CLIENT_ID"],
+                client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"],
+                redirect_uri=self._env_data["SPOTIFY_REDIRECT_URI"],
+                scope=scope,
+                open_browser=True,
+                cache_handler=self._cache_handler
             )
 
-            try:
-                code = auth_manager.parse_response_code(url)
-                token_info = auth_manager.get_access_token(code, as_dict=True)
-                access_token = token_info["access_token"]
-            except Exception as e:
-                raise RuntimeError(f"Authentication Handshake Failed: {e}")
+            cached_token = auth_manager.validate_token(auth_manager.cache_handler.get_cached_token())
 
-        self._sp_token = spotipy.Spotify(auth=access_token)
+            if cached_token or force_cache:
+                access_token = cached_token["access_token"]
+            else:
+                url = yield UIPromptRequest(
+                    type="input",
+                    extra_info={"url": auth_manager.get_authorize_url()},
+                    message="",
+                )
+
+                try:
+                    code = auth_manager.parse_response_code(url)
+                    token_info = auth_manager.get_access_token(code, as_dict=True)
+                    access_token = token_info["access_token"]
+                except Exception as e:
+                    raise RuntimeError(f"Authentication Handshake Failed: {e}")
+
+            self._sp_token = spotipy.Spotify(auth=access_token)
+
         self._sp = spotipy.Spotify(auth_manager=auth_manager_no_token)
         return True
 
@@ -102,26 +145,30 @@ class Downloader:
         auth_manager_no_token = SpotifyClientCredentials(client_id=self._env_data["SPOTIFY_CLIENT_ID"],
                                                          client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"])
 
-        scope = "user-read-currently-playing user-read-playback-state"
+        if self._use_token:
 
-        auth_manager = SpotifyOAuth(
-            client_id=self._env_data["SPOTIFY_CLIENT_ID"],
-            client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"],
-            redirect_uri=self._env_data["SPOTIFY_REDIRECT_URI"],
-            scope=scope,
-            open_browser=True,
-            cache_handler=self._cache_handler
-        )
-        cached_token = auth_manager.validate_token(auth_manager.cache_handler.get_cached_token())
-        if not cached_token:
-            raise Exception("No cached token is available")
-        access_token = cached_token["access_token"]
+            scope = "user-read-currently-playing user-read-playback-state"
+
+            auth_manager = SpotifyOAuth(
+                client_id=self._env_data["SPOTIFY_CLIENT_ID"],
+                client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"],
+                redirect_uri=self._env_data["SPOTIFY_REDIRECT_URI"],
+                scope=scope,
+                open_browser=True,
+                cache_handler=self._cache_handler
+            )
+            cached_token = auth_manager.validate_token(auth_manager.cache_handler.get_cached_token())
+            if not cached_token:
+                raise Exception("No cached token is available")
+            access_token = cached_token["access_token"]
 
 
-        self._sp_token = spotipy.Spotify(auth=access_token)
+            self._sp_token = spotipy.Spotify(auth=access_token)
+
         self._sp = spotipy.Spotify(auth_manager=auth_manager_no_token)
 
-    def get_current_playing_song(self):
+    @handle_spotify_token_errors
+    def get_current_playing_song(self) -> Generator[UIPromptRequest, Any, dict[str, Any]]:
         """
         Gets the current playing song from user's spotify (using the tokens)
         :return: A dict of the song metadata (spotify)
@@ -166,26 +213,42 @@ class Downloader:
 
     def download_song(self, limit: int = 10,
                       retry_count: int = 3,
-                      retry_sleep: float = 5,
-                      get_current_playing_song: bool = False) -> Generator[Any, dict[str, Any], bool | str]:
+                      retry_sleep: float = 5) -> Generator[Any, dict[str, Any], bool | str]:
         # SPOTIFY SECTION
-        if not get_current_playing_song:
+        offset: int = 0
+        youtube_query: str = ""
+        song_list = None
+
+        query = yield UIPromptRequest(
+            type="input",
+            message="Please input song to query: ",
+            sub_type="query",
+            placeholder="Query to search",
+        )
+        first_yt = query["first_yt"]
+        query = query["value"]
+
+        if query == "__current_song__":
+            pipeline = self.get_current_playing_song()
+            try:
+                prompt_request = next(pipeline)
+
+                if prompt_request.type == "hidden_request" and prompt_request.message == 401:
+                    self.authenticate()
+                    pipeline.send(True)
+
+            except StopIteration as e:
+                current_track = e.value
+
+            current_track_metadata = current_track["item"]
+            spotify_metadata = current_track_metadata
+            title, artist = self.get_title_artist(current_track_metadata).values()
+            duration: str = self.milliseconds_to_minutes_and_seconds(current_track_metadata["duration_ms"])
+            youtube_query: str = f"ytsearch{limit}:{title} - {artist}"
+        else:
             persistent_choices = [{"type": "__nav__", "display": "Next", "value": "__next__"},
                                   {"type": "__nav__", "display": "Previous", "value": "__prev__"},
                                   {"type": "__nav__", "display": "New Query", "value": "__new__"}]
-
-            offset: int = 0
-            youtube_query: str = ""
-            song_list = None
-
-            query = yield UIPromptRequest(
-                type="input",
-                message="Please input song to query",
-                sub_type="query",
-                placeholder="Query to search",
-            )
-            query = query["value"]
-
             while True:
                 for _ in range(retry_count):
                     try:
@@ -245,12 +308,7 @@ class Downloader:
                         duration: str = self.milliseconds_to_minutes_and_seconds(spotify_metadata["duration_ms"])
                         youtube_query: str = f"ytsearch{limit}:{title} - {artist}"
                         break
-        else:
-            current_track = self.get_current_playing_song()
-            current_track_metadata = current_track["item"]
-            title, artist = self.get_title_artist(current_track_metadata).values()
-            duration: str = self.milliseconds_to_minutes_and_seconds(current_track_metadata["duration_ms"])
-            youtube_query: str = f"ytsearch{limit}:{title} - {artist}"
+
 
         # YOUTUBE SECTION
         ydl_opts = {'quiet': True,
@@ -290,12 +348,15 @@ class Downloader:
                 })
             formatted_choices.extend(persistent_choices)
 
-            user_choice: dict[str, Any] = yield UIPromptRequest(
-                type="select",
-                message=f"Song: {title} | {artist}\nDuration: {duration}\n\nPlease choose the matching song previously: ",
-                choices=formatted_choices,
-                sub_type="youtube"
-            )
+            if first_yt:
+                user_choice = formatted_choices[0]
+            else:
+                user_choice: dict[str, Any] = yield UIPromptRequest(
+                    type="select",
+                    message=f"Song: {title} | {artist}\nDuration: {duration}\n\nPlease choose the matching song previously: ",
+                    choices=formatted_choices,
+                    sub_type="youtube"
+                )
 
             user_choice = formatted_choices[user_choice["value"]]
             youtube_id = user_choice["id"]

@@ -73,7 +73,7 @@ class InfoModalScreen(ModalScreen):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "exit":
-            self.dismiss()
+            self.dismiss(True)
 
     def _on_mount(self, event: events.Mount) -> None:
         self.query_one(Center).border_title = self.BORDER_TITLE

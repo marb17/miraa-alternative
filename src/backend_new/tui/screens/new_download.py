@@ -11,13 +11,14 @@ from textual.binding import Binding
 
 from backend_new.extractors.downloader import Downloader
 from backend_new.tui.widgets.interactive import InputSubmit
+from backend_new.tui.widgets.static import SpotifyCurrentlyPlayingWidget
 from backend_new.utils.constants import UIPromptRequest
 from backend_new.utils.functions.filesystem import read_config
 
 
 class DownloadScreen(Screen):
     BINDINGS = [
-        Binding("ctrl+x", "app.pop_screen", "Exit Download", priority=True)
+        Binding("ctrl+x", "self_dismiss(False)", "Exit Download", priority=True)
     ]
 
     DEFAULT_CSS = """
@@ -59,12 +60,30 @@ class DownloadScreen(Screen):
     }
     
     #input_pane {
+        height: auto;
+    }
+    
+    #input_query_widget {
         border: solid $secondary;
         border-title-color: $primary;
         border-title-align: center;
         border-title-style: bold;
     
         height: auto;
+    }
+    
+    #current_playing_widget {
+        border: solid $secondary;
+        border-title-color: $primary;
+        border-title-align: center;
+        border-title-style: bold;
+    
+        height: auto;
+    }
+    
+    #current_playing_widget SpotifyCurrentlyPlayingWidget {
+        height: auto;
+        padding: 1 2;
     }
     
     #select_pane {
@@ -150,7 +169,10 @@ class DownloadScreen(Screen):
                         yield RichLog(id="info_rich_log")
 
                     with Vertical(id="input_pane"):
-                        yield InputSubmit(id="input_widget")
+                        with Container(id="current_playing_widget"):
+                            yield SpotifyCurrentlyPlayingWidget()
+                        with Container(id="input_query_widget"):
+                            yield InputSubmit(id="input_widget", extra_buttons=[Button("Current Song", id="current_playing_song_button", variant="primary", disabled=not self.app.use_spotify_token)])
 
                     with Vertical(id="select_pane"):
                         yield Label(id="input_table_header")
@@ -179,8 +201,11 @@ class DownloadScreen(Screen):
     def _on_mount(self, event: events.Mount) -> None:
         self.config_data = read_config()
 
-        self.query_one("#input_pane", Vertical).border_title = "New Download"
+        self.query_one("#current_playing_widget", Container).border_title = "Currently Playing"
+        self.query_one("#input_query_widget", Container).border_title = "New Download"
         self.query_one("#select_pane", Vertical).border_title = "New Download"
+
+        self.query_one(SpotifyCurrentlyPlayingWidget).action_authenticate()
 
         self.run_downloader_pipeline()
 
@@ -228,17 +253,26 @@ class DownloadScreen(Screen):
             self.ui_ready_event.set()
 
     @on(InputSubmit.Submitted, "#input_widget")
-    def handle_input_submit(self) -> None:
-        val = {"value": self.query_one("#input_widget", InputSubmit).value}
+    def handle_input_submit(self, event: InputSubmit.Submitted) -> None:
+        val = {"value": self.query_one("#input_widget", InputSubmit).value,
+               "first_yt": read_config()["downloader"]["query_always_first_youtube_result"]}
 
-        if val["value"]:
+        if event.triggered_by == "submit":
+            if val["value"]:
+                switcher = self.query_one("#main_content_switcher", ContentSwitcher)
+                switcher.current = "loading_screen"
+
+                self.next_ui_response = val
+                self.ui_ready_event.set()
+            else:
+                return
+        elif event.triggered_by == "current_playing_song_button":
             switcher = self.query_one("#main_content_switcher", ContentSwitcher)
             switcher.current = "loading_screen"
 
-            self.next_ui_response = val
+            self.next_ui_response = {"value": "__current_song__",
+                                     "first_yt": read_config()["downloader"]["current_song_always_first_youtube_result"]}
             self.ui_ready_event.set()
-        else:
-            return
 
     @on(DataTable.RowSelected, "#input_table")
     def handle_table_select(self) -> None:
@@ -256,7 +290,7 @@ class DownloadScreen(Screen):
     def _on_key(self, event: events.Key) -> None:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
         if switcher.current in ["finished", "already_exists"]:
-            self.app.pop_screen()
+            self.action_self_dismiss(True)
 
     def update_ui_for_finished(self) -> None:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
@@ -265,6 +299,9 @@ class DownloadScreen(Screen):
     def update_ui_for_already_exists(self) -> None:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
         switcher.current = "already_exists"
+
+    def action_self_dismiss(self, value: Any) -> None:
+        self.dismiss(value)
 
     def update_ui_for_prompt(self, request: UIPromptRequest) -> None:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)

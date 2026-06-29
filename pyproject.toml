@@ -12,6 +12,7 @@ dependencies = [
     "textual", "opencv-python", "mmengine",
     "torch", "torchvision",
     "gdown",
+    "pyperclip",
 
     # force a only windows instasll
     "pywin32 >= 300; platform_system == 'Windows'",

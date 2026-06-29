@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 from dotenv import set_key, load_dotenv
 from textual import events
@@ -8,6 +9,7 @@ from textual.containers import Horizontal, Vertical, Container, VerticalGroup, H
 from textual.screen import Screen
 from textual.widgets import Label, Button, Switch, Checkbox, Input, Header, Footer, TabbedContent, TabPane
 
+from backend_new.tui.modalscreens.full import SpotifyAuthenticateScreen
 from backend_new.tui.modalscreens.interactive import UnsavedConfirmationModalScreen
 from backend_new.utils.constants import ENV_FILE, DEFAULT_CONFIG
 from backend_new.utils.functions.filesystem import read_config, write_config
@@ -88,6 +90,14 @@ class DownloadMenu(Horizontal):
                         yield Label("How long to wait for each retry (s)")
                         yield Input(id="query_retry_sleep", placeholder="5.0", type="number")
 
+                    with Container(classes="hor_option"):
+                        yield Switch(id="current_song_always_first_youtube_result")
+                        yield Label("Always choose first YouTube result when using current song")
+
+                    with Container(classes="hor_option"):
+                        yield Switch(id="query_always_first_youtube_result")
+                        yield Label("Always choose first YouTube result when querying")
+
                 with HorizontalGroup(classes="section_container", id="query_display_settings"):
                     with VerticalGroup(classes="section_container", id="spotify_query_display_settings"):
                         with Container(classes="hor_option"):
@@ -119,28 +129,42 @@ class DownloadMenu(Horizontal):
                             yield Switch(id="youtube_display_id")
                             yield Label("ID")
 
+                with HorizontalGroup(classes="section_container", id="spotify_settings"):
+                    with Container(classes="hor_option"):
+                        yield Switch(id="spotify_token")
+                        yield Label("Authenticate Spotify Account")
+
 
     def _on_mount(self, event: events.Mount) -> None:
-        self.query_one("#query_extract_settings", VerticalGroup).border_title = "Query & Extractor Settings"
+        with self.prevent(Input.Changed, Switch.Changed):
+            self.auto_change = True
+            self.query_one("#query_extract_settings", VerticalGroup).border_title = "Query & Extractor Settings"
 
-        self.query_one("#query_display_settings", HorizontalGroup).border_title = "Information Shown while Querying"
-        self.query_one("#spotify_query_display_settings", VerticalGroup).border_title = "Spotify"
-        self.query_one("#youtube_query_display_settings", VerticalGroup).border_title = "Youtube"
+            self.query_one("#query_display_settings", HorizontalGroup).border_title = "Information Shown while Querying"
+            self.query_one("#spotify_query_display_settings", VerticalGroup).border_title = "Spotify"
+            self.query_one("#youtube_query_display_settings", VerticalGroup).border_title = "Youtube"
 
-        self.config_file_data = read_config()
+            self.query_one("#spotify_settings", HorizontalGroup).border_title = "Spotify"
 
-        self.query_one("#query_view_limit", Input).value = str(self.config_file_data["downloader"]["view_limit"])
-        self.query_one("#query_retry_count", Input).value = str(self.config_file_data["downloader"]["retry_count"])
-        self.query_one("#query_retry_sleep", Input).value = str(self.config_file_data["downloader"]["retry_sleep"])
+            self.config_file_data = read_config()
 
-        self.query_one("#spotify_display_duration", Switch).value = self.config_file_data["spotify_downloader"]["output_format"]["duration"]
-        self.query_one("#spotify_display_album", Switch).value = self.config_file_data["spotify_downloader"]["output_format"]["album"]
-        self.query_one("#spotify_display_popularity", Switch).value = self.config_file_data["spotify_downloader"]["output_format"]["popularity"]
+            self.query_one("#query_view_limit", Input).value = str(self.config_file_data["downloader"]["view_limit"])
+            self.query_one("#query_retry_count", Input).value = str(self.config_file_data["downloader"]["retry_count"])
+            self.query_one("#query_retry_sleep", Input).value = str(self.config_file_data["downloader"]["retry_sleep"])
 
-        self.query_one("#youtube_display_duration", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["duration"]
-        self.query_one("#youtube_display_uploader", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["uploader"]
-        self.query_one("#youtube_display_view_count", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["view_count"]
-        self.query_one("#youtube_display_id", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["id"]
+            self.query_one("#current_song_always_first_youtube_result", Switch).value = self.config_file_data["downloader"]["current_song_always_first_youtube_result"]
+            self.query_one("#query_always_first_youtube_result", Switch).value = self.config_file_data["downloader"]["query_always_first_youtube_result"]
+
+            self.query_one("#spotify_display_duration", Switch).value = self.config_file_data["spotify_downloader"]["output_format"]["duration"]
+            self.query_one("#spotify_display_album", Switch).value = self.config_file_data["spotify_downloader"]["output_format"]["album"]
+            self.query_one("#spotify_display_popularity", Switch).value = self.config_file_data["spotify_downloader"]["output_format"]["popularity"]
+
+            self.query_one("#youtube_display_duration", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["duration"]
+            self.query_one("#youtube_display_uploader", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["uploader"]
+            self.query_one("#youtube_display_view_count", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["view_count"]
+            self.query_one("#youtube_display_id", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["id"]
+
+            self.query_one("#spotify_token", Switch).value = self.config_file_data["spotify_downloader"]["token"]
 
     def on_input_changed(self, event: Input.Changed):
         if event.input.id == "query_view_limit":
@@ -163,7 +187,12 @@ class DownloadMenu(Horizontal):
             write_config(value, ["downloader", "retry_sleep"])
 
     def on_switch_changed(self, event: Switch.Changed):
-        if event.switch.id == "spotify_display_duration":
+        if event.switch.id == "current_song_always_first_youtube_result":
+            write_config(self.query_one("#current_song_always_first_youtube_result", Switch).value, ["downloader", "current_song_always_first_youtube_result"])
+        elif event.switch.id == "query_always_first_youtube_result":
+            write_config(self.query_one("#query_always_first_youtube_result", Switch).value, ["downloader", "query_always_first_youtube_result"])
+
+        elif event.switch.id == "spotify_display_duration":
             write_config(self.query_one("#spotify_display_duration", Switch).value, ["spotify_downloader", "output_format", "duration"])
         elif event.switch.id == "spotify_display_album":
             write_config(self.query_one("#spotify_display_album", Switch).value, ["spotify_downloader", "output_format", "album"])
@@ -178,6 +207,24 @@ class DownloadMenu(Horizontal):
             write_config(self.query_one("#youtube_display_view_count", Switch).value, ["youtube_downloader", "output_format", "view_count"])
         elif event.switch.id == "youtube_display_id":
             write_config(self.query_one("#youtube_display_id", Switch).value, ["youtube_downloader", "output_format", "id"])
+
+        elif event.switch.id == "spotify_token":
+            write_config(self.query_one("#spotify_token", Switch).value, ["spotify_downloader", "token"])
+            self.config_file_data["spotify_downloader"]["token"] = event.switch.value
+            if event.switch.value:
+                self.app.push_screen(SpotifyAuthenticateScreen(), callback=self.handle_auth_result)
+
+    def handle_auth_result(self, result: Any) -> None:
+        """Called automatically when SpotifyAuthenticateScreen is dismissed."""
+        # If result is None or False, authentication failed or was skipped
+        if not result:
+            self.query_one("#spotify_token", Switch).value = False
+            self.config_file_data["spotify_downloader"]["token"] = False
+            write_config(False, ["spotify_downloader", "token"])
+        else:
+            # Token successfully retrieved!
+            self.config_file_data["spotify_downloader"]["token"] = result
+            self.app.read_config_worker()
 
 class ProcessesMenu(Horizontal):
     DEFAULT_CSS = """

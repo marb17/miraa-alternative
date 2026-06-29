@@ -43,9 +43,9 @@ class SongContext:
 
 @dataclass
 class UIPromptRequest:
-    type: Literal["select", "input", "confirm", "info", "log"]
-    message: str
-    sub_type: str | None = None
+    type: Literal["select", "input", "confirm", "info", "log", "hidden_request"]
+    message: Any
+    sub_type: Any = None
     choices: list[Any] | None = None
     persistent_choices: list[Any] | None = None
     default: Any = None
@@ -84,12 +84,15 @@ class DataMismatchError(Exception):
 
 DEFAULT_CONFIG = {
     "version": "1.0.0",
-    "init": True,
+    "init": False,
 
     "downloader": {
         "view_limit": 10,
         "retry_count": 3,
-        "retry_sleep": 5
+        "retry_sleep": 5,
+
+        "current_song_always_first_youtube_result": True,
+        "query_always_first_youtube_result": True
     },
 
     "spotify_downloader": {
@@ -97,7 +100,8 @@ DEFAULT_CONFIG = {
             "duration": True,
             "album": True,
             "popularity": True
-        }
+        },
+        "token": True
     },
 
     "youtube_downloader": {

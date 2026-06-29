@@ -10,6 +10,7 @@ from backend_new.main import Analyzer
 from backend_new.tui.modalscreens.info import InfoModalScreen
 from backend_new.utils.constants import ENV_FILE, DEFAULT_DICTS
 from backend_new.utils.functions.download import download_all_dicts
+from backend_new.utils.functions.filesystem import write_config
 
 
 class InitProgress(Screen):
@@ -43,6 +44,8 @@ class InitProgress(Screen):
     Container {
         align: center middle;
         content-align: center middle;
+        
+        hatch: right $accent 10%
     }
     
     ProgressBar {
@@ -78,7 +81,7 @@ class InitProgress(Screen):
         self.init_miraa()
 
     def go_to_next_screen(self) -> None:
-        self.app.switch_screen("init_env")
+        self.app.switch_screen(InitEnvKeys())
 
     @work(thread=True)
     def init_miraa(self):
@@ -127,6 +130,8 @@ class InitEnvKeys(Screen):
     Container {
         align: center middle;
         content-align: center middle;
+        
+        hatch: right $accent 10%
     }
     
     Button {
@@ -234,7 +239,7 @@ class InitEnvKeys(Screen):
                 set_key(ENV_FILE, "SPOTIFY_REDIRECT_URI", self.spot_redir_uri, quote_mode="never")
                 set_key(ENV_FILE, "GENIUS_ACCESS_TOKEN", self.gen_acc_tok, quote_mode="never")
 
-                self.app.switch_screen("init_dicts")
+                self.app.switch_screen(InitDownloadDicts())
         elif event.button.id == "help_button":
             self.app.push_screen(InfoModalScreen(message="""To get your Tokens from Spotify and Genius, please open these links:
     - [@click="app.open_url('https://developer.spotify.com/dashboard')"]Spotify Dashboard[/]
@@ -284,6 +289,8 @@ class InitDownloadDicts(Screen):
         Container {
             align: center middle;
             content-align: center middle;
+            
+            hatch: right $accent 10%
         }
         
         Label {
@@ -352,7 +359,7 @@ class InitDownloadDicts(Screen):
         align: center middle;
         content-align: center middle;
         
-        border: solid $primary;
+        hatch: right $accent 10%
     }
     
     Label {
@@ -430,6 +437,7 @@ class InitDownloadDicts(Screen):
         if self.finished_downloading:
             # TODO go to next screen
             self.app.pop_screen()
+            write_config(True, ["init"])
 
             event.stop()
 
@@ -467,6 +475,7 @@ class FirstTimeInit(Screen):
     
     #whole_screen {
         align: center middle;
+        hatch: right $accent 10%
     }
     """
 
@@ -491,7 +500,7 @@ class FirstTimeInit(Screen):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "confirm":
-            self.app.switch_screen("init_prog")
+            self.app.switch_screen(InitProgress())
         elif event.button.id == "deny":
             self.app.exit()
 
