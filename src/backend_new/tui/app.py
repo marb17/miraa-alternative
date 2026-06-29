@@ -129,11 +129,31 @@ class MiraaInterface(App):
         
         hatch: right $accent 10%;
         
+        margin: 1 1;
+        
         dock: bottom;
     }
     
     #quick_menu Button {
         margin: 1 1;
+    }
+    
+    SpotifyCurrentlyPlayingWidget {
+        width: 100%;
+        height: auto;
+        
+        padding: 1 2;
+    }
+    
+    #spotify_container {
+        margin: 1 1;
+    
+        hatch: right $accent 10%;
+        
+        border: solid $secondary;
+        border-title-color: $primary;
+        border-title-style: bold;
+        border-title-align: center;
     }
     """
 
@@ -175,7 +195,8 @@ class MiraaInterface(App):
                      show_clock=True)
 
         with Container(id="fullscreen"):
-            yield SpotifyCurrentlyPlayingWidget(id="spotify_currently_playing")
+            with HorizontalGroup(id="spotify_container"):
+                yield SpotifyCurrentlyPlayingWidget(id="spotify_currently_playing")
 
             with HorizontalGroup(id="quick_menu"):
                 yield Button("Download New", id="download", variant="success")
@@ -184,13 +205,14 @@ class MiraaInterface(App):
     def on_mount(self) -> None:
         self.theme = "monokai"
         self.query_one("#quick_menu", HorizontalGroup).border_title = "Quick Menu"
+        self.query_one("#spotify_container", HorizontalGroup).border_title = "Spotify"
 
         if not self.check_if_init():
             self.push_screen("init_screen", callback=self.after_init_finished)
         else:
             self.start_app()
 
-        self.set_interval(5, self.update_spotify_widget)
+        self.set_interval(2, self.update_spotify_widget)
 
     def after_init_finished(self, result: Any = None) -> None:
         self.start_app()
