@@ -89,8 +89,6 @@ class MiraaInterface(App):
         "init_prog": InitProgress,
         "init_env": InitEnvKeys,
         "init_dicts": InitDownloadDicts,
-
-        # "new_download": DownloadScreen
     }
 
     BINDINGS = [("ctrl+o", "push_screen('config_menu')", "Config")]

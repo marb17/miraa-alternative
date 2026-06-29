@@ -187,7 +187,7 @@ class DownloadScreen(Screen):
     @work(thread=True)
     def run_downloader_pipeline(self) -> None:
         dl = Downloader()
-        is_auth = next((False for _ in dl.authenticate()), True)
+        dl.cache_authenticate()
         self.pipeline = dl.download_song()
 
         try:

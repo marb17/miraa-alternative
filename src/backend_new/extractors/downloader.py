@@ -46,7 +46,7 @@ class Downloader:
         self._sp_token = None
         return False
 
-    def authenticate(self) -> Generator[UIPromptRequest, None, bool]:
+    def authenticate(self, force_cache: bool = False) -> Generator[UIPromptRequest, None, bool]:
         """
         Initializes the spotipy client
         """
@@ -65,7 +65,9 @@ class Downloader:
 
         cached_token = auth_manager.validate_token(auth_manager.cache_handler.get_cached_token())
 
-        if not cached_token:
+        if cached_token or force_cache:
+            access_token = cached_token["access_token"]
+        else:
             url = yield UIPromptRequest(
                 type="input",
                 extra_info={"url": auth_manager.get_authorize_url()},
@@ -78,12 +80,29 @@ class Downloader:
                 access_token = token_info["access_token"]
             except Exception as e:
                 raise RuntimeError(f"Authentication Handshake Failed: {e}")
-        else:
-            access_token = cached_token["access_token"]
 
         self._sp_token = spotipy.Spotify(auth=access_token)
         self._sp = spotipy.Spotify(auth_manager=auth_manager_no_token)
         return True
+
+    def cache_authenticate(self) -> None:
+        auth_manager_no_token = SpotifyClientCredentials(client_id=self._env_data["SPOTIFY_CLIENT_ID"],
+                                                         client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"])
+
+        scope = "user-read-currently-playing user-read-playback-state"
+
+        auth_manager = SpotifyOAuth(
+            client_id=self._env_data["SPOTIFY_CLIENT_ID"],
+            client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"],
+            redirect_uri=self._env_data["SPOTIFY_REDIRECT_URI"],
+            scope=scope,
+            open_browser=True
+        )
+        cached_token = auth_manager.validate_token(auth_manager.cache_handler.get_cached_token())
+        access_token = cached_token["access_token"]
+
+        self._sp_token = spotipy.Spotify(auth=access_token)
+        self._sp = spotipy.Spotify(auth_manager=auth_manager_no_token)
 
     def get_current_playing_song(self):
         """
@@ -91,7 +110,7 @@ class Downloader:
         :return: A dict of the song metadata (spotify)
         :rtype: dict[str, Any]
         """
-        return self._sp.current_user_playing_track()
+        return self._sp_token.current_user_playing_track()
 
     def spotify_search_song_metadata_by_id(self, query: str) -> dict:
         """
