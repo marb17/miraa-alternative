@@ -8,6 +8,7 @@ from typing import Any
 from collections.abc import Generator
 
 import requests.exceptions
+from spotipy import cache_handler, CacheFileHandler
 
 # HELPER LIBRARIES
 from backend_new.utils.functions.filesystem import read_json_file, load_env_file
@@ -22,8 +23,7 @@ import yt_dlp
 from yt_dlp.utils import DownloadError, ExtractorError
 
 # CONSTANTS
-from backend_new.utils.constants import TEMP_DIR, CONFIG_FILE, UIPromptRequest
-
+from backend_new.utils.constants import TEMP_DIR, CONFIG_FILE, UIPromptRequest, CACHE_DIR
 
 from backend_new.utils.logger import Logger
 logger = Logger(__name__)
@@ -36,6 +36,11 @@ class Downloader:
         self._env_data = load_env_file()
         self._sp = None
         self._sp_token = None
+
+        self._cache_handler = CacheFileHandler(
+            cache_path=CACHE_DIR,
+            username="spotipy"
+        )
 
 
     def __enter__(self):
@@ -60,7 +65,8 @@ class Downloader:
             client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"],
             redirect_uri=self._env_data["SPOTIFY_REDIRECT_URI"],
             scope=scope,
-            open_browser=True
+            open_browser=True,
+            cache_handler=self._cache_handler
         )
 
         cached_token = auth_manager.validate_token(auth_manager.cache_handler.get_cached_token())
@@ -96,10 +102,14 @@ class Downloader:
             client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"],
             redirect_uri=self._env_data["SPOTIFY_REDIRECT_URI"],
             scope=scope,
-            open_browser=True
+            open_browser=True,
+            cache_handler=self._cache_handler
         )
         cached_token = auth_manager.validate_token(auth_manager.cache_handler.get_cached_token())
         access_token = cached_token["access_token"]
+
+        if not cached_token:
+            raise Exception("No cached token is available")
 
         self._sp_token = spotipy.Spotify(auth=access_token)
         self._sp = spotipy.Spotify(auth_manager=auth_manager_no_token)

@@ -18,6 +18,7 @@ BACKEND_DIR = BASE_DIR / "backend_new"
 
 # DIRECTORIES
 TEMP_DIR = BASE_DIR / ".temp"
+CACHE_DIR = BASE_DIR / ".cache"
 DICTS_DIR = BASE_DIR / "dicts"
 CONFIG_DIR = BASE_DIR / "config"
 DATA_DIR = BASE_DIR / "data"

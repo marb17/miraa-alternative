@@ -54,7 +54,7 @@ class Analyzer:
             current_dir = current_dir.parent
         self._base_dir = current_dir
 
-        folder = ["data", "config", "models", ".temp", "dicts"]
+        folder = ["data", "config", "models", ".temp", "dicts", ".cache"]
         for p in folder:
             Path(self._base_dir / p).mkdir(parents=True, exist_ok=True)
         logger.debug("Main Directories created.")

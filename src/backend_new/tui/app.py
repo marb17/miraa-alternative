@@ -1,5 +1,6 @@
 from typing import Iterable, Any
 import threading
+import webbrowser
 
 from textual import work, events, on
 from textual.app import App, ComposeResult, SystemCommand
@@ -49,9 +50,17 @@ class SpotifyAuthenticateScreen(ModalScreen):
         
     }
     
-    #main_box InputSubmit {
+    #main_box HorizontalGroup InputSubmit {
         height: auto;
+        width: 1fr;
+    }
+    
+    #main_box HorizontalGroup {
         width: 100%;
+    }
+    
+    #btn_open_link {
+        offset-y: 1;
     }
     """
 
@@ -70,10 +79,12 @@ class SpotifyAuthenticateScreen(ModalScreen):
                 )
                 yield Static()
                 yield Static("Don't worry if the website can't be reached, all services are ran locally on your machine, so there is no website to redirect to.\n\nPlease copy the link you have been redirected to after following the instructions below.\n")
-                yield InputSubmit(
-                    placeholder="Enter Link Address",
-                    id="input_box"
-                )
+                with HorizontalGroup():
+                    yield InputSubmit(
+                        placeholder="Enter Link Address",
+                        id="input_box"
+                    )
+                    yield Button(label="Open Link", variant="primary", id="btn_open_link")
 
     def _on_mount(self, event: events.Mount) -> None:
         self.query_one("#main_box", CenterMiddle).border_title = "Spotify Authentication"
@@ -81,6 +92,13 @@ class SpotifyAuthenticateScreen(ModalScreen):
     @on(InputSubmit.Submitted, "#input_box")
     def handle_submit(self, event: InputSubmit.Submitted) -> None:
         self.dismiss(event.value)
+
+    @on(Button.Pressed, "#btn_open_link")
+    def handle_open_link(self):
+        try:
+            webbrowser.open(self.url)
+        except Exception as e:
+            self.notify(f"Failed to open {self.url}, error: {e}")
 
 class MiraaInterface(App):
     SCREENS = {
@@ -157,7 +175,7 @@ class MiraaInterface(App):
                      show_clock=True)
 
         with Container(id="fullscreen"):
-            yield SpotifyCurrentlyPlayingWidget()
+            yield SpotifyCurrentlyPlayingWidget(id="spotify_currently_playing")
 
             with HorizontalGroup(id="quick_menu"):
                 yield Button("Download New", id="download", variant="success")
@@ -211,6 +229,15 @@ class MiraaInterface(App):
                 if not e.value:
                     raise Exception("Authentication failed")
                 break
+
+        self.app.call_from_thread(self.authenticate_spotify_widget)
+        self.set_interval(5, self.update_spotify_widget)
+
+    def authenticate_spotify_widget(self):
+        self.query_one("#spotify_currently_playing", SpotifyCurrentlyPlayingWidget).action_authenticate()
+
+    def update_spotify_widget(self) -> None:
+        self.query_one("#spotify_currently_playing", SpotifyCurrentlyPlayingWidget).update_data()
 
     def display_spotify_auth_message(self, event: threading.Event, url_to_auth: str) -> None:
         def on_modal_closed(result: str | None = None) -> None:
