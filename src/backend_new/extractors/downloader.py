@@ -120,11 +120,13 @@ class Downloader:
             if cached_token or force_cache:
                 access_token = cached_token["access_token"]
             else:
-                url = yield UIPromptRequest(
-                    type="input",
-                    extra_info={"url": auth_manager.get_authorize_url()},
-                    message="",
-                )
+                url = ""
+                while not url:
+                    url = yield UIPromptRequest(
+                        type="input",
+                        extra_info={"url": auth_manager.get_authorize_url()},
+                        message="",
+                    )
 
                 try:
                     code = auth_manager.parse_response_code(url)

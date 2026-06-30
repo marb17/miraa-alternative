@@ -123,10 +123,15 @@ class SpotifyCurrentlyPlayingWidget(Widget):
 
     @work(exclusive=True, thread=True)
     def update_data(self) -> None:
+        self.notify(str(self.app.use_spotify_token))
+
         if not self.app.use_spotify_token:
+            self.notify("leaving eatly")
+            self.app.call_from_thread(self._update_widget_data)
             return
 
         if getattr(self.downloader, "_sp_token") is None:
+            self.notify("no token")
             return
 
         pipeline = self.downloader.get_current_playing_song()
@@ -167,14 +172,19 @@ class SpotifyCurrentlyPlayingWidget(Widget):
 
 
     def _update_widget_data(self) -> None:
+        is_playing_static = self.query_one("#is_playing", Static)
+
         if not self.app.use_spotify_token:
             self.query_one("#title", Static).update("Disabled")
             self.query_one("#artist", Static).update("Disabled")
             self.query_one("#timestamp", Static).update("--:--")
             self.query_one("#end_timestamp", Static).update("--:--")
-            return
 
-        is_playing_static = self.query_one("#is_playing", Static)
+            self.song_length_ms = 0
+            self.current_progress_ms = 0
+
+            is_playing_static.update("⏹")
+            return
 
         if self.response is None:
             self.query_one("#title", Static).update("Nothing Playing")

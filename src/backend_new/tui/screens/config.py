@@ -2,11 +2,13 @@ import os
 from typing import Any
 
 from dotenv import set_key, load_dotenv
-from textual import events
+from textual import events, on
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical, Container, VerticalGroup, HorizontalGroup
+from textual.containers import Horizontal, Vertical, Container, VerticalGroup, HorizontalGroup, VerticalScroll
+from textual.message import Message
 from textual.screen import Screen
+from textual.widget import Widget
 from textual.widgets import Label, Button, Switch, Checkbox, Input, Header, Footer, TabbedContent, TabPane
 
 from backend_new.tui.modalscreens.full import SpotifyAuthenticateScreen
@@ -25,7 +27,7 @@ class DownloadMenu(Horizontal):
         }
         
         #option_container {
-            height: auto;
+            height: 100%;
             
             hatch: right $accent 10%;
         }
@@ -74,9 +76,14 @@ class DownloadMenu(Horizontal):
     config_file_data = None
     anything_changed = False
 
+    class ReAuthSpotify(Message):
+        def __init__(self, *args, **kwargs):
+            super().__init__()
+
     def compose(self) -> ComposeResult:
         with Container(id="main_container"):
-            with Vertical(id="option_container"):
+            # with Vertical(id="option_container"):
+            with VerticalScroll(id="option_container"):
                 with VerticalGroup(classes="section_container", id="query_extract_settings"):
                     with Container(classes="option"):
                         yield Label("How many items to view at once when querying")
@@ -211,6 +218,7 @@ class DownloadMenu(Horizontal):
         elif event.switch.id == "spotify_token":
             write_config(self.query_one("#spotify_token", Switch).value, ["spotify_downloader", "token"])
             self.config_file_data["spotify_downloader"]["token"] = event.switch.value
+            self.app.read_config_worker(False)
             if event.switch.value:
                 self.app.push_screen(SpotifyAuthenticateScreen(), callback=self.handle_auth_result)
 
@@ -218,13 +226,16 @@ class DownloadMenu(Horizontal):
         """Called automatically when SpotifyAuthenticateScreen is dismissed."""
         # If result is None or False, authentication failed or was skipped
         if not result:
-            self.query_one("#spotify_token", Switch).value = False
+            with self.prevent(Switch.Changed):
+                self.query_one("#spotify_token", Switch).value = False
             self.config_file_data["spotify_downloader"]["token"] = False
             write_config(False, ["spotify_downloader", "token"])
+            self.app.read_config_worker(False)
         else:
             # Token successfully retrieved!
             self.config_file_data["spotify_downloader"]["token"] = result
-            self.app.read_config_worker()
+            self.notify("bubble first")
+            self.post_message(self.ReAuthSpotify())
 
 class ProcessesMenu(Horizontal):
     DEFAULT_CSS = """

@@ -114,13 +114,13 @@ class SpotifyAuthenticateScreen(ModalScreen):
     @work(thread=True)
     def advance_pipeline(self, response: Any = None):
         try:
+            self.notify(str(response))
             if response is not None:
                 message = self.pipeline.send(response)
             else:
                 message = next(self.pipeline)
 
-            while message.type != "input":
-                message = next(self.pipeline)
+            self.notify(str(message))
 
             new_url = message.extra_info["url"]
             self.app.call_from_thread(self._update_url, new_url)

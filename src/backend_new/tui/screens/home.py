@@ -1,7 +1,7 @@
 from typing import Any
 import threading
 
-from textual import work
+from textual import work, on
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Button
@@ -12,7 +12,7 @@ from backend_new.tui.modalscreens.full import SpotifyAuthenticateScreen
 
 from backend_new.tui.screens.first_init import FirstTimeInit
 from backend_new.tui.screens.new_download import DownloadScreen
-from backend_new.tui.screens.config import ConfigMenu
+from backend_new.tui.screens.config import ConfigMenu, DownloadMenu
 from backend_new.tui.screens.process_song import ProcessSong
 
 from backend_new.tui.widgets.static import SpotifyCurrentlyPlayingWidget
@@ -72,7 +72,9 @@ class HomeScreen(Screen):
     next_ui_response = None
 
     def action_open_config(self) -> None:
-        self.app.push_screen(ConfigMenu())
+        config = ConfigMenu()
+        config.id = "config_menu"
+        self.app.push_screen(config)
 
     def action_open_new_download(self) -> None:
         self.app.push_screen(DownloadScreen(), callback=self.handle_resume_widget_poll)
@@ -113,11 +115,16 @@ class HomeScreen(Screen):
         self.authenticate_spotify()
 
     def authenticate_spotify(self):
-        self.app.push_screen(SpotifyAuthenticateScreen())
-        self.authenticate_spotify_widget()
+        self.app.push_screen(SpotifyAuthenticateScreen(), callback=self.handle_authenticate_spotify_widget)
 
-    def authenticate_spotify_widget(self):
+    def handle_authenticate_spotify_widget(self, result: Any) -> None:
         self.query_one("#spotify_currently_playing", SpotifyCurrentlyPlayingWidget).action_authenticate()
+
+    @on(DownloadMenu.ReAuthSpotify)
+    def handle_reauth_spotify(self, event: DownloadMenu.ReAuthSpotify) -> None:
+        event.stop()
+        self.notify("reauth")
+        self.authenticate_spotify()
 
     @staticmethod
     def check_if_init() -> bool:

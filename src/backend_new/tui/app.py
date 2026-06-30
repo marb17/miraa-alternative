@@ -15,7 +15,7 @@ from backend_new.tui.modalscreens.info import InfoModalScreen
 from backend_new.tui.screens.first_init import InitProgress, InitEnvKeys, InitDownloadDicts, FirstTimeInit
 from backend_new.tui.screens.home import HomeScreen
 from backend_new.tui.screens.new_download import DownloadScreen
-from backend_new.tui.screens.config import ConfigMenu
+from backend_new.tui.screens.config import ConfigMenu, DownloadMenu
 from backend_new.tui.screens.process_song import ProcessSong
 from backend_new.tui.widgets.interactive import InputSubmit, PasteOnlyInputSubmit
 
@@ -57,18 +57,32 @@ class MiraaInterface(App):
 
     def on_mount(self) -> None:
         self.theme = "monokai"
-        self.read_config_worker()
+        self.read_config_worker(True)
 
-    def handle_config_response(self, result: Any):
+        self.install_screen(HomeScreen(), name="home")
+
+    def handle_config_response(self, result: Any, push_screen: bool = False):
         self.use_spotify_token = result["spotify_downloader"]["token"]
-        self.push_screen(HomeScreen())
+        if push_screen:
+            self.handle_push_home_screen()
+        self.notify(str(self.use_spotify_token))
+
+    def handle_push_home_screen(self) -> None:
+        self.push_screen("home")
 
     @work(thread=True)
-    def read_config_worker(self) -> None:
+    def read_config_worker(self, push_screen: bool = False) -> None:
         result = read_config()
+        self.call_from_thread(self.handle_config_response, result, push_screen)
 
-        self.call_from_thread(self.handle_config_response, result)
-
+    @on(DownloadMenu.ReAuthSpotify)
+    def bubble_reauth_spotify(self, event: DownloadMenu.ReAuthSpotify) -> None:
+        try:
+            home_screen = self.get_screen("home")
+            self.notify(f"bubble app {str(home_screen)}")
+            home_screen.post_message(event)
+        except Exception as e:
+            raise Exception("screen not registered")
 
 if __name__ == '__main__':
     app = MiraaInterface()
