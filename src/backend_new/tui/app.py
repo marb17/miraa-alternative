@@ -1,3 +1,5 @@
+import os
+import sys
 from typing import Iterable, Any
 import threading
 import webbrowser
@@ -61,11 +63,17 @@ class MiraaInterface(App):
 
         self.install_screen(HomeScreen(), name="home")
 
+    def restart_app(self) -> None:
+        self.notify("Restarting Application")
+        self.exit()
+        python_executable = sys.executable
+        script_args = sys.argv
+        os.execv(python_executable, [python_executable] + script_args)
+
     def handle_config_response(self, result: Any, push_screen: bool = False):
         self.use_spotify_token = result["spotify_downloader"]["token"]
         if push_screen:
             self.handle_push_home_screen()
-        self.notify(str(self.use_spotify_token))
 
     def handle_push_home_screen(self) -> None:
         self.push_screen("home")
@@ -79,11 +87,11 @@ class MiraaInterface(App):
     def bubble_reauth_spotify(self, event: DownloadMenu.ReAuthSpotify) -> None:
         try:
             home_screen = self.get_screen("home")
-            self.notify(f"bubble app {str(home_screen)}")
             home_screen.post_message(event)
         except Exception as e:
-            raise Exception("screen not registered")
+            raise Exception()
 
 if __name__ == '__main__':
     app = MiraaInterface()
+
     app.run()

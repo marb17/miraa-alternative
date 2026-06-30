@@ -11,7 +11,7 @@ from textual.binding import Binding
 
 from backend_new.extractors.downloader import Downloader
 from backend_new.utils.constants import UIPromptRequest
-from backend_new.utils.functions.filesystem import read_config
+from backend_new.utils.functions.filesystem import read_config, all_available_temp_json_files
 
 
 class ProcessSong(Screen):
@@ -78,4 +78,6 @@ class ProcessSong(Screen):
 
     @work(thread=True)
     def update_json_select(self) -> None:
-        ...
+        all_files = all_available_temp_json_files()
+
+        

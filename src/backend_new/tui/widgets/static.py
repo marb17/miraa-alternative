@@ -123,15 +123,11 @@ class SpotifyCurrentlyPlayingWidget(Widget):
 
     @work(exclusive=True, thread=True)
     def update_data(self) -> None:
-        self.notify(str(self.app.use_spotify_token))
-
         if not self.app.use_spotify_token:
-            self.notify("leaving eatly")
             self.app.call_from_thread(self._update_widget_data)
             return
 
         if getattr(self.downloader, "_sp_token") is None:
-            self.notify("no token")
             return
 
         pipeline = self.downloader.get_current_playing_song()

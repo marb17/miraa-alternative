@@ -234,7 +234,6 @@ class DownloadMenu(Horizontal):
         else:
             # Token successfully retrieved!
             self.config_file_data["spotify_downloader"]["token"] = result
-            self.notify("bubble first")
             self.post_message(self.ReAuthSpotify())
 
 class ProcessesMenu(Horizontal):

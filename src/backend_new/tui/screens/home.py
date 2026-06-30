@@ -9,6 +9,7 @@ from textual.containers import Container, HorizontalGroup
 
 from backend_new.extractors.downloader import Downloader
 from backend_new.tui.modalscreens.full import SpotifyAuthenticateScreen
+from backend_new.tui.modalscreens.info import RestartAppModalScreen
 
 from backend_new.tui.screens.first_init import FirstTimeInit
 from backend_new.tui.screens.new_download import DownloadScreen
@@ -123,8 +124,7 @@ class HomeScreen(Screen):
     @on(DownloadMenu.ReAuthSpotify)
     def handle_reauth_spotify(self, event: DownloadMenu.ReAuthSpotify) -> None:
         event.stop()
-        self.notify("reauth")
-        self.authenticate_spotify()
+        self.app.push_screen(RestartAppModalScreen())
 
     @staticmethod
     def check_if_init() -> bool:
