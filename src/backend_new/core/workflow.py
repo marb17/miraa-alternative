@@ -6,12 +6,14 @@ from typing import Any
 # PYPI LIBRARIES
 from pathlib import Path
 
+from backend_new.core.translation_analysis import Translator
+from backend_new.extractors.geniusextractor import GeniusExtractor
 # HELPER LIBRARIES
 # from backend_new.utils.helper_funcs import questionary_select
 from backend_new.utils.functions.other import contains_japanese
 from backend_new.utils.functions.filesystem import read_json_file, write_json_file, read_config, load_env_file
 
-from backend_new.utils.classes.dataclasses import SongContext
+from backend_new.utils.classes.dataclasses import SongContext, UIPromptRequest
 from backend_new.utils.classes.exceptions import DataMismatchError
 from backend_new.utils.paths import TEMP_DIR
 
@@ -54,6 +56,36 @@ class WorkflowManager:
                 retry_count=self._config["downloader"]["retry_count"],
                 retry_sleep=self._config["downloader"]["retry_sleep"]
             )
+
+        return True
+
+    def extract_genius_metadata(self, json_file: Path) -> Generator[Any, None, bool]:
+        json_data = read_json_file(json_file)
+
+        with GeniusExtractor() as genius:
+            genius_data = genius.return_metadata(
+                title=json_data["pre_processing"]["raw_metadata"]["name"],
+                artist=json_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
+            )
+
+        write_json_file(json_file, genius_data, ["genius_data"])
+
+        if not contains_japanese(genius_data.get("lyrics", "")):
+            yield UIPromptRequest(
+                type="info",
+                message="The lyrics are romanized, using a LLM to convert into Japanese scripts."
+            )
+
+            logger.warning("Lyrics are romanized, using LLM to convert to Japanese script")
+
+            with Translator() as translator:
+                script_lyrics = translator.romaji_to_script(genius_data["lyrics"])
+
+            write_json_file(json_file, script_lyrics, ["lyrics_main"])
+            write_json_file(json_file, genius_data["lyrics"], ["lyrics_sub"])
+        else:
+            write_json_file(json_file, genius_data["lyrics"], ["lyrics_main"])
+            write_json_file(json_file, "", ["lyrics_sub"])
 
         return True
 

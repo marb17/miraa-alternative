@@ -1,11 +1,14 @@
-from typing import Self, Iterable
+from typing import Self, Iterable, Any
 
+from rich.console import ConsoleRenderable, RichCast
 from textual import on
 from textual.app import ComposeResult
-from textual.containers import Vertical, HorizontalGroup, Container
+from textual.containers import Vertical, HorizontalGroup, Container, HorizontalScroll
 from textual.message import Message
+from textual.visual import SupportsVisual, Visual
 from textual.widget import Widget
-from textual.widgets import Label, Input, Button
+from textual.widgets import Label, Input, Button, DataTable
+from textual.widgets._data_table import CellType
 
 
 class InputSubmit(Widget):
@@ -236,3 +239,149 @@ class PasteOnlyInputSubmit(Widget):
     def focus(self, scroll_visible: bool = True) -> Self:
         super().focus()
         self.query_one("#input_box", Input).focus()
+
+
+class TableSelect(Widget):
+    DEFAULT_CSS = """
+    #select_pane {
+        border: solid $secondary;
+        border-title-color: $primary;
+        border-title-align: center;
+        border-title-style: bold;
+        padding: 1 2;
+        
+        height: auto;
+    }
+    
+    #input_table {
+        height: auto;
+    }
+    
+    .horizontal_scroll {
+        width: 100%;
+        height: auto;
+    }
+    
+    #nav_buttons {
+        width: 100%;
+        
+        content-align: right middle;
+        align: right middle;
+    }
+    
+    #nav_buttons Button {
+        margin: 0 1;
+    }
+    """
+
+    def __init__(self, extra_buttons: Iterable[Button], *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.extra_buttons = extra_buttons
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="select_pane"):
+            yield Label(id="input_table_header")
+            with HorizontalScroll(classes="horizontal_scroll"):
+                yield DataTable(
+                    cursor_type="row",
+                    zebra_stripes=True,
+                    id="input_table"
+                )
+
+            yield Label(id="table_page_footer")
+
+            with HorizontalGroup(id="nav_buttons"):
+                yield Button(id="__select__", variant="success", label="Select")
+                for button in self.extra_buttons: yield button
+
+
+    class Submitted(Message):
+        def __init__(self, sender: Widget, value: Any) -> None:
+            self.value = value
+            self.widget = sender
+            super().__init__()
+
+        @property
+        def control(self):
+            return self.widget
+
+    class ButtonPressed(Message):
+        def __init__(self, sender: Widget, value: Any) -> None:
+            self.value = value
+            self.widget = sender
+            super().__init__()
+
+        @property
+        def control(self):
+            return self.widget
+
+
+
+    @property
+    def selected(self) -> int:
+        return self.query_one("#input_table", DataTable).cursor_row
+
+    @property
+    def table_footer_content(self) -> ConsoleRenderable | RichCast | str | SupportsVisual | Visual:
+        data_table_footer = self.query_one("#table_page_footer", Label).content
+        return data_table_footer
+
+    @table_footer_content.setter
+    def table_footer_content(self, value: ConsoleRenderable | RichCast | str | SupportsVisual | Visual) -> None:
+        data_table_footer = self.query_one("#table_page_footer", Label)
+        data_table_footer.content = value
+
+    @property
+    def table_footer_visible(self) -> bool:
+        return self.query_one("#table_page_footer", Label).display
+
+    @table_footer_visible.setter
+    def table_footer_visible(self, value: bool) -> None:
+        self.query_one("#table_page_footer", Label).display = value
+
+    @property
+    def table_header_content(self) -> ConsoleRenderable | RichCast | str | SupportsVisual | Visual:
+        data_table_header = self.query_one("#input_table_header", Label).content
+        return data_table_header
+
+    @table_header_content.setter
+    def table_header_content(self, value: ConsoleRenderable | RichCast | str | SupportsVisual | Visual):
+        self.query_one("#input_table_header", Label).content = value
+
+
+
+    @on(DataTable.RowSelected, "#input_table")
+    def handle_table_select(self) -> None:
+        val = self.selected
+        self.post_message(self.Submitted(self, val))
+
+    @on(Button.Pressed, "#__select__")
+    def handle_select_pressed(self) -> None:
+        self.handle_table_select()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "__select__":
+            return
+
+        self.post_message(self.ButtonPressed(self, event.button.id))
+
+
+
+    def add_columns(self, columns: Iterable[str]) -> None:
+        data_table_widget = self.query_one("#input_table", DataTable)
+        data_table_widget.add_columns(*columns)
+
+    def add_rows(self, rows: Iterable[Iterable[CellType]]) -> None:
+        data_table_widget = self.query_one("#input_table", DataTable)
+        data_table_widget.add_rows(rows)
+
+    def clear_rows(self, clear_columns: bool = True) -> None:
+        data_table_widget = self.query_one("#input_table", DataTable)
+        data_table_widget.clear(columns=clear_columns)
+
+
+    def button_visible(self, button_id: str, value: bool) -> None:
+        if button_id.startswith("#"):
+            self.query_one(button_id, Button).display = value
+        else:
+            self.query_one(f"#{button_id}", Button).display = value

@@ -14,7 +14,7 @@ from yt_dlp import DownloadError
 
 from backend_new.core.workflow import WorkflowManager
 from backend_new.extractors.downloader import Downloader
-from backend_new.tui.widgets.interactive import InputSubmit
+from backend_new.tui.widgets.interactive import InputSubmit, TableSelect
 from backend_new.tui.widgets.static import SpotifyCurrentlyPlayingWidget
 from backend_new.utils.classes.dataclasses import UIPromptRequest
 from backend_new.utils.functions.filesystem import read_config
@@ -186,6 +186,7 @@ class DownloadScreen(Screen):
                             yield InputSubmit(id="input_widget", extra_buttons=[Button("Current Song", id="current_playing_song_button", variant="primary", disabled=not self.app.use_spotify_token)])
 
                     with Vertical(id="select_pane"):
+                        # TODO should prob refactor this to use the new widget
                         yield Label(id="input_table_header")
                         with HorizontalScroll(classes="horizontal_scroll"):
                             yield DataTable(
@@ -193,14 +194,6 @@ class DownloadScreen(Screen):
                                 zebra_stripes=True,
                                 id="input_table"
                             )
-
-                        yield Label(id="table_page_number")
-
-                        with HorizontalGroup(id="nav_buttons"):
-                            yield Button(id="__select__", variant="success", label="Select")
-                            yield Button(id="__new__", variant="warning", label="New")
-                            yield Button(id="__prev__", variant="primary", label="Previous")
-                            yield Button(id="__next__", variant="primary", label="Next")
 
                     with Vertical(id="finished"):
                         yield Static(id="finished_text", content="Finished downloading, press any key to continue[blink]_[/]")
