@@ -19,14 +19,11 @@ from backend_new.utils.logger import Logger
 logger = Logger(__name__)
 
 class WorkflowManager:
-    def __init__(self, song_ctx: SongContext) -> None:
+    def __init__(self) -> None:
         """
         Loads the WorkflowManager for a specific song
-        :param song_ctx: Song to be processed
-        :type song_ctx: SongContext
         """
         self._env_data = load_env_file()
-        self._song_ctx = song_ctx
         self._config = read_config()
 
     def __enter__(self):
@@ -50,6 +47,7 @@ class WorkflowManager:
         from backend_new.extractors.downloader import Downloader
 
         with Downloader() as dl:
+            dl.cache_authenticate()
             yield from dl.download_song(
                 limit=self._config["downloader"]["view_limit"],
                 retry_count=self._config["downloader"]["retry_count"],

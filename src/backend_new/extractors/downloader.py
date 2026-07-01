@@ -10,7 +10,7 @@ from typing import Any
 from collections.abc import Generator
 
 import requests.exceptions
-from spotipy import cache_handler, CacheFileHandler
+from spotipy import cache_handler, CacheFileHandler, SpotifyException
 
 # HELPER LIBRARIES
 from backend_new.utils.functions.filesystem import read_json_file, load_env_file, read_config
@@ -262,7 +262,7 @@ class Downloader:
                         raise e
                 if song_list is None:
                     # TODO add exception handling
-                    raise Exception(f"Could not retrieve songs from {query}")
+                    raise SpotifyException(f"Could not retrieve songs from {query}")
 
                 formatted_choices: list[dict[str, Any]] = []
 
@@ -328,7 +328,7 @@ class Downloader:
 
             if info is None:
                 # TODO add fall back query
-                raise Exception(f"Could not extract info from {youtube_query}")
+                raise DownloadError(f"Could not extract info from {youtube_query}")
             info = ydl.sanitize_info(info)
             results = info.get("entries", [])
 
@@ -435,7 +435,7 @@ class Downloader:
                 continue
 
         if not success_downloading:
-            raise Exception(f"Could not download {youtube_id}")
+            raise DownloadError(f"Could not download {youtube_id}")
         # FINAL WRITE
 
         final_data = {

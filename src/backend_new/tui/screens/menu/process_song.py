@@ -3,7 +3,7 @@ from textual import events, work, on
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.containers import Vertical, Horizontal, Container
-from textual.widgets import Header, Footer, Label, Button, ContentSwitcher, Select
+from textual.widgets import Header, Footer, Label, Button, ContentSwitcher, Select, TabbedContent, Static
 from textual.binding import Binding
 
 from backend_new.tui.screens.config.config import ProcessesMenu
@@ -106,6 +106,9 @@ class ProcessSong(Screen):
                     with Vertical(id="options"):
                         yield ProcessesMenu(id="processes_menu", main_container_height="auto")
 
+                with Vertical(id="process_menu"):
+                    yield Static(id="current_process_display")
+
     def _on_mount(self, event: events.Mount) -> None:
         self.query_one("#choose_json", Vertical).border_title = "Song Processing"
         self.query_one("#options", Vertical).border_title = "Options"
@@ -127,7 +130,8 @@ class ProcessSong(Screen):
             return
 
         self.selected_json_file = select_value
-        self.notify(str(self.selected_json_file))
+
+        self.query_one("#main_content_switcher", ContentSwitcher).current = "process_menu"
 
     def update_select_json_widget(self) -> None:
         self.query_one("#select_json", Select).set_options(self.json_options)

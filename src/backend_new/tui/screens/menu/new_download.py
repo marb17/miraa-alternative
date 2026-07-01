@@ -1,6 +1,8 @@
 import time
 import threading
 from typing import Any, Generator
+
+from spotipy import SpotifyException
 from textual import events, work, on
 from textual.app import App, ComposeResult
 from textual.screen import Screen
@@ -8,7 +10,9 @@ from textual.containers import Vertical, Horizontal, CenterMiddle, Container, Ho
 from textual.widgets import Header, Footer, Input, DataTable, Label, Button, ContentSwitcher, Static, LoadingIndicator, \
     RichLog
 from textual.binding import Binding
+from yt_dlp import DownloadError
 
+from backend_new.core.workflow import WorkflowManager
 from backend_new.extractors.downloader import Downloader
 from backend_new.tui.widgets.interactive import InputSubmit
 from backend_new.tui.widgets.static import SpotifyCurrentlyPlayingWidget
@@ -128,7 +132,7 @@ class DownloadScreen(Screen):
         margin: 1 2;
     }
     
-    #finished, #already_exists {
+    #finished, #already_exists, #error_message {
         border: solid $secondary;
         border-title-color: $primary;
         border-title-align: center;
@@ -144,6 +148,10 @@ class DownloadScreen(Screen):
     }
     
     #already_exists Static {
+        width: auto
+    }
+    
+    #error_message Static {
         width: auto
     }
     """
@@ -200,6 +208,11 @@ class DownloadScreen(Screen):
                     with Vertical(id="already_exists"):
                         yield Static(id="already_exists_text", content="Data already exists, skipping, press any key to continue[blink]_[/]")
 
+                    with Vertical(id="error_message"):
+                        yield Static("An error has occurred, try again[blink]_[/]\n")
+                        yield Static(id="error_message_static")
+
+
 
     def _on_mount(self, event: events.Mount) -> None:
         self.config_data = read_config()
@@ -214,23 +227,24 @@ class DownloadScreen(Screen):
 
     @work(thread=True)
     def run_downloader_pipeline(self) -> None:
-        dl = Downloader()
-        dl.cache_authenticate()
-        self.pipeline = dl.download_song()
+        with WorkflowManager() as manager:
+            self.pipeline = manager.download_new_song()
 
-        try:
-            prompt_request = next(self.pipeline)
+            try:
+                prompt_request = next(self.pipeline)
 
-            while True:
-                self.ui_ready_event.clear()
-                user_answer = self.app.call_from_thread(self.update_ui_for_prompt, prompt_request)
-                self.ui_ready_event.wait()
-                prompt_request = self.pipeline.send(self.next_ui_response)
-        except StopIteration as e:
-            if e.value is True:
-                self.app.call_from_thread(self.update_ui_for_finished)
-            elif isinstance(e.value, str):
-                self.app.call_from_thread(self.update_ui_for_already_exists)
+                while True:
+                    self.ui_ready_event.clear()
+                    user_answer = self.app.call_from_thread(self.update_ui_for_prompt, prompt_request)
+                    self.ui_ready_event.wait()
+                    prompt_request = self.pipeline.send(self.next_ui_response)
+            except StopIteration as e:
+                if e.value is True:
+                    self.app.call_from_thread(self.update_ui_for_finished)
+                elif isinstance(e.value, str):
+                    self.app.call_from_thread(self.update_ui_for_already_exists)
+            except (SpotifyException, DownloadError) as e:
+                self.app.call_from_thread(self.update_ui_for_error, str(e))
 
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -297,7 +311,7 @@ class DownloadScreen(Screen):
 
     def _on_key(self, event: events.Key) -> None:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
-        if switcher.current in ["finished", "already_exists"]:
+        if switcher.current in ["finished", "already_exists", "error_message"]:
             self.action_self_dismiss(True)
 
     def update_ui_for_finished(self) -> None:
@@ -307,6 +321,12 @@ class DownloadScreen(Screen):
     def update_ui_for_already_exists(self) -> None:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
         switcher.current = "already_exists"
+
+    def update_ui_for_error(self, message: str) -> None:
+        switcher = self.query_one("#main_content_switcher", ContentSwitcher)
+        switcher.current = "error_message"
+
+        self.query_one("#error_message_static", Static).update(message)
 
     def action_self_dismiss(self, value: Any) -> None:
         self.dismiss(value)
