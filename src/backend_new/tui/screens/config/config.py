@@ -262,6 +262,10 @@ class ProcessesMenu(Horizontal):
     }
     """
 
+    def __init__(self, *args, main_container_height: str = "100%", **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.chosen_height = main_container_height
+
     def compose(self) -> ComposeResult:
         with Container(id="main_container"):
             with Container(classes="option_sections"):
@@ -290,6 +294,8 @@ class ProcessesMenu(Horizontal):
         separate_stems_checkbox.value = initial_skip_processes["vocal_separation"]
         split_and_tag_checkbox.value = initial_skip_processes["split_and_tag"]
         translate_lyrics_checkbox.value = initial_skip_processes["translate_lyrics"]
+
+        self.query_one("#main_container", Container).styles.height = self.chosen_height
 
     @staticmethod
     def on_checkbox_changed(event: Checkbox.Changed):

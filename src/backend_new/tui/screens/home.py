@@ -1,5 +1,4 @@
 from typing import Any
-import threading
 
 from textual import work, on
 from textual.app import ComposeResult
@@ -11,13 +10,13 @@ from backend_new.extractors.downloader import Downloader
 from backend_new.tui.modalscreens.full import SpotifyAuthenticateScreen
 from backend_new.tui.modalscreens.info import RestartAppModalScreen
 
-from backend_new.tui.screens.first_init import FirstTimeInit
-from backend_new.tui.screens.new_download import DownloadScreen
-from backend_new.tui.screens.config import ConfigMenu, DownloadMenu
-from backend_new.tui.screens.process_song import ProcessSong
+from backend_new.tui.screens.init.first_init import FirstTimeInit
+from backend_new.tui.screens.menu.new_download import DownloadScreen
+from backend_new.tui.screens.config.config import ConfigMenu, DownloadMenu
+from backend_new.tui.screens.menu.process_song import ProcessSong
 
 from backend_new.tui.widgets.static import SpotifyCurrentlyPlayingWidget
-from backend_new.utils.functions.filesystem import read_config, write_config
+from backend_new.utils.functions.filesystem import read_config, all_available_temp_json_files
 
 
 class HomeScreen(Screen):
@@ -108,6 +107,15 @@ class HomeScreen(Screen):
             self.app.push_screen(FirstTimeInit(), callback=self.after_init_finished)
         else:
             self.start_app()
+
+        self.check_can_process_song()
+
+    @work(thread=True)
+    def check_can_process_song(self) -> None:
+        self.handle_display_process_song(not bool(all_available_temp_json_files()))
+
+    def handle_display_process_song(self, value: bool) -> None:
+        self.query_one("#process", Button).disabled = value
 
     def after_init_finished(self, result: Any = None) -> None:
         self.start_app()

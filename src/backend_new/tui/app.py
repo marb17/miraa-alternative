@@ -1,27 +1,16 @@
 import os
 import sys
 from typing import Iterable, Any
-import threading
-import webbrowser
 
-from textual import work, events, on
-from textual.app import App, ComposeResult, SystemCommand
-from textual.events import ScreenResume, ScreenSuspend
-from textual.screen import Screen, ModalScreen
-from textual.widgets import Footer, Header, Button, Static, Link
-from textual.containers import Container, Horizontal, HorizontalGroup, CenterMiddle
+from textual import work, on
+from textual.app import App, SystemCommand
+from textual.screen import Screen
 
-from backend_new.extractors.downloader import Downloader
-from backend_new.tui.modalscreens.info import InfoModalScreen
-
-from backend_new.tui.screens.first_init import InitProgress, InitEnvKeys, InitDownloadDicts, FirstTimeInit
 from backend_new.tui.screens.home import HomeScreen
-from backend_new.tui.screens.new_download import DownloadScreen
-from backend_new.tui.screens.config import ConfigMenu, DownloadMenu
-from backend_new.tui.screens.process_song import ProcessSong
-from backend_new.tui.widgets.interactive import InputSubmit, PasteOnlyInputSubmit
+from backend_new.tui.screens.menu.new_download import DownloadScreen
+from backend_new.tui.screens.config.config import ConfigMenu, DownloadMenu
+from backend_new.tui.screens.menu.process_song import ProcessSong
 
-from backend_new.tui.widgets.static import SpotifyCurrentlyPlayingWidget
 from backend_new.utils.functions.filesystem import read_config
 
 

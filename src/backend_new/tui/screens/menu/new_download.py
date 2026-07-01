@@ -34,11 +34,12 @@ class DownloadScreen(Screen):
     #main_content_switcher {
         height: auto;
         width: auto;
+        hatch: right $accent 10%;
     }
     
     InputSubmit {
         height: auto;
-        padding: 1 2;
+        padding: 1 2 1 1;
     }
     
     #fullscreen {
@@ -60,7 +61,9 @@ class DownloadScreen(Screen):
     }
     
     #input_pane {
+        hatch: right $accent 10%;
         height: auto;
+        margin: 0 2;
     }
     
     #input_query_widget {
@@ -254,7 +257,7 @@ class DownloadScreen(Screen):
 
     @on(InputSubmit.Submitted, "#input_widget")
     def handle_input_submit(self, event: InputSubmit.Submitted) -> None:
-        val = {"value": self.query_one("#input_widget", InputSubmit).value,
+        val = {"value": self.query_one("#input_widget", InputSubmit).value.strip(),
                "first_yt": read_config()["downloader"]["query_always_first_youtube_result"]}
 
         if event.triggered_by == "submit":
@@ -265,8 +268,13 @@ class DownloadScreen(Screen):
                 self.next_ui_response = val
                 self.ui_ready_event.set()
             else:
+                self.notify("Please enter a query.", severity="warning")
                 return
         elif event.triggered_by == "current_playing_song_button":
+            if not self.query_one(SpotifyCurrentlyPlayingWidget).song_available:
+                self.notify("No song is playing on spotify.", severity="warning")
+                return
+
             switcher = self.query_one("#main_content_switcher", ContentSwitcher)
             switcher.current = "loading_screen"
 
