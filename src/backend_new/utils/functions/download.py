@@ -4,7 +4,8 @@ from typing import Generator
 
 import gdown
 
-from backend_new.utils.constants import DEFAULT_DICTS_FOLDER_LINK, DEFAULT_DICTS, DICTS_DIR
+from backend_new.utils.paths import DICTS_DIR
+from backend_new.utils.default.default_var import DEFAULT_DICTS, DEFAULT_DICTS_FOLDER_LINK
 
 
 def download_google_drive(link: str, output_path: Path) -> None:

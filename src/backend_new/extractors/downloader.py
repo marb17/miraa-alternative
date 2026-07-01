@@ -25,7 +25,8 @@ import yt_dlp
 from yt_dlp.utils import DownloadError, ExtractorError
 
 # CONSTANTS
-from backend_new.utils.constants import TEMP_DIR, CONFIG_FILE, UIPromptRequest, CACHE_DIR
+from backend_new.utils.paths import TEMP_DIR, CONFIG_FILE, CACHE_DIR
+from backend_new.utils.classes.dataclasses import UIPromptRequest
 
 from backend_new.utils.logger import Logger
 logger = Logger(__name__)

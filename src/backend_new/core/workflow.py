@@ -11,8 +11,9 @@ from pathlib import Path
 from backend_new.utils.functions.other import contains_japanese
 from backend_new.utils.functions.filesystem import read_json_file, write_json_file, read_config, load_env_file
 
-from backend_new.utils.constants import SongContext, DataMismatchError
-from backend_new.utils.constants import TEMP_DIR
+from backend_new.utils.classes.dataclasses import SongContext
+from backend_new.utils.classes.exceptions import DataMismatchError
+from backend_new.utils.paths import TEMP_DIR
 
 from backend_new.utils.logger import Logger
 

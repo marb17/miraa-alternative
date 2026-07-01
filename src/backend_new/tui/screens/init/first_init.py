@@ -8,7 +8,8 @@ from textual.widgets import Header, Label, ProgressBar, RichLog, Static, Button,
 
 from backend_new.main import Analyzer
 from backend_new.tui.modalscreens.info import InfoModalScreen
-from backend_new.utils.constants import ENV_FILE, DEFAULT_DICTS
+from backend_new.utils.paths import ENV_FILE
+from backend_new.utils.default.default_var import DEFAULT_DICTS
 from backend_new.utils.functions.download import download_all_dicts
 from backend_new.utils.functions.filesystem import write_config
 

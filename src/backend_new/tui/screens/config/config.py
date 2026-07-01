@@ -13,7 +13,8 @@ from textual.widgets import Label, Button, Switch, Checkbox, Input, Header, Foot
 
 from backend_new.tui.modalscreens.full import SpotifyAuthenticateScreen
 from backend_new.tui.modalscreens.interactive import UnsavedConfirmationModalScreen
-from backend_new.utils.constants import ENV_FILE, DEFAULT_CONFIG
+from backend_new.utils.paths import ENV_FILE
+from backend_new.utils.default.default_var import DEFAULT_CONFIG
 from backend_new.utils.functions.filesystem import read_config, write_config
 
 

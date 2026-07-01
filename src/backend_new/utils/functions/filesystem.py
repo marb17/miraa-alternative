@@ -6,7 +6,8 @@ from typing import Any
 import questionary as q
 from dotenv import set_key, load_dotenv
 
-from backend_new.utils.constants import CONFIG_FILE, ENV_FILE, DEFAULT_ENV_VARS, TEMP_DIR
+from backend_new.utils.paths import CONFIG_FILE, ENV_FILE, TEMP_DIR
+from backend_new.utils.default.default_var import DEFAULT_ENV_VARS
 from backend_new.utils.logger import Logger
 logger = Logger(__name__)
 

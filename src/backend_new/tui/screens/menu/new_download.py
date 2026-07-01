@@ -16,7 +16,7 @@ from backend_new.core.workflow import WorkflowManager
 from backend_new.extractors.downloader import Downloader
 from backend_new.tui.widgets.interactive import InputSubmit
 from backend_new.tui.widgets.static import SpotifyCurrentlyPlayingWidget
-from backend_new.utils.constants import UIPromptRequest
+from backend_new.utils.classes.dataclasses import UIPromptRequest
 from backend_new.utils.functions.filesystem import read_config
 
 
