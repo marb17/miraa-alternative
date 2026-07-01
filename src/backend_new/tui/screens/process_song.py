@@ -1,5 +1,6 @@
 import time
 import threading
+from pathlib import Path
 from typing import Any, Generator
 from textual import events, work, on
 from textual.app import App, ComposeResult
@@ -61,6 +62,8 @@ class ProcessSong(Screen):
         Binding("ctrl+x", "app.pop_screen", "Exit Processing", priority=True)
     ]
 
+    json_options: list[tuple[str, Path]] = list()
+
     def compose(self) -> ComposeResult:
         yield Header()
         yield Footer()
@@ -75,9 +78,18 @@ class ProcessSong(Screen):
 
     def _on_mount(self, event: events.Mount) -> None:
         self.query_one("#choose_json", Vertical).border_title = "Song Processing"
+        self.update_json_select()
 
     @work(thread=True)
     def update_json_select(self) -> None:
         all_files = all_available_temp_json_files()
+        self.json_options = [(file["name"], file["path"]) for file in all_files]
+
+        self.update_select_json_widget()
+
+    def update_select_json_widget(self) -> None:
+        self.query_one("#select_json", Select).set_options(self.json_options)
+
+
 
         
