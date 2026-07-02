@@ -113,7 +113,7 @@ class Downloader:
         return False
 
     #TODO fix dup lines
-    @handle_spotify_no_connection_error
+    # @handle_spotify_no_connection_error
     def authenticate(self, force_cache: bool = False) -> Generator[UIPromptRequest, None, bool]:
         """
         Initializes the spotipy client
@@ -132,7 +132,7 @@ class Downloader:
                 client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"],
                 redirect_uri=self._env_data["SPOTIFY_REDIRECT_URI"],
                 scope=scope,
-                open_browser=True,
+                open_browser=False,
                 cache_handler=self._cache_handler
             )
 
@@ -149,6 +149,7 @@ class Downloader:
                         message="",
                     )
 
+
                 try:
                     code = auth_manager.parse_response_code(url)
                     token_info = auth_manager.get_access_token(code, as_dict=True)
@@ -161,7 +162,7 @@ class Downloader:
         self._sp = spotipy.Spotify(auth_manager=auth_manager_no_token)
         return True
 
-    @handle_spotify_no_connection_error
+    # @handle_spotify_no_connection_error
     def cache_authenticate(self) -> None:
         if self._sp and self._sp_token:
             return

@@ -8,8 +8,6 @@ from textual.containers import Container, CenterMiddle
 from textual.screen import ModalScreen
 from textual.widgets import Static, Link, Button
 from uc_micro.properties import Any
-from urllib3 import HTTPSConnectionPool
-from urllib3.exceptions import NameResolutionError
 
 from backend_new.extractors.downloader import Downloader
 from backend_new.tui.widgets.interactive import PasteOnlyInputSubmit

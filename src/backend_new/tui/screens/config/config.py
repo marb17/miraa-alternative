@@ -227,23 +227,21 @@ class DownloadMenu(Horizontal):
 
     @on(ConfigOption.Changed, "#spotify_token")
     def handle_spotify_token(self, event: ConfigOption.Changed) -> None:
-        write_config(self.query_one("#spotify_token", Switch).value, ["spotify_downloader", "token"])
+        write_config(self.query_one("#spotify_token", ConfigOption).value, ["spotify_downloader", "token"])
         self.config_file_data["spotify_downloader"]["token"] = event.value
         self.app.read_config_worker(False)
         if event.value:
             self.app.push_screen(SpotifyAuthenticateScreen(), callback=self.handle_auth_result)
 
     def handle_auth_result(self, result: Any) -> None:
-        """Called automatically when SpotifyAuthenticateScreen is dismissed."""
-        # If result is None or False, authentication failed or was skipped
         if not result:
+            self.notify("failed")
             with self.prevent(Switch.Changed):
-                self.query_one("#spotify_token", Switch).value = False
+                self.query_one("#spotify_token", ConfigOption).value = False
             self.config_file_data["spotify_downloader"]["token"] = False
             write_config(False, ["spotify_downloader", "token"])
             self.app.read_config_worker(False)
         else:
-            # Token successfully retrieved!
             self.config_file_data["spotify_downloader"]["token"] = result
             self.post_message(self.ReAuthSpotify())
 

@@ -130,6 +130,11 @@ class DownloadScreen(Screen):
     #info_rich_log {
         margin: 1 2;
     }
+    
+    FinishedAnyKeyContinue {
+        align: center middle;
+        content-align: center middle;
+    }
     """
 
 

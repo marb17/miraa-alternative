@@ -449,20 +449,25 @@ class ConfigOption(Widget):
     def value(self) -> Any:
         if self.config_type == "switch":
             return self.query_one("#switch_widget", Switch).value
-        elif self.config_type in ["input_int", "input_float", "input_str"]:
-            return self.query_one("#input_widget", Input).value
+        elif self.config_type == "input_int":
+            return int(self.query_one("#input_widget", Input).value)
+        elif self.config_type == "input_float":
+            return float(self.query_one("#input_widget", Input).value)
+        elif self.config_type == "input_str":
+            return str(self.query_one("#input_widget", Input).value)
         elif self.config_type == "checkbox":
             return self.query_one("#checkbox_widget", Checkbox).value
         return None
 
     @value.setter
     def value(self, value: Any) -> None:
-        if self.config_type == "switch":
-            self.query_one("#switch_widget", Switch).value = value
-        elif self.config_type in ["input_int", "input_float", "input_str"]:
-            self.query_one("#input_widget", Input).value = str(value)
-        elif self.config_type == "checkbox":
-            self.query_one("#checkbox_widget", Checkbox).value = value
+        with self.prevent(Switch.Changed, Input.Changed, Checkbox.Changed):
+            if self.config_type == "switch":
+                self.query_one("#switch_widget", Switch).value = value
+            elif self.config_type in ["input_int", "input_float", "input_str"]:
+                self.query_one("#input_widget", Input).value = str(value)
+            elif self.config_type == "checkbox":
+                self.query_one("#checkbox_widget", Checkbox).value = value
 
     @property
     def password(self) -> Any:
@@ -495,7 +500,7 @@ class ConfigOption(Widget):
         else:
             self.json_keys = None
         self.enable_config_write = enable_config_write if json_keys else False
-        self.password = input_password
+        self._password = input_password
 
 
 
@@ -510,21 +515,21 @@ class ConfigOption(Widget):
                 yield Input(id="input_widget",
                             placeholder=self.placeholder,
                             type="integer",
-                            password=self.password)
+                            password=self._password)
         elif self.config_type == "input_float":
             with Container(id="option"):
                 yield Label(self.label)
                 yield Input(id="input_widget",
                             placeholder=self.placeholder,
                             type="number",
-                            password=self.password)
+                            password=self._password)
         elif self.config_type == "input_str":
             with Container(id="option"):
                 yield Label(self.label)
                 yield Input(id="input_widget",
                             placeholder=self.placeholder,
                             type="text",
-                            password=self.password)
+                            password=self._password)
         elif self.config_type == "checkbox":
             with Container(id="flat_option"):
                 yield Checkbox(self.label, id="checkbox_widget")
