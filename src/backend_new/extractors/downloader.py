@@ -31,7 +31,7 @@ from backend_new.utils.classes.dataclasses import UIPromptRequest
 from backend_new.utils.logger import Logger
 logger = Logger(__name__)
 
-def handle_spotify_token_errors(func):
+def handle_spotify_no_token_error(func):
     @functools.wraps(func)
     def wrapper(self, *args, **kwargs):
         try:
@@ -68,6 +68,25 @@ def handle_spotify_token_errors(func):
     return wrapper
 
 
+def handle_spotify_no_connection_error(func):
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        try:
+            result = func(self, *args, **kwargs)
+
+            if isinstance(result, types.GeneratorType):
+                try:
+                    yield from result
+                except Exception as e:
+                    raise e
+            else:
+                return result
+        except ConnectionError as e:
+            raise e
+
+    return wrapper
+
+
 
 class Downloader:
     def __init__(self) -> None:
@@ -94,6 +113,7 @@ class Downloader:
         return False
 
     #TODO fix dup lines
+    @handle_spotify_no_connection_error
     def authenticate(self, force_cache: bool = False) -> Generator[UIPromptRequest, None, bool]:
         """
         Initializes the spotipy client
@@ -141,6 +161,7 @@ class Downloader:
         self._sp = spotipy.Spotify(auth_manager=auth_manager_no_token)
         return True
 
+    @handle_spotify_no_connection_error
     def cache_authenticate(self) -> None:
         if self._sp and self._sp_token:
             return
@@ -170,7 +191,7 @@ class Downloader:
 
         self._sp = spotipy.Spotify(auth_manager=auth_manager_no_token)
 
-    @handle_spotify_token_errors
+    @handle_spotify_no_token_error
     def get_current_playing_song(self) -> Generator[UIPromptRequest, Any, dict[str, Any]]:
         """
         Gets the current playing song from user's spotify (using the tokens)

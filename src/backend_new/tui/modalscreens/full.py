@@ -1,12 +1,15 @@
 import threading
 import webbrowser
 
+import requests.exceptions
 from textual import events, on, work
 from textual.app import ComposeResult
 from textual.containers import Container, CenterMiddle
 from textual.screen import ModalScreen
 from textual.widgets import Static, Link, Button
 from uc_micro.properties import Any
+from urllib3 import HTTPSConnectionPool
+from urllib3.exceptions import NameResolutionError
 
 from backend_new.extractors.downloader import Downloader
 from backend_new.tui.widgets.interactive import PasteOnlyInputSubmit
@@ -124,6 +127,9 @@ class SpotifyAuthenticateScreen(ModalScreen):
 
         except StopIteration as e:
             self.app.call_from_thread(self.dismiss, e.value)
+        except requests.exceptions.ConnectionError as e:
+            self.app.call_from_thread(self.notify, f"You are not possibly connected to the internet.\n\n{e}", severity="error")
+            self.app.call_from_thread(self.dismiss, False)
         except Exception as e:
-            self.app.call_from_thread(self.notify, f"Authentication Error: {e}")
-            self.app.call_from_thread(self.dismiss, None)
+            self.app.call_from_thread(self.notify, f"Authentication Error: {e}", severity="error")
+            self.app.call_from_thread(self.dismiss, False)

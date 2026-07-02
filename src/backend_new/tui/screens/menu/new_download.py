@@ -6,15 +6,14 @@ from spotipy import SpotifyException
 from textual import events, work, on
 from textual.app import App, ComposeResult
 from textual.screen import Screen
-from textual.containers import Vertical, Horizontal, CenterMiddle, Container, HorizontalGroup, HorizontalScroll
-from textual.widgets import Header, Footer, Input, DataTable, Label, Button, ContentSwitcher, Static, LoadingIndicator, \
+from textual.containers import Vertical, CenterMiddle, Container, HorizontalGroup, HorizontalScroll
+from textual.widgets import Header, Footer, DataTable, Label, Button, ContentSwitcher, Static, LoadingIndicator, \
     RichLog
 from textual.binding import Binding
-from yt_dlp import DownloadError
+from yt_dlp.utils import DownloadError
 
 from backend_new.core.workflow import WorkflowManager
-from backend_new.extractors.downloader import Downloader
-from backend_new.tui.widgets.interactive import InputSubmit, TableSelect, FinishedAnyKeyContinue
+from backend_new.tui.widgets.interactive import InputSubmit, FinishedAnyKeyContinue
 from backend_new.tui.widgets.static import SpotifyCurrentlyPlayingWidget
 from backend_new.utils.classes.dataclasses import UIPromptRequest
 from backend_new.utils.functions.filesystem import read_config
@@ -133,11 +132,15 @@ class DownloadScreen(Screen):
     }
     """
 
+
+
     pipeline = None
     next_ui_response = None
     config_data = None
 
     ui_ready_event = threading.Event()
+
+
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -204,6 +207,8 @@ class DownloadScreen(Screen):
 
         self.run_downloader_pipeline()
 
+
+
     @work(thread=True)
     def run_downloader_pipeline(self) -> None:
         with WorkflowManager() as manager:
@@ -224,6 +229,7 @@ class DownloadScreen(Screen):
                     self.app.call_from_thread(self.update_ui_for_already_exists)
             except (SpotifyException, DownloadError) as e:
                 self.app.call_from_thread(self.update_ui_for_error, str(e))
+
 
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -247,6 +253,8 @@ class DownloadScreen(Screen):
             val = {"value": "__next__"}
             self.next_ui_response = val
             self.ui_ready_event.set()
+
+
 
     @on(InputSubmit.Submitted, "#input_widget")
     def handle_input_submit(self, event: InputSubmit.Submitted) -> None:
@@ -275,6 +283,8 @@ class DownloadScreen(Screen):
                                      "first_yt": read_config()["downloader"]["current_song_always_first_youtube_result"]}
             self.ui_ready_event.set()
 
+
+
     @on(DataTable.RowSelected, "#input_table")
     def handle_table_select(self) -> None:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
@@ -288,11 +298,18 @@ class DownloadScreen(Screen):
     def handle_select_pressed(self) -> None:
         self.handle_table_select()
 
+
+
     @on(FinishedAnyKeyContinue.Closed)
     def handle_ending_closed(self, event: events.Key) -> None:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
         if switcher.current in ["finished", "already_exists", "error_message"]:
             self.action_self_dismiss(True)
+
+    def action_self_dismiss(self, value: Any) -> None:
+        self.dismiss(value)
+
+
 
     def update_ui_for_finished(self) -> None:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
@@ -307,9 +324,6 @@ class DownloadScreen(Screen):
         switcher.current = "error_message"
 
         self.query_one("#error_message", FinishedAnyKeyContinue).update_static("#error_message_static", message)
-
-    def action_self_dismiss(self, value: Any) -> None:
-        self.dismiss(value)
 
     def update_ui_for_prompt(self, request: UIPromptRequest) -> None:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)

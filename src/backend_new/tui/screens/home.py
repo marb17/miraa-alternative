@@ -68,8 +68,18 @@ class HomeScreen(Screen):
         }
         """
 
+
+
     spotify_client = Downloader()
     next_ui_response = None
+
+    def __init__(
+            self,
+            name: str | None = None,
+            id: str | None = None,
+            classes: str | None = None,
+    ):
+        super().__init__(name, id, classes)
 
     def action_open_config(self) -> None:
         config = ConfigMenu()
@@ -82,9 +92,13 @@ class HomeScreen(Screen):
     def action_open_process(self) -> None:
         self.app.push_screen(ProcessSong(), callback=self.handle_resume_widget_poll)
 
+
+
     def handle_resume_widget_poll(self, result: Any) -> None:
         widget = self.query_one("#spotify_currently_playing", SpotifyCurrentlyPlayingWidget)
         widget.handle_start_updating()
+
+
 
     def compose(self) -> ComposeResult:
         yield Footer()
@@ -99,6 +113,8 @@ class HomeScreen(Screen):
                 yield Button("Download New", id="download", variant="success")
                 yield Button("Process Song", id="process", variant="primary")
 
+
+
     def on_mount(self) -> None:
         self.query_one("#quick_menu", HorizontalGroup).border_title = "Quick Menu"
         self.query_one("#spotify_container", HorizontalGroup).border_title = "Spotify"
@@ -109,13 +125,8 @@ class HomeScreen(Screen):
             self.start_app()
 
         self.check_can_process_song()
-
-    @work(thread=True)
-    def check_can_process_song(self) -> None:
-        self.handle_display_process_song(not bool(all_available_temp_json_files()))
-
-    def handle_display_process_song(self, value: bool) -> None:
-        self.query_one("#process", Button).disabled = value
+        self.is_connected_to_internet()
+        self.set_interval(0.5, self.is_connected_to_internet)
 
     def after_init_finished(self, result: Any = None) -> None:
         self.start_app()
@@ -123,16 +134,42 @@ class HomeScreen(Screen):
     def start_app(self) -> None:
         self.authenticate_spotify()
 
+
+
+    @work(thread=True)
+    def check_can_process_song(self) -> None:
+        self.app.call_from_thread(self.handle_display_process_song, not bool(all_available_temp_json_files()))
+
+    def handle_display_process_song(self, value: bool) -> None:
+        self.query_one("#process", Button).disabled = value
+
+
+
+    @work(thread=True)
+    def is_connected_to_internet(self) -> None:
+        is_connected = self.app.connected_to_internet
+        self.app.call_from_thread(self.handle_display_download_song, not is_connected)
+
+
+    def handle_display_download_song(self, value: bool) -> None:
+        self.query_one("#download", Button).disabled = value
+
+
+
     def authenticate_spotify(self):
         self.app.push_screen(SpotifyAuthenticateScreen(), callback=self.handle_authenticate_spotify_widget)
 
     def handle_authenticate_spotify_widget(self, result: Any) -> None:
         self.query_one("#spotify_currently_playing", SpotifyCurrentlyPlayingWidget).action_authenticate()
+        if result is False:
+            self.query_one("#download", Button).disabled = True
 
     @on(DownloadMenu.ReAuthSpotify)
     def handle_reauth_spotify(self, event: DownloadMenu.ReAuthSpotify) -> None:
         event.stop()
         self.app.push_screen(RestartAppModalScreen())
+
+
 
     @staticmethod
     def check_if_init() -> bool:
@@ -143,6 +180,8 @@ class HomeScreen(Screen):
                 return False
         except FileNotFoundError:
             return False
+
+
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "download":

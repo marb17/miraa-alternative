@@ -5,7 +5,7 @@ from textual import events, work, on
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.containers import Vertical, Horizontal, Container
-from textual.widgets import Header, Footer, Label, Button, ContentSwitcher, Select, TabbedContent, Static, RichLog
+from textual.widgets import Header, Footer, Label, Button, ContentSwitcher, Select, Static, RichLog
 from textual.binding import Binding
 
 from backend_new.core.workflow import WorkflowManager
@@ -100,6 +100,8 @@ class ProcessSong(Screen):
     json_options: list[tuple[str, Path]] = list()
     selected_json_file = None
 
+
+
     def compose(self) -> ComposeResult:
         yield Header()
         yield Footer()
@@ -123,10 +125,26 @@ class ProcessSong(Screen):
                 with Vertical(id="finished"):
                     yield FinishedAnyKeyContinue(message="Finished processing")
 
+
+
     def _on_mount(self, event: events.Mount) -> None:
         self.query_one("#choose_json", Vertical).border_title = "Song Processing"
         self.query_one("#options", Vertical).border_title = "Options"
         self.update_json_select()
+
+
+
+    @work(thread=True)
+    def update_json_select(self) -> None:
+        all_files = all_available_temp_json_files()
+        self.json_options = [(file["name"], file["path"]) for file in all_files]
+
+        self.update_select_json_widget()
+
+    def update_select_json_widget(self) -> None:
+        self.query_one("#select_json", Select).set_options(self.json_options)
+
+
 
     @work(thread=True)
     def run_work(self) -> None:
@@ -176,12 +194,6 @@ class ProcessSong(Screen):
                 switcher.current = "finished"
 
 
-    @work(thread=True)
-    def update_json_select(self) -> None:
-        all_files = all_available_temp_json_files()
-        self.json_options = [(file["name"], file["path"]) for file in all_files]
-
-        self.update_select_json_widget()
 
     @on(Button.Pressed, "#confirm_json")
     def select_json_file(self):
@@ -197,8 +209,7 @@ class ProcessSong(Screen):
 
         self.run_work()
 
-    def update_select_json_widget(self) -> None:
-        self.query_one("#select_json", Select).set_options(self.json_options)
+
 
     def action_self_dismiss(self, value: Any) -> None:
         self.dismiss(value)

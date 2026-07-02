@@ -105,6 +105,8 @@ class SpotifyCurrentlyPlayingWidget(Widget):
     def song_available(self) -> bool:
         return bool(self.response)
 
+
+
     @work(thread=True)
     def action_authenticate(self) -> None:
         if not self.app.use_spotify_token:
@@ -124,6 +126,8 @@ class SpotifyCurrentlyPlayingWidget(Widget):
             return
 
         self.downloader.authenticate()
+
+
 
     @work(exclusive=True, thread=True)
     def update_data(self) -> None:
@@ -153,11 +157,15 @@ class SpotifyCurrentlyPlayingWidget(Widget):
 
         self.app.call_from_thread(self._update_widget_data)
 
+
+
     def handle_start_updating(self):
         self.update_timer.resume()
 
     def handle_stop_updating(self) -> None:
         self.update_timer.pause()
+
+
 
     def increment_timestamp(self, increment_by_ms: int = 100) -> None:
         if self.response is None or not self.is_playing:
@@ -169,6 +177,7 @@ class SpotifyCurrentlyPlayingWidget(Widget):
             self.current_progress_ms += increment_by_ms
         self._update_timestamp()
         self._update_progressbar()
+
 
 
     def _update_widget_data(self) -> None:

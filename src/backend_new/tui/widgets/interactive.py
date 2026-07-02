@@ -1,4 +1,4 @@
-from typing import Self, Iterable, Any
+from typing import Self, Iterable, Any, Literal
 
 from rich.console import ConsoleRenderable, RichCast
 from textual import on, events
@@ -8,8 +8,10 @@ from textual.dom import DOMNode
 from textual.message import Message
 from textual.visual import SupportsVisual, Visual
 from textual.widget import Widget
-from textual.widgets import Label, Input, Button, DataTable, Static
+from textual.widgets import Label, Input, Button, DataTable, Static, Switch, Checkbox
 from textual.widgets._data_table import CellType
+
+from backend_new.utils.functions.filesystem import write_config, read_config
 
 
 class InputSubmit(Widget):
@@ -40,6 +42,8 @@ class InputSubmit(Widget):
     }
     """
 
+
+
     class Submitted(Message):
         def __init__(self, sender: Widget, value: str, triggered_by: str):
             super().__init__()
@@ -52,12 +56,15 @@ class InputSubmit(Widget):
             """Return the widget that sent this message."""
             return self.sender_widget
 
+
+
     def __init__(self, label: str = "", placeholder: str = "", default_value: str = "", extra_buttons: Iterable[Button] = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.label_text = label
         self.placeholder_text = placeholder
         self.default_value = default_value
         self.extra_buttons = extra_buttons
+
 
 
     def compose(self) -> ComposeResult:
@@ -74,6 +81,8 @@ class InputSubmit(Widget):
                     yield Button("Submit", id="submit_input", variant="success")
                     if self.extra_buttons:
                         for button in self.extra_buttons:
+                            if not button.id:
+                                raise Exception("Please put id on extra buttons")
                             button.add_class("extra_button")
                             yield button
 
@@ -83,6 +92,8 @@ class InputSubmit(Widget):
             return self.query_one("#input_box", Input).value
         except Exception:
             return self.default_value
+
+
 
     @on(Button.Pressed, "#submit_input")
     def action_button_submit_pressed(self) -> None:
@@ -104,6 +115,8 @@ class InputSubmit(Widget):
         input_value = self.query_one("#input_box", Input).value
         self.post_message(self.Submitted(sender=self, value=input_value, triggered_by=triggered_by))
 
+
+
     def update_prompt(self, label: str = "", placeholder: str = "", value: str = "", border_title: str = "") -> None:
         if label:
             self.query_one("#input_label", Label).update(label)
@@ -113,6 +126,8 @@ class InputSubmit(Widget):
             self.query_one("#input_box", Input).value = value
         if border_title:
             self.query_one("#input_pane", Vertical).border_title = border_title
+
+
 
     def focus(self, scroll_visible: bool = True) -> Self:
         super().focus()
@@ -136,53 +151,7 @@ class PasteOnlyInput(Input):
             self.value = ""
 
 
-class PasteOnlyInputSubmit(Widget):
-    DEFAULT_CSS = """
-    #input_box {
-        width: 1fr;
-    }
-    
-    #input_container {
-        height: auto;
-    }
-    
-    #input_label {
-        padding: 0 1;
-    }
-    
-    .extra_button {
-        margin: 0 0 0 1;
-    }
-    
-    #button_con {
-        width: auto;
-        height: auto;
-    }
-    
-    #submit_input {
-        width: auto;
-    }
-    """
-
-    class Submitted(Message):
-        def __init__(self, sender: Widget, value: str, triggered_by: str):
-            super().__init__()
-            self.value = value
-            self.triggered_by = triggered_by
-            self.sender_widget = sender
-
-        @property
-        def control(self) -> Widget:
-            """Return the widget that sent this message."""
-            return self.sender_widget
-
-    def __init__(self, label: str = "", placeholder: str = "", default_value: str = "", extra_buttons: Iterable[Button] = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.label_text = label
-        self.placeholder_text = placeholder
-        self.default_value = default_value
-        self.extra_buttons = extra_buttons
-
+class PasteOnlyInputSubmit(InputSubmit):
     def compose(self) -> ComposeResult:
         with Vertical(id="input_container"):
             if self.label_text != "" or True:
@@ -199,47 +168,6 @@ class PasteOnlyInputSubmit(Widget):
                         for button in self.extra_buttons:
                             button.add_class("extra_button")
                             yield button
-
-    @property
-    def value(self):
-        try:
-            return self.query_one("#input_box", PasteOnlyInput).value
-        except Exception:
-            return self.default_value
-
-    @on(Button.Pressed, "#submit_input")
-    def action_button_submit_pressed(self) -> None:
-        self.action_submit(triggered_by="submit")
-
-    @on(Input.Submitted, "#input_box")
-    def action_input_submitted(self) -> None:
-        self.action_submit(triggered_by="submit")
-
-    @on(Button.Pressed)
-    def handle_extra_buttons(self, event: Button.Pressed):
-        if event.button.id is None:
-            raise Exception("please put id on extra buttons")
-
-        if event.button.id != "submit_input":
-            self.action_submit(triggered_by=event.button.id)
-
-    def action_submit(self, triggered_by: str) -> None:
-        input_value = self.query_one("#input_box", Input).value
-        self.post_message(self.Submitted(sender=self, value=input_value, triggered_by=triggered_by))
-
-    def update_prompt(self, label: str = "", placeholder: str = "", value: str = "", border_title: str = "") -> None:
-        if label:
-            self.query_one("#input_label", Label).update(label)
-        if placeholder:
-            self.query_one("#input_box", Input).placeholder = placeholder
-        if value:
-            self.query_one("#input_box", Input).value = value
-        if border_title:
-            self.query_one("#input_pane", Vertical).border_title = border_title
-
-    def focus(self, scroll_visible: bool = True) -> Self:
-        super().focus()
-        self.query_one("#input_box", Input).focus()
 
 
 class TableSelect(Widget):
@@ -294,6 +222,7 @@ class TableSelect(Widget):
             with HorizontalGroup(id="nav_buttons"):
                 for button in self.extra_buttons: yield button
                 yield Button(id="__select__", variant="success", label="Select")
+
 
 
     class Submitted(Message):
@@ -381,6 +310,7 @@ class TableSelect(Widget):
         data_table_widget.clear(columns=clear_columns)
 
 
+
     def button_visible(self, button_id: str, value: bool) -> None:
         if button_id.startswith("#"):
             self.query_one(button_id, Button).display = value
@@ -408,6 +338,8 @@ class FinishedAnyKeyContinue(Widget):
     }
     """
 
+
+
     class Closed(Message):
         def __init__(self, sender: Widget, message: Any) -> None:
             super().__init__()
@@ -418,12 +350,16 @@ class FinishedAnyKeyContinue(Widget):
         def control(self) -> DOMNode | None:
             return self.sender
 
+
+
     def __init__(self, message: str, press_key_add: bool = True, extra_static: Iterable[Static] = None, value: Any = None, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.message = message
         self.press_key_add = press_key_add
         self.extra_static = extra_static if extra_static else []
         self.value = value
+
+
 
     @property
     def dismiss_value(self) -> Any:
@@ -432,6 +368,8 @@ class FinishedAnyKeyContinue(Widget):
     @dismiss_value.setter
     def dismiss_value(self, value: Any) -> None:
         self.value = value
+
+
 
     def compose(self) -> ComposeResult:
         text = self.message
@@ -444,11 +382,15 @@ class FinishedAnyKeyContinue(Widget):
                 static.classes = "extra_static"
                 yield static
 
+
+
     def _on_mount(self, event: events.Mount) -> None:
         self.focus()
 
     def _on_key(self, event: events.Key) -> None:
         self.post_message(self.Closed(self, self.value))
+
+
 
     def update_static(self, static_id: str, value: str) -> None:
         if static_id.startswith("#"):
@@ -457,3 +399,150 @@ class FinishedAnyKeyContinue(Widget):
             static_id = "#" + static_id
 
         self.query_one(f"#{static_id}", Static).update(value)
+
+
+class ConfigOption(Widget):
+    DEFAULT_CSS = """
+        #hor_option {
+            height: auto;
+            margin: 0 0 0 0;
+            layout: horizontal;
+        }
+        
+        #hor_option Label {
+            align: left middle;
+            content-align: left middle;
+            
+            width: 100%;
+            height: 100%;
+        }
+        
+        #option {
+            height: auto;
+            margin: 0 0 0 0;
+        }
+        
+        #option Label {
+            margin: 0 1;
+        }
+        
+        #flat_option {
+            height: auto;
+        }
+    """
+
+
+
+    class Changed(Message):
+        def __init__(self, sender: Widget, message: Any) -> None:
+            super().__init__()
+            self.sender = sender
+            self.message = message
+
+        @property
+        def control(self) -> DOMNode | None:
+            return self.sender
+
+
+
+    @property
+    def value(self) -> Any:
+        if self.config_type == "switch":
+            return self.query_one("#switch_widget", Switch).value
+        elif self.config_type in ["input_int", "input_float"]:
+            return self.query_one("#input_widget", Input).value
+        elif self.config_type == "checkbox":
+            return self.query_one("#checkbox_widget", Checkbox).value
+        return None
+
+    @value.setter
+    def value(self, value: Any) -> None:
+        if self.config_type == "switch":
+            self.query_one("#switch_widget", Switch).value = value
+        elif self.config_type in ["input_int", "input_float"]:
+            self.query_one("#input_widget", Input).value = str(value)
+        elif self.config_type == "checkbox":
+            self.query_one("#checkbox_widget", Checkbox).value = value
+
+
+
+    def __init__(self, config_type: Literal["switch", "input_int", "input_float", "checkbox"],
+                 label: str,
+                 widget_id: str,
+                 placeholder: str = "",
+                 json_keys: list[str] = None,
+                 enable_config_write: bool = True,
+                 *args, **kwargs) -> None:
+
+        super().__init__(id=widget_id, *args, **kwargs)
+        self.config_type = config_type
+        self.label = label
+        self.placeholder = placeholder
+        if json_keys:
+            self.json_keys = json_keys
+        else:
+            self.json_keys = None
+        self.enable_config_write = enable_config_write if json_keys else False
+
+
+
+    def compose(self) -> ComposeResult:
+        if self.config_type == "switch":
+            with Container(id="hor_option"):
+                yield Switch(id="switch_widget")
+                yield Label(self.label)
+        elif self.config_type == "input_int":
+            with Container(id="option"):
+                yield Label(self.label)
+                yield Input(id="input_widget", placeholder=self.placeholder, type="integer")
+        elif self.config_type == "input_float":
+            with Container(id="option"):
+                yield Label(self.label)
+                yield Input(id="input_widget", placeholder=self.placeholder, type="number")
+        elif self.config_type == "checkbox":
+            with Container(id="flat_option"):
+                yield Checkbox(self.label, id="checkbox_widget")
+
+
+
+    def _on_mount(self, event: events.Mount) -> None:
+        config_data = read_config()
+        if self.json_keys:
+            for key in self.json_keys:
+                config_data = config_data[key]
+
+        if isinstance(config_data, dict) or isinstance(config_data, list):
+            raise Exception("Wrong key traversal")
+
+        self.value = config_data
+
+
+
+    @on(Switch.Changed)
+    def handle_switch_message(self, event: Switch.Changed) -> None:
+        self.post_message(self.Changed(self, self.value))
+
+    @on(Input.Changed)
+    def handle_input_message(self, event: Input.Changed) -> None:
+        self.post_message(self.Changed(self, self.value))
+
+    @on(Checkbox.Changed)
+    def handle_checkbox_message(self, event: Checkbox.Changed) -> None:
+        self.post_message(self.Changed(self, self.value))
+
+
+
+    @on(Switch.Changed)
+    def switch_write_config(self, event: Switch.Changed) -> None:
+        if self.enable_config_write:
+            write_config(self.value, self.json_keys)
+
+    @on(Input.Changed)
+    def input_write_config(self, event: Input.Changed) -> None:
+        if self.enable_config_write:
+            write_config(self.value, self.json_keys)
+
+    @on(Checkbox.Changed)
+    def input_write_checkbox(self, event: Checkbox.Changed) -> None:
+        if self.enable_config_write:
+            write_config(self.value, self.json_keys)

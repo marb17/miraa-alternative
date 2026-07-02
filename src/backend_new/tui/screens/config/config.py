@@ -13,6 +13,7 @@ from textual.widgets import Label, Button, Switch, Checkbox, Input, Header, Foot
 
 from backend_new.tui.modalscreens.full import SpotifyAuthenticateScreen
 from backend_new.tui.modalscreens.interactive import UnsavedConfirmationModalScreen
+from backend_new.tui.widgets.interactive import ConfigOption
 from backend_new.utils.paths import ENV_FILE
 from backend_new.utils.default.default_var import DEFAULT_CONFIG
 from backend_new.utils.functions.filesystem import read_config, write_config
@@ -72,6 +73,10 @@ class DownloadMenu(Horizontal):
         #query_display_settings {
             hatch: right $accent 10%;
         }
+        
+        ConfigOption {
+            height: auto;
+        }
         """
 
     config_file_data = None
@@ -86,61 +91,114 @@ class DownloadMenu(Horizontal):
             # with Vertical(id="option_container"):
             with VerticalScroll(id="option_container"):
                 with VerticalGroup(classes="section_container", id="query_extract_settings"):
-                    with Container(classes="option"):
-                        yield Label("How many items to view at once when querying")
-                        yield Input(id="query_view_limit", placeholder="10", type="integer")
+                    yield ConfigOption(
+                        "input_int",
+                        "How many items to view at once when querying",
+                        "query_view_limit",
+                        json_keys=["downloader", "view_limit"],
+                        enable_config_write=True,
+                    )
 
-                    with Container(classes="option"):
-                        yield Label("How many times to retry")
-                        yield Input(id="query_retry_count", placeholder="3", type="integer")
+                    yield ConfigOption(
+                        "input_int",
+                        "How many times to retry",
+                        "query_retry_count",
+                        json_keys=["downloader", "retry_count"],
+                        enable_config_write=True,
+                    )
 
-                    with Container(classes="option"):
-                        yield Label("How long to wait for each retry (s)")
-                        yield Input(id="query_retry_sleep", placeholder="5.0", type="number")
+                    yield ConfigOption(
+                        "input_float",
+                        "How time to wait for each retry (s)",
+                        "query_retry_sleep",
+                        json_keys=["downloader", "retry_sleep"],
+                        enable_config_write=True,
+                    )
 
-                    with Container(classes="hor_option"):
-                        yield Switch(id="current_song_always_first_youtube_result")
-                        yield Label("Always choose first YouTube result when using current song")
 
-                    with Container(classes="hor_option"):
-                        yield Switch(id="query_always_first_youtube_result")
-                        yield Label("Always choose first YouTube result when querying")
+                    yield ConfigOption(
+                        "switch",
+                        "Always choose first YouTube result when using current song",
+                        "current_song_always_first_youtube_result",
+                        json_keys=["downloader", "current_song_always_first_youtube_result"],
+                        enable_config_write=True,
+                    )
+
+                    yield ConfigOption(
+                        "switch",
+                        "Always choose first YouTube result when querying",
+                        "query_always_first_youtube_result",
+                        json_keys=["downloader", "query_always_first_youtube_result"],
+                        enable_config_write=True,
+                    )
 
                 with HorizontalGroup(classes="section_container", id="query_display_settings"):
                     with VerticalGroup(classes="section_container", id="spotify_query_display_settings"):
-                        with Container(classes="hor_option"):
-                            yield Switch(id="spotify_display_duration")
-                            yield Label("Duration")
+                        yield ConfigOption(
+                            "switch",
+                            "Duration",
+                            "spotify_display_duration",
+                            json_keys=["spotify_downloader", "output_format", "duration"],
+                            enable_config_write=True,
+                        )
 
-                        with Container(classes="hor_option"):
-                            yield Switch(id="spotify_display_album")
-                            yield Label("Album")
+                        yield ConfigOption(
+                            "switch",
+                            "Album",
+                            "spotify_display_album",
+                            json_keys=["spotify_downloader", "output_format", "album"],
+                            enable_config_write=True,
+                        )
 
-                        with Container(classes="hor_option"):
-                            yield Switch(id="spotify_display_popularity")
-                            yield Label("Popularity")
+                        yield ConfigOption(
+                            "switch",
+                            "Popularity",
+                            "spotify_display_popularity",
+                            json_keys=["spotify_downloader", "output_format", "popularity"],
+                            enable_config_write=True,
+                        )
 
                     with VerticalGroup(classes="section_container", id="youtube_query_display_settings"):
-                        with Container(classes="hor_option"):
-                            yield Switch(id="youtube_display_duration")
-                            yield Label("Duration")
+                        yield ConfigOption(
+                            "switch",
+                            "Duration",
+                            "youtube_display_duration",
+                            json_keys=["youtube_downloader", "output_format", "duration"],
+                            enable_config_write=True,
+                        )
 
-                        with Container(classes="hor_option"):
-                            yield Switch(id="youtube_display_uploader")
-                            yield Label("Uploader")
+                        yield ConfigOption(
+                            "switch",
+                            "Uploader",
+                            "youtube_display_uploader",
+                            json_keys=["youtube_downloader", "output_format", "uploader"],
+                            enable_config_write=True,
+                        )
 
-                        with Container(classes="hor_option"):
-                            yield Switch(id="youtube_display_view_count")
-                            yield Label("View Count")
+                        yield ConfigOption(
+                            "switch",
+                            "View Count",
+                            "youtube_display_view_count",
+                            json_keys=["youtube_downloader", "output_format", "view_count"],
+                            enable_config_write=True,
+                        )
 
-                        with Container(classes="hor_option"):
-                            yield Switch(id="youtube_display_id")
-                            yield Label("ID")
+                        yield ConfigOption(
+                            "switch",
+                            "ID",
+                            "youtube_display_id",
+                            json_keys=["youtube_downloader", "output_format", "id"],
+                            enable_config_write=True,
+                        )
 
                 with HorizontalGroup(classes="section_container", id="spotify_settings"):
-                    with Container(classes="hor_option"):
-                        yield Switch(id="spotify_token")
-                        yield Label("Authenticate Spotify Account")
+                    yield ConfigOption(
+                        "switch",
+                        "Authenticate Spotify Account",
+                        "spotify_token",
+                        json_keys=["spotify_downloader", "token"],
+                        enable_config_write=True,
+                    )
 
 
     def _on_mount(self, event: events.Mount) -> None:
@@ -156,67 +214,67 @@ class DownloadMenu(Horizontal):
 
             self.config_file_data = read_config()
 
-            self.query_one("#query_view_limit", Input).value = str(self.config_file_data["downloader"]["view_limit"])
-            self.query_one("#query_retry_count", Input).value = str(self.config_file_data["downloader"]["retry_count"])
-            self.query_one("#query_retry_sleep", Input).value = str(self.config_file_data["downloader"]["retry_sleep"])
+            # self.query_one("#query_view_limit", Input).value = str(self.config_file_data["downloader"]["view_limit"])
+            # self.query_one("#query_retry_count", Input).value = str(self.config_file_data["downloader"]["retry_count"])
+            # self.query_one("#query_retry_sleep", Input).value = str(self.config_file_data["downloader"]["retry_sleep"])
+            #
+            # self.query_one("#current_song_always_first_youtube_result", Switch).value = self.config_file_data["downloader"]["current_song_always_first_youtube_result"]
+            # self.query_one("#query_always_first_youtube_result", Switch).value = self.config_file_data["downloader"]["query_always_first_youtube_result"]
+            #
+            # self.query_one("#spotify_display_duration", Switch).value = self.config_file_data["spotify_downloader"]["output_format"]["duration"]
+            # self.query_one("#spotify_display_album", Switch).value = self.config_file_data["spotify_downloader"]["output_format"]["album"]
+            # self.query_one("#spotify_display_popularity", Switch).value = self.config_file_data["spotify_downloader"]["output_format"]["popularity"]
+            #
+            # self.query_one("#youtube_display_duration", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["duration"]
+            # self.query_one("#youtube_display_uploader", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["uploader"]
+            # self.query_one("#youtube_display_view_count", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["view_count"]
+            # self.query_one("#youtube_display_id", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["id"]
+            #
+            # self.query_one("#spotify_token", Switch).value = self.config_file_data["spotify_downloader"]["token"]
 
-            self.query_one("#current_song_always_first_youtube_result", Switch).value = self.config_file_data["downloader"]["current_song_always_first_youtube_result"]
-            self.query_one("#query_always_first_youtube_result", Switch).value = self.config_file_data["downloader"]["query_always_first_youtube_result"]
-
-            self.query_one("#spotify_display_duration", Switch).value = self.config_file_data["spotify_downloader"]["output_format"]["duration"]
-            self.query_one("#spotify_display_album", Switch).value = self.config_file_data["spotify_downloader"]["output_format"]["album"]
-            self.query_one("#spotify_display_popularity", Switch).value = self.config_file_data["spotify_downloader"]["output_format"]["popularity"]
-
-            self.query_one("#youtube_display_duration", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["duration"]
-            self.query_one("#youtube_display_uploader", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["uploader"]
-            self.query_one("#youtube_display_view_count", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["view_count"]
-            self.query_one("#youtube_display_id", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["id"]
-
-            self.query_one("#spotify_token", Switch).value = self.config_file_data["spotify_downloader"]["token"]
-
-    def on_input_changed(self, event: Input.Changed):
-        if event.input.id == "query_view_limit":
-            if self.query_one("#query_view_limit", Input).value == '':
-                value = DEFAULT_CONFIG["downloader"]["view_limit"]
-            else:
-                value = int(self.query_one("#query_view_limit", Input).value)
-            write_config(value, ["downloader", "view_limit"])
-        elif event.input.id == "query_retry_count":
-            if self.query_one("#query_retry_count", Input).value == '':
-                value = DEFAULT_CONFIG["downloader"]["retry_count"]
-            else:
-                value = int(self.query_one("#query_retry_count", Input).value)
-            write_config(value, ["downloader", "retry_count"])
-        elif event.input.id == "query_retry_sleep":
-            if self.query_one("#query_retry_sleep", Input).value == '':
-                value = DEFAULT_CONFIG["downloader"]["retry_sleep"]
-            else:
-                value = float(self.query_one("#query_retry_sleep", Input).value)
-            write_config(value, ["downloader", "retry_sleep"])
+    # def on_input_changed(self, event: Input.Changed):
+    #     if event.input.id == "query_view_limit":
+    #         if self.query_one("#query_view_limit", Input).value == '':
+    #             value = DEFAULT_CONFIG["downloader"]["view_limit"]
+    #         else:
+    #             value = int(self.query_one("#query_view_limit", Input).value)
+    #         write_config(value, ["downloader", "view_limit"])
+    #     elif event.input.id == "query_retry_count":
+    #         if self.query_one("#query_retry_count", Input).value == '':
+    #             value = DEFAULT_CONFIG["downloader"]["retry_count"]
+    #         else:
+    #             value = int(self.query_one("#query_retry_count", Input).value)
+    #         write_config(value, ["downloader", "retry_count"])
+    #     elif event.input.id == "query_retry_sleep":
+    #         if self.query_one("#query_retry_sleep", Input).value == '':
+    #             value = DEFAULT_CONFIG["downloader"]["retry_sleep"]
+    #         else:
+    #             value = float(self.query_one("#query_retry_sleep", Input).value)
+    #         write_config(value, ["downloader", "retry_sleep"])
 
     def on_switch_changed(self, event: Switch.Changed):
-        if event.switch.id == "current_song_always_first_youtube_result":
-            write_config(self.query_one("#current_song_always_first_youtube_result", Switch).value, ["downloader", "current_song_always_first_youtube_result"])
-        elif event.switch.id == "query_always_first_youtube_result":
-            write_config(self.query_one("#query_always_first_youtube_result", Switch).value, ["downloader", "query_always_first_youtube_result"])
+        # if event.switch.id == "current_song_always_first_youtube_result":
+        #     write_config(self.query_one("#current_song_always_first_youtube_result", Switch).value, ["downloader", "current_song_always_first_youtube_result"])
+        # elif event.switch.id == "query_always_first_youtube_result":
+        #     write_config(self.query_one("#query_always_first_youtube_result", Switch).value, ["downloader", "query_always_first_youtube_result"])
+        #
+        # elif event.switch.id == "spotify_display_duration":
+        #     write_config(self.query_one("#spotify_display_duration", Switch).value, ["spotify_downloader", "output_format", "duration"])
+        # elif event.switch.id == "spotify_display_album":
+        #     write_config(self.query_one("#spotify_display_album", Switch).value, ["spotify_downloader", "output_format", "album"])
+        # elif event.switch.id == "spotify_display_popularity":
+        #     write_config(self.query_one("#spotify_display_popularity", Switch).value, ["spotify_downloader", "output_format", "popularity"])
+        #
+        # elif event.switch.id == "youtube_display_duration":
+        #     write_config(self.query_one("#youtube_display_duration", Switch).value, ["youtube_downloader", "output_format", "duration"])
+        # elif event.switch.id == "youtube_display_uploader":
+        #     write_config(self.query_one("#youtube_display_uploader", Switch).value, ["youtube_downloader", "output_format", "uploader"])
+        # elif event.switch.id == "youtube_display_view_count":
+        #     write_config(self.query_one("#youtube_display_view_count", Switch).value, ["youtube_downloader", "output_format", "view_count"])
+        # elif event.switch.id == "youtube_display_id":
+        #     write_config(self.query_one("#youtube_display_id", Switch).value, ["youtube_downloader", "output_format", "id"])
 
-        elif event.switch.id == "spotify_display_duration":
-            write_config(self.query_one("#spotify_display_duration", Switch).value, ["spotify_downloader", "output_format", "duration"])
-        elif event.switch.id == "spotify_display_album":
-            write_config(self.query_one("#spotify_display_album", Switch).value, ["spotify_downloader", "output_format", "album"])
-        elif event.switch.id == "spotify_display_popularity":
-            write_config(self.query_one("#spotify_display_popularity", Switch).value, ["spotify_downloader", "output_format", "popularity"])
-
-        elif event.switch.id == "youtube_display_duration":
-            write_config(self.query_one("#youtube_display_duration", Switch).value, ["youtube_downloader", "output_format", "duration"])
-        elif event.switch.id == "youtube_display_uploader":
-            write_config(self.query_one("#youtube_display_uploader", Switch).value, ["youtube_downloader", "output_format", "uploader"])
-        elif event.switch.id == "youtube_display_view_count":
-            write_config(self.query_one("#youtube_display_view_count", Switch).value, ["youtube_downloader", "output_format", "view_count"])
-        elif event.switch.id == "youtube_display_id":
-            write_config(self.query_one("#youtube_display_id", Switch).value, ["youtube_downloader", "output_format", "id"])
-
-        elif event.switch.id == "spotify_token":
+        if event.switch.id == "spotify_token":
             write_config(self.query_one("#spotify_token", Switch).value, ["spotify_downloader", "token"])
             self.config_file_data["spotify_downloader"]["token"] = event.switch.value
             self.app.read_config_worker(False)
@@ -236,6 +294,7 @@ class DownloadMenu(Horizontal):
             # Token successfully retrieved!
             self.config_file_data["spotify_downloader"]["token"] = result
             self.post_message(self.ReAuthSpotify())
+
 
 class ProcessesMenu(Horizontal):
     DEFAULT_CSS = """
@@ -261,6 +320,10 @@ class ProcessesMenu(Horizontal):
         
         height: auto;
     }
+    
+    ConfigOption {
+        height: auto
+    }
     """
 
     def __init__(self, *args, main_container_height: str = "100%", **kwargs) -> None:
@@ -272,44 +335,42 @@ class ProcessesMenu(Horizontal):
             with Container(classes="option_sections"):
                 with Container(classes="section_container", id="skip_processes"):
                     # yield Checkbox("Download Song", id="download_song_checkbox")
-                    yield Checkbox("Genius Metadata", id="genius_metadata_checkbox")
-                    yield Checkbox("Separate Stems", id="separate_stems_checkbox")
-                    yield Checkbox("Split and Tag lyrics", id="split_and_tag_checkbox")
-                    yield Checkbox("Translate Lyrics", id="translate_lyrics_checkbox")
+
+                    yield ConfigOption(
+                        "checkbox",
+                        "Genius Metadata",
+                        "genius_metadata_checkbox",
+                        json_keys=["skip_processes", "genius_metadata"],
+                        enable_config_write=True
+                    )
+                    yield ConfigOption(
+                        "checkbox",
+                        "Separate Stems",
+                        "separate_stems_checkbox",
+                        json_keys=["skip_processes", "vocal_separation"],
+                        enable_config_write=True
+                    )
+                    yield ConfigOption(
+                        "checkbox",
+                        "Split and Tag lyrics",
+                        "split_and_tag_checkbox",
+                        json_keys=["skip_processes", "split_and_tag"],
+                        enable_config_write=True
+                    )
+                    yield ConfigOption(
+                        "checkbox",
+                        "Translate Lyrics",
+                        "translate_lyrics_checkbox",
+                        json_keys=["skip_processes", "translate_lyrics"],
+                        enable_config_write=True
+                    )
+
 
     def _on_mount(self, event: events.Mount) -> None:
         skip_processes = self.query_one("#skip_processes", Container)
         skip_processes.border_title = "Skip Processes"
 
-        config_file_data = read_config()
-        initial_skip_processes = config_file_data["skip_processes"]
-
-        # download_song_checkbox = self.query_one("#download_song_checkbox", Checkbox)
-        genius_metadata_checkbox = self.query_one("#genius_metadata_checkbox", Checkbox)
-        separate_stems_checkbox = self.query_one("#separate_stems_checkbox", Checkbox)
-        split_and_tag_checkbox = self.query_one("#split_and_tag_checkbox", Checkbox)
-        translate_lyrics_checkbox = self.query_one("#translate_lyrics_checkbox", Checkbox)
-
-        # download_song_checkbox.value = initial_skip_processes["download_song"]
-        genius_metadata_checkbox.value = initial_skip_processes["genius_metadata"]
-        separate_stems_checkbox.value = initial_skip_processes["vocal_separation"]
-        split_and_tag_checkbox.value = initial_skip_processes["split_and_tag"]
-        translate_lyrics_checkbox.value = initial_skip_processes["translate_lyrics"]
-
         self.query_one("#main_container", Container).styles.height = self.chosen_height
-
-    @staticmethod
-    def on_checkbox_changed(event: Checkbox.Changed):
-        # if event.checkbox.id == "download_song_checkbox":
-            # write_config(event.value, ["skip_processes", "download_song"])
-        if event.checkbox.id == "genius_metadata_checkbox":
-            write_config(event.value, ["skip_processes", "genius_metadata"])
-        elif event.checkbox.id == "separate_stems_checkbox":
-            write_config(event.value, ["skip_processes", "vocal_separation"])
-        elif event.checkbox.id == "split_and_tag_checkbox":
-            write_config(event.value, ["skip_processes", "split_and_tag"])
-        elif event.checkbox.id == "translate_lyrics_checkbox":
-            write_config(event.value, ["skip_processes", "translate_lyrics"])
 
 
 class EnvironmentVariablesMenu(Horizontal):
