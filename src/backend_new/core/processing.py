@@ -13,7 +13,8 @@ from typing import Literal
 from backend_new.utils.functions.filesystem import read_json_file
 
 # CONSTANTS
-from backend_new.utils.constants import TEMP_DIR, AUDIO_MODEL_PRESETS
+from backend_new.utils.paths import TEMP_DIR
+from backend_new.utils.default.default_var import AUDIO_MODEL_PRESETS
 
 # PYPI LIBRARIES
 from sudachipy.morpheme import Morpheme

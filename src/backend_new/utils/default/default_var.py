@@ -87,3 +87,53 @@ DEFAULT_DICTS = ["PixivLight",
               "ことわざ・慣用句の百科事典",
               "大辞林　第四版"]
 DEFAULT_DICTS_FOLDER_LINK = 'https://drive.google.com/drive/folders/1xURpMJN7HTtSLuVs9ZtIbE7MDRCdoU29?usp=drive_link'
+MODEL_INFO = """\b
+2-STEM SEPARATION (Vocals & Instrumental):
+  vocal_full                Rawer vocals, best articulation, minor noise artifacts.
+  vocal_clean               Polished vocals, minimal noise, slightly muffled in mid-tones.
+  instrumental_full         Pristine backing tracks; vocal stems are low-priority.
+  instrumental_low_resource Fast, lightweight processing; minor stem bleed.
+
+\b
+MULTI-STEM SEPARATION (Full Band):
+  htdemucs_ft               Elite 4-stem model (Vocals/Drums/Bass/Other). Minimal artifacts.
+  htdemucs_6s               6-stem model adds Guitar/Piano. Higher artifact risk.
+
+\b
+SPECIALIZED CORE UTILITIES:
+  drum_sep                  Isolates acoustic/electronic drum elements natively.
+  dereverb                  Strips room reflections, decay, and echo tails from stems.
+  crowd_iso                 Separates central performances from background crowd noise.
+"""
+AUDIO_MODEL_PRESETS: dict[str, dict[str, str | list[str]]] = {
+    # ENSEMBLES
+    "vocal_full": {"model_name": "vocal_full",
+                   "type": "ensemble",
+                   "rename_order": ["inst", "vocal"]},
+    "vocal_clean": {"model_name": "vocal_clean",
+                    "type": "ensemble",
+                    "rename_order": ["inst", "vocal"]},
+    "instrumental_full": {"model_name": "instrumental_full",
+                          "type": "ensemble",
+                          "rename_order": ["vocal", "inst"]},
+    "instrumental_low_resource": {"model_name": "instrumental_low_resource",
+                                  "type": "ensemble",
+                                  "rename_order": ["vocal", "inst"]},
+
+    # SINGLE MODELS
+    "htdemucs_ft": {"model_name": "htdemucs_ft.yaml",
+                    "type": "single",
+                    "rename_order": ["bass", "drums", "other", "vocal"]},
+    "htdemucs_6s": {"model_name": "htdemucs_6s.yaml",
+                    "type": "single",
+                    "rename_order": ["bass", "drums", "other", "vocal", "guitar", "piano"]},
+    "drum_sep": {"model_name": "MDX23C-DrumSep-aufr33-jarredou.ckpt",
+                 "type": "single",
+                 "rename_order": ["kick", "snare", "toms", "hh", "ride", "crash"]},
+    "dereverb": {"model_name": "dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt",
+                 "type": "single",
+                 "rename_order": ["dry", "wet"]},
+    "crowd_iso": {"model_name": "mel_band_roformer_crowd_aufr33_viperx_sdr_8.7144.ckpt",
+                  "type": "single",
+                  "rename_order": ["wet", "dry"]}
+}

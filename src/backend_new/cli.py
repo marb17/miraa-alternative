@@ -2,10 +2,11 @@
 from pathlib import Path
 
 # HELPER LIBRARY
-from backend_new.core.processing import ALLOWED_MODEL_NAMES, AUDIO_MODEL_PRESETS
+from backend_new.core.processing import ALLOWED_MODEL_NAMES
 
 # CONSTANTS
-from backend_new.utils.constants import TEMP_DIR, MODEL_INFO
+from backend_new.utils.paths import TEMP_DIR
+from backend_new.utils.default.default_var import MODEL_INFO, AUDIO_MODEL_PRESETS
 
 # PYPI LIBRARIES
 import click
