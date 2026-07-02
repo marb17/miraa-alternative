@@ -106,16 +106,22 @@ class WorkflowManager:
 
         return True
     
-    def separate_vocals(self, json_path: Path):
+    def separate_vocals(self, json_path: Path) -> Generator[UIPromptRequest, None, bool]:
         json_data = read_json_file(json_path)
-        
+
         with VocalSeparation() as vs:
-            vs.separate_vocal(
-                f"../.temp/{json_data["pre_processing"]["youtube_id"]}.wav")
-            write_json_file(json_path, {"separated": True,
-                                                               "vocal_file": f"{json_data["pre_processing"]["youtube_id"]}_vocal",
-                                                               "inst_file": f"{json_data["pre_processing"]["youtube_id"]}_inst"},
-                            ["vocal_separation"])
+            yield from vs.separate_audio(TEMP_DIR/json_data["pre_processing"]["audio_file"])
+
+            write_json_file(json_path, {
+                "stems": {
+                    "vocal": True
+                },
+                "vocal_file": f"{json_data["pre_processing"]["youtube_id"]}_vocal",
+                "inst_file": f"{json_data["pre_processing"]["youtube_id"]}_inst"},
+
+            ["vocal_separation"])
+
+        return True
 
 
 class OldWorkflowManager:

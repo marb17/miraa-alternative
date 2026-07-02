@@ -2,13 +2,17 @@
 import time
 import gc
 import shutil
+from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 from functools import partial
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Literal
+import sys
+import multiprocessing
 
+from backend_new.utils.classes.dataclasses import UIPromptRequest
 # HELPER LIBRARIES
 from backend_new.utils.functions.filesystem import read_json_file
 
@@ -24,6 +28,12 @@ import nagisa
 
 from backend_new.utils.logger import Logger
 logger = Logger(__name__)
+
+if sys.platform == "darwin":
+    # from functools import partial
+    # import tqdm
+    # tqdm.tqdm = partial(tqdm.tqdm, disable=True)
+    multiprocessing.set_start_method("fork", force=True)
 
 # region vocal sep
 ALLOWED_MODEL_NAMES = Literal["vocal_full", "vocal_clean", "instrumental_full", "instrumental_low_resource",
@@ -116,7 +126,7 @@ class VocalSeparation:
         elif AUDIO_MODEL_PRESETS[self._model_name]["type"] == "single":
             self._selected_model.load_model(model_filename=AUDIO_MODEL_PRESETS[self._model_name]["model_name"])
 
-    def separate_audio(self, audio_path: str | Path) -> None:
+    def separate_audio(self, audio_path: str | Path) -> Generator[UIPromptRequest, None, bool]:
         """
         Separates vocals into respective stems determined by model used
         :param audio_path: Path to the file
@@ -124,7 +134,15 @@ class VocalSeparation:
         :return: None
         :rtype: None
         """
+        yield UIPromptRequest(
+            type="log",
+            message=f"Initializing '{self._model_name}'"
+        )
         self._init_model()
+        yield UIPromptRequest(
+            type="log",
+            message="Finished loading model"
+        )
 
         if isinstance(audio_path, str):
             win_audio_path = Path(audio_path)
@@ -135,9 +153,17 @@ class VocalSeparation:
         if len(win_audio_path.parts) == 1:
             win_audio_path = TEMP_DIR / win_audio_path
 
+        yield UIPromptRequest(
+            type="log",
+            message="Starting to separate into stems"
+        )
         now = time.time()
         output_files = self._selected_model.separate([win_audio_path])
-        logger.info(f"Took {(time.time() - now):.2f} seconds to separate stems")
+
+        yield UIPromptRequest(
+            type="log",
+            message=f"Took {(time.time() - now):.2f} seconds to separate stems"
+        )
 
         output_files = [Path(f) for f in output_files]
 
@@ -150,118 +176,8 @@ class VocalSeparation:
         # different models output differently, if flipped recheck constants.py
         for file, rename_to in zip(output_files, AUDIO_MODEL_PRESETS[self._model_name]["rename_order"]):
             rename_file(file, rename_to)
-# endregion
 
-# region dictionaries
-# TODO make a dataclass that has everything in valid termbank in temp.py yummy not excited.
-
-@dataclass
-class RawYomitanEntry:
-    dictionary: str
-    term: str
-    reading: str
-    definition_tags: str | None
-    deinflection_rules: str
-    popularity_score: int
-    definitions: list[str | dict[str, Any]]
-    sequence_number: int
-    term_tags: str
-
-
-class JPDictionary:
-    def __init__(self) -> None:
-        current_dir = Path(__file__).resolve().parent
-        while current_dir.name != "src" and current_dir != current_dir.parent:
-            current_dir = current_dir.parent
-        self._base_dir = current_dir
-        self._dict_dir = self._base_dir / "dicts"
-
-        self._available_dicts_directories: list[Path] = []
-        # TODO change any to something meaningful
-        self._lookup_table: Any = None
-
-        # prepare all dicts
-        self._extract_zip_files()
-        self._read_all_available_dicts()
-
-    # TODO make it save into a json file so it doesnt have to reprocess everytime
-
-    def _extract_zip_files(self):
-        all_zip_files = [file for file in self._dict_dir.iterdir() if file.suffix == ".zip"]
-        all_zip_files_stem = [file.stem for file in all_zip_files]
-
-        if all_zip_files:
-            logger.debug("New .zip files detected, extracting now")
-            for file_path, stem_name in zip(all_zip_files, all_zip_files_stem):
-                dir_path = self._dict_dir / f"{stem_name}"
-                dir_path.mkdir(parents=True, exist_ok=True)
-
-                logger.debug(f"Extracting: {file_path}")
-                try:
-                    shutil.unpack_archive(file_path, dir_path)
-                    logger.debug(f"Completed extracting: {file_path}, deleting old .zip files")
-                    file_path.unlink()
-                except:
-                    raise Exception("File unsuccessfully extracted, please re-run and check for any unintended changes in 'dict' directory")
-            logger.debug("All .zip files extracted successfully")
-        else:
-            logger.debug("No new .zip files detected, skipping")
-
-    def _read_all_available_dicts(self) -> None:
-        all_dicts = [path for path in self._dict_dir.iterdir() if path.is_dir()]
-        self._available_dicts_directories = all_dicts
-
-    #==================================
-    #   FORMAT YOMITAN JSON SCHEMA
-    #==================================
-    def _structured_content_read(self, content: list) -> dict:
-        ...
-
-    def _read_index_5_definition(self, data: list) -> dict:
-        definition_data = []
-        for definition in data:
-            match definition.get("type", "invalid"):
-                case "string":
-                    definition_data.append(definition.get("description", ""))
-                #TODO do object
-                case "structured-content":
-                    ...
-                case "invalid":
-                    if type(definition) is str:
-                        definition_data.append(definition)
-
-    def _read_single_dict(self, dict_path: Path) -> dict:
-        # TODO add final for faster read after dong processing
-        
-        all_term_bank_files = list(dict_path.rglob("term_bank_*.json"))
-        completion_counter = 0
-
-        single_bank_entries = {}
-
-        for term_bank_file in all_term_bank_files:
-            file_data = read_json_file(term_bank_file)
-
-            for entry in file_data:
-                if entry[0] in single_bank_entries:
-                    single_bank_entries[entry[0]].append(RawYomitanEntry(dict_path.stem, *entry))
-
-                single_bank_entries[entry[0]] = [RawYomitanEntry(dict_path.stem, *entry)]
-
-            completion_counter += 1
-            logger.debug(f"Term bank {term_bank_file.stem} completed. ({completion_counter} / {len(all_term_bank_files)})")
-
-            break
-
-
-        temp = single_bank_entries.get("其奴", "dont have")
-        print(temp)
-
-
-    def _initialize_lookup(self):
-        # TODO allow user to choose what dicts to use cuz yeah would be cool and accept the always ask so it doesnt keep asking
-        self._read_single_dict(self._available_dicts_directories[0])
-
-
+        return True
 # endregion
 
 # region japanese morphological analyzer

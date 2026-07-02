@@ -120,8 +120,9 @@ class SpotifyAuthenticateScreen(ModalScreen):
             else:
                 message = next(self.pipeline)
 
-            new_url = message.extra_info["url"]
-            self.app.call_from_thread(self._update_url, new_url)
+            if message.type == "input":
+                new_url = message.extra_info["url"]
+                self.app.call_from_thread(self._update_url, new_url)
 
         except StopIteration as e:
             self.app.call_from_thread(self.dismiss, e.value)

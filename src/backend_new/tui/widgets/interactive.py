@@ -98,6 +98,8 @@ class InputSubmit(Widget):
     @on(Button.Pressed, "#submit_input")
     def action_button_submit_pressed(self) -> None:
         self.action_submit(triggered_by="submit")
+        for button in self.query(Button): button.disabled = True
+
 
     @on(Input.Submitted, "#input_box")
     def action_input_submitted(self) -> None:

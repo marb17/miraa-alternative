@@ -186,9 +186,27 @@ class ProcessSong(Screen):
                         else:
                             ...
 
-        if not config["vocal_separation"]:
-            with WorkflowManager() as manager:
-                ...
+        if song_data.get("vocal_separation", {}).get("stems", {}).get("vocal"):
+            self.app.call_from_thread(self.update_ui_for_prompt, UIPromptRequest(
+                type="log",
+                message="Song has already been separated, skipping"
+            ))
+        else:
+            if not config["vocal_separation"]:
+                with WorkflowManager() as manager:
+                    pipeline = manager.separate_vocals(self.selected_json_file)
+
+                    try:
+                        prompt_request = next(pipeline)
+
+                        while True:
+                            user_answer = self.app.call_from_thread(self.update_ui_for_prompt, prompt_request)
+                            prompt_request = pipeline.send(user_answer)
+                    except StopIteration as e:
+                        if e.value is True:
+                            ...
+                        else:
+                            ...
 
 
         self.app.call_from_thread(self.update_ui_for_prompt, UIPromptRequest(

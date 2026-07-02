@@ -79,6 +79,7 @@ DEFAULT_DICTS_MESSAGE = """# Please download these recommended dictionaries:
 - To install these dictionaries, please download the dictionaries and place them in the "dicts" directory
 - The app will automatically extract the .zip files if not yet done and automatically detect each dictionary each run
 """
+
 DEFAULT_DICTS = ["PixivLight",
               "JMnedict",
               "jitendex-yomitan",
@@ -86,7 +87,9 @@ DEFAULT_DICTS = ["PixivLight",
               "四字熟語の百科事典",
               "ことわざ・慣用句の百科事典",
               "大辞林　第四版"]
+
 DEFAULT_DICTS_FOLDER_LINK = 'https://drive.google.com/drive/folders/1xURpMJN7HTtSLuVs9ZtIbE7MDRCdoU29?usp=drive_link'
+
 MODEL_INFO = """\b
 2-STEM SEPARATION (Vocals & Instrumental):
   vocal_full                Rawer vocals, best articulation, minor noise artifacts.

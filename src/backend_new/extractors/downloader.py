@@ -149,7 +149,6 @@ class Downloader:
                         message="",
                     )
 
-
                 try:
                     code = auth_manager.parse_response_code(url)
                     token_info = auth_manager.get_access_token(code, as_dict=True)
