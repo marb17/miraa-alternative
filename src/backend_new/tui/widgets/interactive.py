@@ -1,7 +1,7 @@
 from typing import Self, Iterable, Any, Literal
 
 from rich.console import ConsoleRenderable, RichCast
-from textual import on, events
+from textual import on, events, work
 from textual.app import ComposeResult
 from textual.containers import Vertical, HorizontalGroup, Container, HorizontalScroll
 from textual.dom import DOMNode
@@ -437,7 +437,7 @@ class ConfigOption(Widget):
         def __init__(self, sender: Widget, message: Any) -> None:
             super().__init__()
             self.sender = sender
-            self.message = message
+            self.value = message
 
         @property
         def control(self) -> DOMNode | None:
@@ -449,7 +449,7 @@ class ConfigOption(Widget):
     def value(self) -> Any:
         if self.config_type == "switch":
             return self.query_one("#switch_widget", Switch).value
-        elif self.config_type in ["input_int", "input_float"]:
+        elif self.config_type in ["input_int", "input_float", "input_str"]:
             return self.query_one("#input_widget", Input).value
         elif self.config_type == "checkbox":
             return self.query_one("#checkbox_widget", Checkbox).value
@@ -459,19 +459,31 @@ class ConfigOption(Widget):
     def value(self, value: Any) -> None:
         if self.config_type == "switch":
             self.query_one("#switch_widget", Switch).value = value
-        elif self.config_type in ["input_int", "input_float"]:
+        elif self.config_type in ["input_int", "input_float", "input_str"]:
             self.query_one("#input_widget", Input).value = str(value)
         elif self.config_type == "checkbox":
             self.query_one("#checkbox_widget", Checkbox).value = value
 
+    @property
+    def password(self) -> Any:
+        if self.config_type in ["input_int", "input_float", "input_str"]:
+            return self.query_one("#input_widget", Input).password
+        return None
+
+    @password.setter
+    def password(self, value: Any) -> None:
+        if self.config_type in ["input_int", "input_float", "input_str"]:
+            self.query_one("#input_widget", Input).password = value
 
 
-    def __init__(self, config_type: Literal["switch", "input_int", "input_float", "checkbox"],
+
+    def __init__(self, config_type: Literal["switch", "input_int", "input_float", "input_str", "checkbox"],
                  label: str,
                  widget_id: str,
                  placeholder: str = "",
                  json_keys: list[str] = None,
                  enable_config_write: bool = True,
+                 input_password: bool = False,
                  *args, **kwargs) -> None:
 
         super().__init__(id=widget_id, *args, **kwargs)
@@ -483,6 +495,7 @@ class ConfigOption(Widget):
         else:
             self.json_keys = None
         self.enable_config_write = enable_config_write if json_keys else False
+        self.password = input_password
 
 
 
@@ -494,11 +507,24 @@ class ConfigOption(Widget):
         elif self.config_type == "input_int":
             with Container(id="option"):
                 yield Label(self.label)
-                yield Input(id="input_widget", placeholder=self.placeholder, type="integer")
+                yield Input(id="input_widget",
+                            placeholder=self.placeholder,
+                            type="integer",
+                            password=self.password)
         elif self.config_type == "input_float":
             with Container(id="option"):
                 yield Label(self.label)
-                yield Input(id="input_widget", placeholder=self.placeholder, type="number")
+                yield Input(id="input_widget",
+                            placeholder=self.placeholder,
+                            type="number",
+                            password=self.password)
+        elif self.config_type == "input_str":
+            with Container(id="option"):
+                yield Label(self.label)
+                yield Input(id="input_widget",
+                            placeholder=self.placeholder,
+                            type="text",
+                            password=self.password)
         elif self.config_type == "checkbox":
             with Container(id="flat_option"):
                 yield Checkbox(self.label, id="checkbox_widget")
@@ -506,6 +532,12 @@ class ConfigOption(Widget):
 
 
     def _on_mount(self, event: events.Mount) -> None:
+        self.refresh_value()
+
+
+
+    @work(thread=True)
+    def refresh_value(self) -> None:
         config_data = read_config()
         if self.json_keys:
             for key in self.json_keys:

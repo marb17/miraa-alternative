@@ -76,6 +76,11 @@ class DownloadMenu(Horizontal):
         
         ConfigOption {
             height: auto;
+            padding-top: 1;
+        }
+        
+        .bottom_margin {
+            margin-bottom: 1;
         }
         """
 
@@ -130,6 +135,7 @@ class DownloadMenu(Horizontal):
                         "query_always_first_youtube_result",
                         json_keys=["downloader", "query_always_first_youtube_result"],
                         enable_config_write=True,
+                        classes="bottom_margin"
                     )
 
                 with HorizontalGroup(classes="section_container", id="query_display_settings"):
@@ -156,6 +162,7 @@ class DownloadMenu(Horizontal):
                             "spotify_display_popularity",
                             json_keys=["spotify_downloader", "output_format", "popularity"],
                             enable_config_write=True,
+                            classes="bottom_margin"
                         )
 
                     with VerticalGroup(classes="section_container", id="youtube_query_display_settings"):
@@ -189,6 +196,7 @@ class DownloadMenu(Horizontal):
                             "youtube_display_id",
                             json_keys=["youtube_downloader", "output_format", "id"],
                             enable_config_write=True,
+                            classes="bottom_margin"
                         )
 
                 with HorizontalGroup(classes="section_container", id="spotify_settings"):
@@ -198,6 +206,7 @@ class DownloadMenu(Horizontal):
                         "spotify_token",
                         json_keys=["spotify_downloader", "token"],
                         enable_config_write=True,
+                        classes="bottom_margin"
                     )
 
 
@@ -214,72 +223,15 @@ class DownloadMenu(Horizontal):
 
             self.config_file_data = read_config()
 
-            # self.query_one("#query_view_limit", Input).value = str(self.config_file_data["downloader"]["view_limit"])
-            # self.query_one("#query_retry_count", Input).value = str(self.config_file_data["downloader"]["retry_count"])
-            # self.query_one("#query_retry_sleep", Input).value = str(self.config_file_data["downloader"]["retry_sleep"])
-            #
-            # self.query_one("#current_song_always_first_youtube_result", Switch).value = self.config_file_data["downloader"]["current_song_always_first_youtube_result"]
-            # self.query_one("#query_always_first_youtube_result", Switch).value = self.config_file_data["downloader"]["query_always_first_youtube_result"]
-            #
-            # self.query_one("#spotify_display_duration", Switch).value = self.config_file_data["spotify_downloader"]["output_format"]["duration"]
-            # self.query_one("#spotify_display_album", Switch).value = self.config_file_data["spotify_downloader"]["output_format"]["album"]
-            # self.query_one("#spotify_display_popularity", Switch).value = self.config_file_data["spotify_downloader"]["output_format"]["popularity"]
-            #
-            # self.query_one("#youtube_display_duration", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["duration"]
-            # self.query_one("#youtube_display_uploader", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["uploader"]
-            # self.query_one("#youtube_display_view_count", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["view_count"]
-            # self.query_one("#youtube_display_id", Switch).value = self.config_file_data["youtube_downloader"]["output_format"]["id"]
-            #
-            # self.query_one("#spotify_token", Switch).value = self.config_file_data["spotify_downloader"]["token"]
 
-    # def on_input_changed(self, event: Input.Changed):
-    #     if event.input.id == "query_view_limit":
-    #         if self.query_one("#query_view_limit", Input).value == '':
-    #             value = DEFAULT_CONFIG["downloader"]["view_limit"]
-    #         else:
-    #             value = int(self.query_one("#query_view_limit", Input).value)
-    #         write_config(value, ["downloader", "view_limit"])
-    #     elif event.input.id == "query_retry_count":
-    #         if self.query_one("#query_retry_count", Input).value == '':
-    #             value = DEFAULT_CONFIG["downloader"]["retry_count"]
-    #         else:
-    #             value = int(self.query_one("#query_retry_count", Input).value)
-    #         write_config(value, ["downloader", "retry_count"])
-    #     elif event.input.id == "query_retry_sleep":
-    #         if self.query_one("#query_retry_sleep", Input).value == '':
-    #             value = DEFAULT_CONFIG["downloader"]["retry_sleep"]
-    #         else:
-    #             value = float(self.query_one("#query_retry_sleep", Input).value)
-    #         write_config(value, ["downloader", "retry_sleep"])
 
-    def on_switch_changed(self, event: Switch.Changed):
-        # if event.switch.id == "current_song_always_first_youtube_result":
-        #     write_config(self.query_one("#current_song_always_first_youtube_result", Switch).value, ["downloader", "current_song_always_first_youtube_result"])
-        # elif event.switch.id == "query_always_first_youtube_result":
-        #     write_config(self.query_one("#query_always_first_youtube_result", Switch).value, ["downloader", "query_always_first_youtube_result"])
-        #
-        # elif event.switch.id == "spotify_display_duration":
-        #     write_config(self.query_one("#spotify_display_duration", Switch).value, ["spotify_downloader", "output_format", "duration"])
-        # elif event.switch.id == "spotify_display_album":
-        #     write_config(self.query_one("#spotify_display_album", Switch).value, ["spotify_downloader", "output_format", "album"])
-        # elif event.switch.id == "spotify_display_popularity":
-        #     write_config(self.query_one("#spotify_display_popularity", Switch).value, ["spotify_downloader", "output_format", "popularity"])
-        #
-        # elif event.switch.id == "youtube_display_duration":
-        #     write_config(self.query_one("#youtube_display_duration", Switch).value, ["youtube_downloader", "output_format", "duration"])
-        # elif event.switch.id == "youtube_display_uploader":
-        #     write_config(self.query_one("#youtube_display_uploader", Switch).value, ["youtube_downloader", "output_format", "uploader"])
-        # elif event.switch.id == "youtube_display_view_count":
-        #     write_config(self.query_one("#youtube_display_view_count", Switch).value, ["youtube_downloader", "output_format", "view_count"])
-        # elif event.switch.id == "youtube_display_id":
-        #     write_config(self.query_one("#youtube_display_id", Switch).value, ["youtube_downloader", "output_format", "id"])
-
-        if event.switch.id == "spotify_token":
-            write_config(self.query_one("#spotify_token", Switch).value, ["spotify_downloader", "token"])
-            self.config_file_data["spotify_downloader"]["token"] = event.switch.value
-            self.app.read_config_worker(False)
-            if event.switch.value:
-                self.app.push_screen(SpotifyAuthenticateScreen(), callback=self.handle_auth_result)
+    @on(ConfigOption.Changed, "#spotify_token")
+    def handle_spotify_token(self, event: ConfigOption.Changed) -> None:
+        write_config(self.query_one("#spotify_token", Switch).value, ["spotify_downloader", "token"])
+        self.config_file_data["spotify_downloader"]["token"] = event.value
+        self.app.read_config_worker(False)
+        if event.value:
+            self.app.push_screen(SpotifyAuthenticateScreen(), callback=self.handle_auth_result)
 
     def handle_auth_result(self, result: Any) -> None:
         """Called automatically when SpotifyAuthenticateScreen is dismissed."""
