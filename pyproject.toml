@@ -19,6 +19,8 @@ dependencies = [
 ]
 requires-python = "=3.12"
 
+[project.scripts]
+miraa-alt = "backend_new.cli:main"
 [[tool.uv.index]]
 name = "pytorch-cu126"
 url = "https://download.pytorch.org/whl/cu126"
