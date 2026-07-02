@@ -5,7 +5,8 @@ from textual import events, work, on
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.containers import Vertical, Horizontal, Container
-from textual.widgets import Header, Footer, Label, Button, ContentSwitcher, Select, Static, RichLog
+from textual.widgets import Header, Footer, Label, Button, ContentSwitcher, Select, Static, RichLog, TabbedContent, \
+    Tabs, Tab
 from textual.binding import Binding
 
 from backend_new.core.workflow import WorkflowManager
@@ -91,6 +92,11 @@ class ProcessSong(Screen):
         align: center middle;
         content-align: center middle;
     }
+    
+    FinishedAnyKeyContinue {
+        align: center middle;
+        content-align: center middle;
+    }
     """
 
     BINDINGS = [
@@ -119,6 +125,13 @@ class ProcessSong(Screen):
                         yield ProcessesMenu(id="processes_menu", main_container_height="auto")
 
                 with Vertical(id="process_menu"):
+                    yield Tabs(
+                        Tab("Genius", id="genius_metadata"),
+                        Tab("Audio Stems", id="audio_separation"),
+                        Tab("Analysis", id="split_and_tag"),
+                        Tab("Translate", id="translate_lyrics")
+                    )
+
                     yield Static(id="current_process_display")
                     yield RichLog(id="process_log")
 
