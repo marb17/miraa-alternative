@@ -14,7 +14,7 @@ from yt_dlp import DownloadError
 
 from backend_new.core.workflow import WorkflowManager
 from backend_new.extractors.downloader import Downloader
-from backend_new.tui.widgets.interactive import InputSubmit, TableSelect
+from backend_new.tui.widgets.interactive import InputSubmit, TableSelect, FinishedAnyKeyContinue
 from backend_new.tui.widgets.static import SpotifyCurrentlyPlayingWidget
 from backend_new.utils.classes.dataclasses import UIPromptRequest
 from backend_new.utils.functions.filesystem import read_config
@@ -131,29 +131,6 @@ class DownloadScreen(Screen):
     #info_rich_log {
         margin: 1 2;
     }
-    
-    #finished, #already_exists, #error_message {
-        border: solid $secondary;
-        border-title-color: $primary;
-        border-title-align: center;
-        border-title-style: bold;
-        padding: 1 2;
-        
-        height: auto;
-        width: auto;
-    }
-    
-    #finished Static {
-        width: auto
-    }
-    
-    #already_exists Static {
-        width: auto
-    }
-    
-    #error_message Static {
-        width: auto
-    }
     """
 
     pipeline = None
@@ -195,15 +172,24 @@ class DownloadScreen(Screen):
                                 id="input_table"
                             )
 
+                        yield Label(id="table_page_footer")
+
+                        with HorizontalGroup(id="nav_buttons"):
+                            yield Button(id="__new__", variant="warning", label="New")
+                            yield Button(id="__prev__", variant="primary", label="Previous")
+                            yield Button(id="__next__", variant="primary", label="Next")
+                            yield Button(id="__select__", variant="success", label="Select")
+
                     with Vertical(id="finished"):
-                        yield Static(id="finished_text", content="Finished downloading, press any key to continue[blink]_[/]")
+                        yield FinishedAnyKeyContinue(message="Finished downloading")
 
                     with Vertical(id="already_exists"):
-                        yield Static(id="already_exists_text", content="Data already exists, skipping, press any key to continue[blink]_[/]")
+                        yield FinishedAnyKeyContinue(message="Data already exists, skipping")
 
                     with Vertical(id="error_message"):
-                        yield Static("An error has occurred, try again[blink]_[/]\n")
-                        yield Static(id="error_message_static")
+                        yield FinishedAnyKeyContinue(id="error_widget",
+                                                     message="An error has occurred",
+                                                     extra_static=[Static(id="error_message_static")])
 
 
 
@@ -302,7 +288,8 @@ class DownloadScreen(Screen):
     def handle_select_pressed(self) -> None:
         self.handle_table_select()
 
-    def _on_key(self, event: events.Key) -> None:
+    @on(FinishedAnyKeyContinue.Closed)
+    def handle_ending_closed(self, event: events.Key) -> None:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
         if switcher.current in ["finished", "already_exists", "error_message"]:
             self.action_self_dismiss(True)
@@ -319,7 +306,7 @@ class DownloadScreen(Screen):
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
         switcher.current = "error_message"
 
-        self.query_one("#error_message_static", Static).update(message)
+        self.query_one("#error_message", FinishedAnyKeyContinue).update_static("#error_message_static", message)
 
     def action_self_dismiss(self, value: Any) -> None:
         self.dismiss(value)
@@ -353,7 +340,7 @@ class DownloadScreen(Screen):
                 data_table_header = self.query_one("#input_table_header", Label)
                 data_table_header.content = request.message
 
-                data_table_page = self.query_one("#table_page_number", Label)
+                data_table_page = self.query_one("#table_page_footer", Label)
 
                 if request.sub_type == "spotify":
                     data_table_page.display = True

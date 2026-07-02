@@ -6,7 +6,7 @@ from typing import Any
 # PYPI LIBRARIES
 from pathlib import Path
 
-from backend_new.core.translation_analysis import Translator
+from backend_new.core.processing import VocalSeparation
 from backend_new.extractors.geniusextractor import GeniusExtractor
 # HELPER LIBRARIES
 # from backend_new.utils.helper_funcs import questionary_select
@@ -59,22 +59,34 @@ class WorkflowManager:
 
         return True
 
-    def extract_genius_metadata(self, json_file: Path) -> Generator[Any, None, bool]:
+    def extract_genius_metadata(self, json_file: Path) -> Generator[Any, bool, bool]:
         json_data = read_json_file(json_file)
+
+        title, artist = json_data["pre_processing"]["raw_metadata"]["name"], json_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
+
+        yield UIPromptRequest(
+            type="log",
+            message=f"Extracting genius metadata for {title} | {artist}"
+        )
 
         with GeniusExtractor() as genius:
             genius_data = genius.return_metadata(
-                title=json_data["pre_processing"]["raw_metadata"]["name"],
-                artist=json_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
+                title=title,
+                artist=artist
             )
 
         write_json_file(json_file, genius_data, ["genius_data"])
 
         if not contains_japanese(genius_data.get("lyrics", "")):
-            yield UIPromptRequest(
-                type="info",
-                message="The lyrics are romanized, using a LLM to convert into Japanese scripts."
+            response = yield UIPromptRequest(
+                type="confirm",
+                message="The lyrics are romanized, using a LLM to convert into Japanese scripts.",
             )
+
+            if not response:
+                return False
+
+            from backend_new.core.translation_analysis import Translator
 
             logger.warning("Lyrics are romanized, using LLM to convert to Japanese script")
 
@@ -87,7 +99,23 @@ class WorkflowManager:
             write_json_file(json_file, genius_data["lyrics"], ["lyrics_main"])
             write_json_file(json_file, "", ["lyrics_sub"])
 
+        yield UIPromptRequest(
+            type="log",
+            message="Finished extracting genius metadata"
+        )
+
         return True
+    
+    def separate_vocals(self, json_path: Path):
+        json_data = read_json_file(json_path)
+        
+        with VocalSeparation() as vs:
+            vs.separate_vocal(
+                f"../.temp/{json_data["pre_processing"]["youtube_id"]}.wav")
+            write_json_file(json_path, {"separated": True,
+                                                               "vocal_file": f"{json_data["pre_processing"]["youtube_id"]}_vocal",
+                                                               "inst_file": f"{json_data["pre_processing"]["youtube_id"]}_inst"},
+                            ["vocal_separation"])
 
 
 class OldWorkflowManager:

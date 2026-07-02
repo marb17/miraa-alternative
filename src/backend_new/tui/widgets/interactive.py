@@ -1,13 +1,14 @@
 from typing import Self, Iterable, Any
 
 from rich.console import ConsoleRenderable, RichCast
-from textual import on
+from textual import on, events
 from textual.app import ComposeResult
 from textual.containers import Vertical, HorizontalGroup, Container, HorizontalScroll
+from textual.dom import DOMNode
 from textual.message import Message
 from textual.visual import SupportsVisual, Visual
 from textual.widget import Widget
-from textual.widgets import Label, Input, Button, DataTable
+from textual.widgets import Label, Input, Button, DataTable, Static
 from textual.widgets._data_table import CellType
 
 
@@ -291,8 +292,8 @@ class TableSelect(Widget):
             yield Label(id="table_page_footer")
 
             with HorizontalGroup(id="nav_buttons"):
-                yield Button(id="__select__", variant="success", label="Select")
                 for button in self.extra_buttons: yield button
+                yield Button(id="__select__", variant="success", label="Select")
 
 
     class Submitted(Message):
@@ -385,3 +386,74 @@ class TableSelect(Widget):
             self.query_one(button_id, Button).display = value
         else:
             self.query_one(f"#{button_id}", Button).display = value
+
+
+class FinishedAnyKeyContinue(Widget):
+    can_focus = True
+
+    DEFAULT_CSS = """
+    #finished {
+        border: solid $secondary;
+        border-title-color: $primary;
+        border-title-align: center;
+        border-title-style: bold;
+        padding: 1 2;
+        
+        height: auto;
+        width: auto;
+    }
+    
+    #finished_text {
+        width: auto
+    }
+    """
+
+    class Closed(Message):
+        def __init__(self, sender: Widget, message: Any) -> None:
+            super().__init__()
+            self.sender = sender
+            self.message = message
+
+        @property
+        def control(self) -> DOMNode | None:
+            return self.sender
+
+    def __init__(self, message: str, press_key_add: bool = True, extra_static: Iterable[Static] = None, value: Any = None, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.message = message
+        self.press_key_add = press_key_add
+        self.extra_static = extra_static if extra_static else []
+        self.value = value
+
+    @property
+    def dismiss_value(self) -> Any:
+        return self.value
+
+    @dismiss_value.setter
+    def dismiss_value(self, value: Any) -> None:
+        self.value = value
+
+    def compose(self) -> ComposeResult:
+        text = self.message
+        if self.press_key_add:
+            text += ", press any key to continue[blink]_[/]"
+
+        with Vertical(id="finished"):
+            yield Static(id="finished_text", content=text)
+            for static in self.extra_static:
+                static.classes = "extra_static"
+                yield static
+
+    def _on_mount(self, event: events.Mount) -> None:
+        self.focus()
+
+    def _on_key(self, event: events.Key) -> None:
+        self.post_message(self.Closed(self, self.value))
+
+    def update_static(self, static_id: str, value: str) -> None:
+        if static_id.startswith("#"):
+            pass
+        else:
+            static_id = "#" + static_id
+
+        self.query_one(f"#{static_id}", Static).update(value)

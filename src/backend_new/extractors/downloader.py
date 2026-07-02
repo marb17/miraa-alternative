@@ -445,7 +445,8 @@ class Downloader:
                 "view_name": f"{title} - {artist}",
                 "raw_metadata": spotify_metadata,
                 "youtube_metadata": youtube_metadata,
-                "downloaded": True
+                "downloaded": True,
+                "audio_file": f"{youtube_id}.wav"
             }
         }
         file_path = TEMP_DIR / f"{title} - {artist}.json"

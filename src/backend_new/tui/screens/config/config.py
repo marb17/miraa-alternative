@@ -271,7 +271,7 @@ class ProcessesMenu(Horizontal):
         with Container(id="main_container"):
             with Container(classes="option_sections"):
                 with Container(classes="section_container", id="skip_processes"):
-                    yield Checkbox("Download Song", id="download_song_checkbox")
+                    # yield Checkbox("Download Song", id="download_song_checkbox")
                     yield Checkbox("Genius Metadata", id="genius_metadata_checkbox")
                     yield Checkbox("Separate Stems", id="separate_stems_checkbox")
                     yield Checkbox("Split and Tag lyrics", id="split_and_tag_checkbox")
@@ -284,13 +284,13 @@ class ProcessesMenu(Horizontal):
         config_file_data = read_config()
         initial_skip_processes = config_file_data["skip_processes"]
 
-        download_song_checkbox = self.query_one("#download_song_checkbox", Checkbox)
+        # download_song_checkbox = self.query_one("#download_song_checkbox", Checkbox)
         genius_metadata_checkbox = self.query_one("#genius_metadata_checkbox", Checkbox)
         separate_stems_checkbox = self.query_one("#separate_stems_checkbox", Checkbox)
         split_and_tag_checkbox = self.query_one("#split_and_tag_checkbox", Checkbox)
         translate_lyrics_checkbox = self.query_one("#translate_lyrics_checkbox", Checkbox)
 
-        download_song_checkbox.value = initial_skip_processes["download_song"]
+        # download_song_checkbox.value = initial_skip_processes["download_song"]
         genius_metadata_checkbox.value = initial_skip_processes["genius_metadata"]
         separate_stems_checkbox.value = initial_skip_processes["vocal_separation"]
         split_and_tag_checkbox.value = initial_skip_processes["split_and_tag"]
@@ -300,9 +300,9 @@ class ProcessesMenu(Horizontal):
 
     @staticmethod
     def on_checkbox_changed(event: Checkbox.Changed):
-        if event.checkbox.id == "download_song_checkbox":
-            write_config(event.value, ["skip_processes", "download_song"])
-        elif event.checkbox.id == "genius_metadata_checkbox":
+        # if event.checkbox.id == "download_song_checkbox":
+            # write_config(event.value, ["skip_processes", "download_song"])
+        if event.checkbox.id == "genius_metadata_checkbox":
             write_config(event.value, ["skip_processes", "genius_metadata"])
         elif event.checkbox.id == "separate_stems_checkbox":
             write_config(event.value, ["skip_processes", "vocal_separation"])

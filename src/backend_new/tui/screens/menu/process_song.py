@@ -1,13 +1,18 @@
 from pathlib import Path
+from typing import Any
+
 from textual import events, work, on
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.containers import Vertical, Horizontal, Container
-from textual.widgets import Header, Footer, Label, Button, ContentSwitcher, Select, TabbedContent, Static
+from textual.widgets import Header, Footer, Label, Button, ContentSwitcher, Select, TabbedContent, Static, RichLog
 from textual.binding import Binding
 
+from backend_new.core.workflow import WorkflowManager
 from backend_new.tui.screens.config.config import ProcessesMenu
-from backend_new.utils.functions.filesystem import all_available_temp_json_files
+from backend_new.tui.widgets.interactive import FinishedAnyKeyContinue
+from backend_new.utils.classes.dataclasses import UIPromptRequest
+from backend_new.utils.functions.filesystem import all_available_temp_json_files, read_config, read_json_file
 
 
 class ProcessSong(Screen):
@@ -81,6 +86,11 @@ class ProcessSong(Screen):
         
         hatch: right $accent 10%;
     }
+    
+    #finished {
+        align: center middle;
+        content-align: center middle;
+    }
     """
 
     BINDINGS = [
@@ -108,11 +118,63 @@ class ProcessSong(Screen):
 
                 with Vertical(id="process_menu"):
                     yield Static(id="current_process_display")
+                    yield RichLog(id="process_log")
+
+                with Vertical(id="finished"):
+                    yield FinishedAnyKeyContinue(message="Finished processing")
 
     def _on_mount(self, event: events.Mount) -> None:
         self.query_one("#choose_json", Vertical).border_title = "Song Processing"
         self.query_one("#options", Vertical).border_title = "Options"
         self.update_json_select()
+
+    @work(thread=True)
+    def run_work(self) -> None:
+        config = read_config()["skip_processes"]
+        song_data = read_json_file(self.selected_json_file)
+
+        if song_data.get("genius_data"):
+            self.app.call_from_thread(self.update_ui_for_prompt, UIPromptRequest(
+                type="log",
+                message="Genius data already exists, skipping"
+            ))
+        else:
+            if not config["genius_metadata"]:
+                with WorkflowManager() as manager:
+                    pipeline = manager.extract_genius_metadata(self.selected_json_file)
+
+                    try:
+                        prompt_request = next(pipeline)
+
+                        while True:
+                            user_answer = self.app.call_from_thread(self.update_ui_for_prompt, prompt_request)
+                            prompt_request = pipeline.send(user_answer)
+                    except StopIteration as e:
+                        if e.value is True:
+                            ...
+                        else:
+                            ...
+
+        if not config["vocal_separation"]:
+            with WorkflowManager() as manager:
+                ...
+
+
+        self.app.call_from_thread(self.update_ui_for_prompt, UIPromptRequest(
+            type="hidden_request",
+            sub_type="__finished__",
+            message=""
+        ))
+
+    def update_ui_for_prompt(self, prompt_request: UIPromptRequest) -> None:
+        switcher = self.query_one("#main_content_switcher", ContentSwitcher)
+
+        if prompt_request.type == "log":
+            self.query_one("#process_log", RichLog).write(prompt_request.message)
+        elif prompt_request.type == "hidden_request":
+            if prompt_request.sub_type == "__finished__":
+                switcher.current = "finished"
+
 
     @work(thread=True)
     def update_json_select(self) -> None:
@@ -133,8 +195,17 @@ class ProcessSong(Screen):
 
         self.query_one("#main_content_switcher", ContentSwitcher).current = "process_menu"
 
+        self.run_work()
+
     def update_select_json_widget(self) -> None:
         self.query_one("#select_json", Select).set_options(self.json_options)
+
+    def action_self_dismiss(self, value: Any) -> None:
+        self.dismiss(value)
+
+    @on(FinishedAnyKeyContinue.Closed)
+    def close_menu(self) -> None:
+        self.action_self_dismiss(True)
 
 
 

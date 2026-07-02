@@ -31,7 +31,6 @@ DEFAULT_CONFIG = {
     },
 
     "skip_processes": {
-        "download_song": False,
         "genius_metadata": False,
         "vocal_separation": False,
         "split_and_tag": False,
