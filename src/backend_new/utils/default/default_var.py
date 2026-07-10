@@ -138,5 +138,8 @@ AUDIO_MODEL_PRESETS: dict[str, dict[str, str | list[str]]] = {
                  "rename_order": ["dry", "wet"]},
     "crowd_iso": {"model_name": "mel_band_roformer_crowd_aufr33_viperx_sdr_8.7144.ckpt",
                   "type": "single",
-                  "rename_order": ["wet", "dry"]}
+                  "rename_order": ["wet", "dry"]},
+    "bs_roformer_sw": {"model_name": "BS-Roformer-SW.ckpt",
+                       "type": "single",
+                       "rename_order": ["bass", "drums", "other", "vocal", "guitar", "piano"]}
 }

@@ -23,15 +23,7 @@ def download_audio(url: str, rename_id: bool) -> None:
     """
     Downloads the audio from YouTube, always outputs .wav and outputs to .temp
     """
-    from backend_new.extractors.downloader import Downloader
-
-    with Downloader() as dl:
-        file_path, file_data = dl.download_youtube_video(url)
-
-    print(file_path)
-
-    if not rename_id:
-        file_path.rename(f"{TEMP_DIR / file_data["title"]}.wav")
+    # TODO gotta redo this
 
 @main.command()
 @click.argument("file",
@@ -46,7 +38,7 @@ def download_audio(url: str, rename_id: bool) -> None:
               help=f"Model to use for separation\n\n{MODEL_INFO}")
 def separate_audio(file: str, model: ALLOWED_MODEL_NAMES) -> None:
     """
-    Separates the audio from the URL provided, if song not yet downloaded, it will download automatically
+    Separates the audio from the file provided
     """
     from backend_new.core.processing import VocalSeparation
 
@@ -58,15 +50,13 @@ def separate_audio(file: str, model: ALLOWED_MODEL_NAMES) -> None:
     else:
         raise Exception(f"Please do not use relative file paths.")
 
-    if file_path.exists():
-        pass
-    else:
+    if not file_path.exists():
         raise FileNotFoundError("File does not exist.")
 
     click.echo(f"Separating {file_path}")
 
     with VocalSeparation(model_name=model) as separation:
-        separation.separate_audio(file_path)
+        list(separation.separate_audio(file_path))
 
 
 if __name__ == "__main__":

@@ -97,9 +97,10 @@ class SpotifyCurrentlyPlayingWidget(Widget):
                 yield Static("--:--", id="end_timestamp")
 
     def _on_mount(self, event: events.Mount) -> None:
-        self.downloader = Downloader()
-        self.set_interval(0.1, self.increment_timestamp)
-        self.update_timer = self.set_interval(2, self.update_data)
+        if self.app.use_spotify_token:
+            self.downloader = Downloader()
+            self.set_interval(0.1, self.increment_timestamp)
+            self.update_timer = self.set_interval(2, self.update_data)
 
     @property
     def song_available(self) -> bool:

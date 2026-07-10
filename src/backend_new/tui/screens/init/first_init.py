@@ -7,7 +7,7 @@ from textual.screen import Screen, ModalScreen
 from textual.widgets import Header, Label, ProgressBar, RichLog, Static, Button, Input, Footer
 
 from backend_new.main import Analyzer
-from backend_new.tui.modalscreens.info import InfoModalScreen
+from backend_new.tui.modalscreens.info import InfoModalScreen, RestartAppModalScreen
 from backend_new.utils.paths import ENV_FILE
 from backend_new.utils.default.default_var import DEFAULT_DICTS
 from backend_new.utils.functions.download import download_all_dicts
@@ -439,6 +439,10 @@ class InitDownloadDicts(Screen):
             # TODO go to next screen
             self.app.pop_screen()
             write_config(True, ["init"])
+            self.app.push_screen(RestartAppModalScreen(
+                help_message="Would you like to restart now?",
+                border_title="Finished Initialization"
+            ))
 
             event.stop()
 

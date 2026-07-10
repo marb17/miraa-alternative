@@ -38,7 +38,8 @@ if sys.platform == "darwin":
 # region vocal sep
 ALLOWED_MODEL_NAMES = Literal["vocal_full", "vocal_clean", "instrumental_full", "instrumental_low_resource",
                               "htdemucs_ft", "htdemucs_6s",
-                              "drum_sep", "dereverb", "crowd_iso"]
+                              "drum_sep", "dereverb", "crowd_iso",
+                              "bs_reformer_sw"]
 
 class VocalSeparation:
     # TODO fix docs here cuz its bad

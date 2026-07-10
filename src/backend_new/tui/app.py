@@ -19,6 +19,7 @@ from backend_new.utils.functions.filesystem import read_config
 class MiraaInterface(App):
     use_spotify_token = False
     connected_to_internet = False
+    is_initialized = False
 
     # PALATTE COMMANDS
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
@@ -74,7 +75,11 @@ class MiraaInterface(App):
 
 
     def handle_config_response(self, result: Any, push_screen: bool = False):
-        self.use_spotify_token = result["spotify_downloader"]["token"]
+        if result:
+            self.use_spotify_token = result["spotify_downloader"]["token"]
+        else:
+            self.use_spotify_token = False
+
         if push_screen:
             self.handle_push_home_screen()
 
@@ -83,10 +88,12 @@ class MiraaInterface(App):
 
     @work(thread=True)
     def read_config_worker(self, push_screen: bool = False) -> None:
-        result = read_config()
+        try:
+            result = read_config()
+        except FileNotFoundError:
+            result = None
+
         self.call_from_thread(self.handle_config_response, result, push_screen)
-
-
 
     @on(DownloadMenu.ReAuthSpotify)
     def bubble_reauth_spotify(self, event: DownloadMenu.ReAuthSpotify) -> None:

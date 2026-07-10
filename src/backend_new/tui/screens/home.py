@@ -70,7 +70,7 @@ class HomeScreen(Screen):
 
 
 
-    spotify_client = Downloader()
+    # spotify_client = Downloader()
     next_ui_response = None
 
     def __init__(

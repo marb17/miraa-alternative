@@ -125,9 +125,14 @@ class RestartAppModalScreen(ModalScreen):
             }}
             """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, help_message: str = None, border_title: str = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.styles.align = ("center", "middle")
+
+        if help_message:
+            self.HELP_MESSAGE = help_message
+        if border_title:
+            self.MIDDLE_BORDER_TITLE = border_title
 
     def compose(self) -> ComposeResult:
         with Center(id="vert_group"):
