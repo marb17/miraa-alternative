@@ -7,6 +7,7 @@ from typing import Any
 from pathlib import Path
 
 from backend_new.core.processing import VocalSeparation
+from backend_new.core.translation_analysis import Translator
 from backend_new.extractors.geniusextractor import GeniusExtractor
 # HELPER LIBRARIES
 # from backend_new.utils.helper_funcs import questionary_select
@@ -122,6 +123,16 @@ class WorkflowManager:
                 "inst_file": f"{json_data["pre_processing"]["youtube_id"]}_inst"},
 
             ["vocal_separation"])
+
+        return True
+
+    def translate_lyrics(self, json_path: Path) -> Generator[UIPromptRequest, None, bool]:
+        json_data = read_json_file(json_path)
+
+        with Translator() as tl:
+            translated_lyrics = yield from tl.translate_lyrics(json_data["lyrics_main"])
+
+        write_json_file(json_path, translated_lyrics, ["translated_lyrics"])
 
         return True
 

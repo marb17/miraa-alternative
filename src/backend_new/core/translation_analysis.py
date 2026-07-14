@@ -2,8 +2,10 @@
 import re
 import gc
 import time
+from typing import Any, Generator
 
 from backend_new.core.llm_model import WindowsLLMModel
+from backend_new.utils.classes.dataclasses import UIPromptRequest
 # HELPER LIBRARIES
 from backend_new.utils.functions.other import contains_japanese
 
@@ -53,7 +55,7 @@ class Translator:
 
         return input_string
 
-    def translate_lyrics(self, texts: list[str] | str, use_context: bool = False) -> list[str]:
+    def translate_lyrics(self, texts: list[str] | str, use_context: bool = False) -> Generator[UIPromptRequest, None, list[Any]]:
         """
         Translates lyrics
         :param texts: Pure string or list of strings (pure string splits by newlines)
@@ -159,7 +161,8 @@ class Translator:
             raise ValueError("No prompts found to be generated, please re-check lyrics to ensure they are in Japanese Scripts")
 
         with WindowsLLMModel() as llm:
-            responses = dict(zip([idx for idx, exp in mapping_index if exp == "do"], llm.batch_inference(prompts, estimated_output_cost=50, gen_config=gen_config)))
+            inference_response = yield from llm.batch_inference(prompts, estimated_output_cost=50, gen_config=gen_config)
+            responses = dict(zip([idx for idx, exp in mapping_index if exp == "do"], inference_response))
 
         results = []
 

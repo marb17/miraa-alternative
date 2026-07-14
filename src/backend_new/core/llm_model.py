@@ -1,12 +1,19 @@
 import gc
 import os
 import time
+from collections.abc import Generator
 from itertools import batched
 from math import ceil
 from pathlib import Path
+from typing import Any, Generator
 
-from backend_new.core.translation_analysis import logger
+from backend_new.utils.classes.dataclasses import UIPromptRequest
 from backend_new.utils.functions.filesystem import read_json_file
+
+from lmdeploy import GenerationConfig
+
+from backend_new.utils.logger import Logger
+logger = Logger(__name__)
 
 
 class WindowsLLMModel:
@@ -153,7 +160,7 @@ class WindowsLLMModel:
         else:
             logger.debug("Model already initialized, skipping")
 
-    def batch_inference(self, prompts: list[str], batch_size: int = -1, estimated_output_cost: int = 2048, gen_config: GenerationConfig | None = None) -> list[str]:
+    def batch_inference(self, prompts: list[str], batch_size: int = -1, estimated_output_cost: int = 2048, gen_config: GenerationConfig | None = None) -> Generator[UIPromptRequest, None, list[Any]]:
         """
         Performs inference on a batch of prompts.
         :param gen_config: A generation config object to change how the LLM generates
@@ -199,11 +206,16 @@ class WindowsLLMModel:
 
             batch_size = ceil(num_prompts / num_batches)
 
-            logger.info("Automatic Batch Sizing")
-            logger.debug(f"Estimated Prompt Cost: {total_prompt_cost}")
-            logger.debug(f"Model Weight: {self._model_weight}")
-            logger.debug(f"Number of batches: {num_batches}")
-            logger.debug(f"Batch size: ~{batch_size}")
+            yield UIPromptRequest(type="log",
+                                  message="Automatic Batch Sizing")
+            yield UIPromptRequest(type="log",
+                                  message=f"Estimated Prompt Cost: {total_prompt_cost}")
+            yield UIPromptRequest(type="log",
+                                  message=f"Model Weight: {self._model_weight}")
+            yield UIPromptRequest(type="log",
+                                  message=f"Number of batches: {num_batches}")
+            yield UIPromptRequest(type="log",
+                                  message=f"Batch size: ~{batch_size}")
 
         batched_prompts = list(batched(prompts, batch_size))
         # endregion
@@ -215,7 +227,9 @@ class WindowsLLMModel:
             results.extend([response.text for response in self._pipe(list(batch), gen_config)])
             gc.collect()
             torch.cuda.empty_cache()
-            logger.debug(f"Completed Batch {idx} in {(time.time() - batch_now):.2f} seconds")
+            yield UIPromptRequest(type="log",
+                                  message=f"Completed Batch {idx} in {(time.time() - batch_now):.2f} seconds")
 
-        logger.info(f"Completed Batch Inference in {(time.time() - now):.2f} seconds")
+        yield UIPromptRequest(type="log",
+                              message=f"Completed Batch Inference in {(time.time() - now):.2f} seconds")
         return results

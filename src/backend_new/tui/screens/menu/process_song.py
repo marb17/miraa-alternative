@@ -208,6 +208,28 @@ class ProcessSong(Screen):
                         else:
                             ...
 
+        if song_data.get("translated_lyrics"):
+            self.app.call_from_thread(self.update_ui_for_prompt, UIPromptRequest(
+                type="log",
+                message="Song has already been translated, skipping"
+            ))
+        else:
+            if not config["translate_lyrics"]:
+                with WorkflowManager() as manager:
+                    pipeline = manager.translate_lyrics(self.selected_json_file)
+
+                    try:
+                        prompt_request = next(pipeline)
+
+                        while True:
+                            user_answer = self.app.call_from_thread(self.update_ui_for_prompt, prompt_request)
+                            prompt_request = pipeline.send(user_answer)
+                    except StopIteration as e:
+                        if e.value is True:
+                            ...
+                        else:
+                            ...
+
 
         self.app.call_from_thread(self.update_ui_for_prompt, UIPromptRequest(
             type="hidden_request",

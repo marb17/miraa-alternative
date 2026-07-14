@@ -200,6 +200,15 @@ class Downloader:
         """
         return self._sp_token.current_user_playing_track()
 
+    @handle_spotify_no_token_error
+    def get_user_spotify_queue(self) -> Generator[UIPromptRequest, Any, Any]:
+        """
+        Gets the current users queue from user's spotify
+        :return:
+        :rtype:
+        """
+        return self._sp_token.queue()
+
     def spotify_search_song_metadata_by_id(self, query: str) -> dict:
         """
         Searches for a song on Spotify and returns the metadata

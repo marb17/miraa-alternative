@@ -100,7 +100,7 @@ class JitendexYomitanParser(BaseDictionaryParser):
 
                     response = self._sense_group_parser(sense_content)
 
-                    # glossary_holding.append(response)
+                    # glossary_holding.append(playing_song_response)
                     if isinstance(response, DefinitionSense):
                         if response.glossaries:
                             raise InvalidDictDefinitionFormatError(logger, "")

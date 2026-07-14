@@ -10,71 +10,108 @@ from backend_new.extractors.downloader import Downloader
 
 
 class SpotifyCurrentlyPlayingWidget(Widget):
-    TITLE_ARTIST_ALIGN = "left"
-
-    DEFAULT_CSS = f"""
-    #main_widget {{
+    DEFAULT_CSS = """
+    #main_widget {
         height: auto;
-    }}
+    }
     
-    #progress_group {{
+    #progress_group {
         width: 100%;
-    }}
+    }
     
-    #progress_group Static {{
+    #progress_group Static {
         width: auto;
         height: auto;
-    }}
+    }
     
-    #progress_group ProgressBar {{
+    #progress_group ProgressBar {
         width: 1fr;
         height: auto;
-    }}
+    }
     
-    #progress_group ProgressBar Bar {{
+    #progress_group ProgressBar Bar {
         width: 100%;
         margin: 0 2;
-    }}
+    }
     
-    #progress_group ProgressBar Bar > .bar--bar {{
+    #progress_group ProgressBar Bar > .bar--bar {
         color: $primary;
         background: $accent 30%;
-    }}
+    }
     
-    #title {{
+    #title {
         background: $secondary;
         text-style: bold;
         width: auto;
-    }}
+        max-width: 100%;
+        
+        text-overflow: ellipsis;
+        text-wrap: nowrap;
+    }
     
-    #title_con {{
-        width: 100%;
+    #title_con {
+        width: 1fr;
+
         height: auto;
         
-        content-align: {TITLE_ARTIST_ALIGN} middle;
-        align: {TITLE_ARTIST_ALIGN} middle;
-    }}
+        content-align: left middle;
+        align: left middle;
+    }
     
-    #artist {{
+    #artist {
         color: $text-muted;
-        content-align: {TITLE_ARTIST_ALIGN} middle;
-    }}
+        content-align: left middle;
+        
+        width: auto;
+        max-width: 100%;
+
+        text-overflow: ellipsis;
+        text-wrap: nowrap;
+    }
     
-    #is_playing {{
+    #is_playing {
         margin: 0 2 0 0;
-    }}
+    }
     
-    #song_data {{
+    #song_data {
         height: auto;
         width: 100%;
         
-        content-align: {TITLE_ARTIST_ALIGN} middle;
-        align: {TITLE_ARTIST_ALIGN} middle;
-    }}
+        content-align: left middle;
+        align: left middle;
+    }
+    
+    .text_line {
+        width: 100%;
+    }
+    
+    #up_next_song {
+        dock: right;
+        width: auto;
+        max-width: 50%;
+        
+        margin: 0 0 0 5;
+        
+        color: 30%;
+        background: 10%;
+        
+        text-overflow: ellipsis;
+        text-wrap: nowrap;
+    }
+    
+    #static_up_next {
+        dock: right;
+        width: auto;
+        
+        padding: 0 0 0 5;
+        
+        color: 30%;
+    }
     """
 
     downloader = None
-    response = None
+    playing_song_response = None
+    queue_response = None
     current_progress_ms = 0
     song_length_ms = 0
     is_playing = False
@@ -83,9 +120,17 @@ class SpotifyCurrentlyPlayingWidget(Widget):
     def compose(self) -> ComposeResult:
         with Container(id="main_widget"):
             with Container(id="song_data"):
-                with Container(id="title_con"):
-                    yield Static("Disabled", id="title")
-                yield Static("Disabled", id="artist")
+
+                with HorizontalGroup(classes="text_line"):
+                    with Container(id="title_con"):
+                        yield Static("Disabled", id="title")
+
+                    yield Static("Next", id="static_up_next")
+
+                with HorizontalGroup(classes="text_line"):
+                    yield Static("Disabled", id="artist")
+                    yield Static("Disabled", id="up_next_song")
+
             yield Static()
             with HorizontalGroup(id="progress_group"):
                 yield Static("--:--", id="timestamp")
@@ -104,7 +149,7 @@ class SpotifyCurrentlyPlayingWidget(Widget):
 
     @property
     def song_available(self) -> bool:
-        return bool(self.response)
+        return bool(self.playing_song_response)
 
 
 
@@ -139,24 +184,40 @@ class SpotifyCurrentlyPlayingWidget(Widget):
         if getattr(self.downloader, "_sp_token") is None:
             return
 
-        pipeline = self.downloader.get_current_playing_song()
+
+        # CURRENT SONG
+        playing_song_pipeline = self.downloader.get_current_playing_song()
         try:
-            prompt_request = next(pipeline)
+            prompt_request = next(playing_song_pipeline)
 
             if prompt_request.type == "hidden_request" and prompt_request.message == 401:
                 self.notify("Expired Token")
                 self.app.call_from_thread(self._client_no_cache_authenticate)
-                pipeline.send(True)
+                playing_song_pipeline.send(True)
 
         except StopIteration as e:
-            self.response = e.value
+            self.playing_song_response = e.value
 
-        if self.response is None:
+        if self.playing_song_response is None:
             self.is_playing = False
         else:
-            self.is_playing = self.response.get("is_playing")
+            self.is_playing = self.playing_song_response.get("is_playing")
 
         self.app.call_from_thread(self._update_widget_data)
+
+
+        # SPOTIFY QUEUE
+        queue_pipeline = self.downloader.get_user_spotify_queue()
+        try:
+            prompt_request = next(queue_pipeline)
+
+            if prompt_request.type == "hidden_request" and prompt_request.message == 401:
+                self.notify("Expired Token")
+                self.app.call_from_thread(self._client_no_cache_authenticate)
+                queue_pipeline.send(True)
+
+        except StopIteration as e:
+            self.queue_response = e.value
 
 
 
@@ -169,7 +230,7 @@ class SpotifyCurrentlyPlayingWidget(Widget):
 
 
     def increment_timestamp(self, increment_by_ms: int = 100) -> None:
-        if self.response is None or not self.is_playing:
+        if self.playing_song_response is None or not self.is_playing:
             return
 
         if self.current_progress_ms + increment_by_ms >= self.song_length_ms:
@@ -183,10 +244,12 @@ class SpotifyCurrentlyPlayingWidget(Widget):
 
     def _update_widget_data(self) -> None:
         is_playing_static = self.query_one("#is_playing", Static)
+        up_next_static = self.query_one("#up_next_song", Static)
 
         if not self.app.use_spotify_token:
             self.query_one("#title", Static).update("Disabled")
             self.query_one("#artist", Static).update("Disabled")
+            up_next_static.update("Disabled")
             self.query_one("#timestamp", Static).update("--:--")
             self.query_one("#end_timestamp", Static).update("--:--")
 
@@ -196,9 +259,10 @@ class SpotifyCurrentlyPlayingWidget(Widget):
             is_playing_static.update("⏹")
             return
 
-        if self.response is None:
+        if self.playing_song_response is None:
             self.query_one("#title", Static).update("Nothing Playing")
             self.query_one("#artist", Static).update("-")
+            up_next_static.update("Nothing Playing")
             self.query_one("#timestamp", Static).update("--:--")
             self.query_one("#end_timestamp", Static).update("--:--")
 
@@ -206,14 +270,13 @@ class SpotifyCurrentlyPlayingWidget(Widget):
             self.current_progress_ms = 0
 
             is_playing_static.update("⏹")
-
             return
 
 
-        title, artist = self.downloader.get_title_artist(self.response["item"]).values()
-        self.current_progress_ms = self.response["progress_ms"]
+        title, artist = self.downloader.get_title_artist(self.playing_song_response["item"]).values()
+        self.current_progress_ms = self.playing_song_response["progress_ms"]
 
-        self.song_length_ms = self.response["item"]["duration_ms"]
+        self.song_length_ms = self.playing_song_response["item"]["duration_ms"]
         song_length_timestamp = self.downloader.milliseconds_to_minutes_and_seconds(
             self.song_length_ms
         )
@@ -229,6 +292,20 @@ class SpotifyCurrentlyPlayingWidget(Widget):
             is_playing_static.update("▶")
         else:
             is_playing_static.update("⏸")
+
+
+        # UPNEXT SECTION
+        if self.queue_response:
+            try:
+                up_next_static.update(
+                    f"{self.queue_response["queue"][0]["name"]} - {self.queue_response["queue"][0]["artists"][0]["name"]}"
+                )
+            except IndexError:
+                up_next_static.update("-")
+        else:
+            ...
+
+
 
     def _update_timestamp(self) -> None:
         timestamp = self.downloader.milliseconds_to_minutes_and_seconds(
