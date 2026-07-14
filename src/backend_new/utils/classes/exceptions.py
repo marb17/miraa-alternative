@@ -21,3 +21,17 @@ class DataMismatchError(Exception):
         self.logger.warning(self.message)
         self.logger.warning("Please do not rename, convert or alter files in .temp to prevent further errors")
         self.logger.warning("Please clear all files in .temp directory to ensure proper functionality")
+
+
+class InvalidDictDefinitionFormatError(Exception):
+    """Format of the raw dictionary entry is not as expected"""
+    def __init__(self, logger: Logger, message: str) -> None:
+        self.logger = logger
+        self.message = message
+
+        self.logger_invalid_dict_format()
+
+        super().__init__(self.message)
+
+    def logger_invalid_dict_format(self):
+        self.logger.critical(f"InvalidDictDefinitionFormatError: {self.message}")

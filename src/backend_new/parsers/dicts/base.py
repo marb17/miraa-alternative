@@ -2,10 +2,10 @@ from abc import ABC, abstractmethod
 from typing import Any
 from functools import wraps
 from pathlib import Path
-from backend_new.utils.structures import DictionaryEntry, RawYomitanEntry, RedirectEntry
-from backend_new.utils.constants import DICTS_DIR
-from backend_new.utils.exceptions import InvalidDictDefinitionFormatError
-from backend_new.utils.helper_funcs import read_json_file
+from backend_new.utils.classes.dataclasses import RawYomitanEntry, DictionaryEntry, RedirectEntry
+from backend_new.utils.paths import DICTS_DIR
+from backend_new.utils.classes.exceptions import InvalidDictDefinitionFormatError
+from backend_new.utils.functions.filesystem import read_json_file
 import time
 from concurrent.futures import ProcessPoolExecutor
 import os

@@ -1,6 +1,7 @@
 from backend_new.parsers.dicts.base import BaseDictionaryParser
-from backend_new.utils.structures import DictionaryEntry, RawYomitanEntry, ExampleSentence, DefinitionSense, RedirectEntry
-from backend_new.utils.exceptions import InvalidDictDefinitionFormatError
+from backend_new.utils.classes.dataclasses import ExampleSentence, RawYomitanEntry, DefinitionSense, DictionaryEntry, \
+    RedirectEntry
+from backend_new.utils.classes.exceptions import InvalidDictDefinitionFormatError
 
 #! TEMP
 from pathlib import Path
