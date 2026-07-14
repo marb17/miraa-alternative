@@ -13,6 +13,9 @@ from backend_new.extractors.geniusextractor import GeniusExtractor
 from backend_new.utils.functions.other import contains_japanese
 from backend_new.utils.functions.filesystem import read_json_file, write_json_file, read_config, load_env_file
 
+from backend_new.utils.exceptions import DataMismatchError
+from backend_new.utils.structures import SongContext
+from backend_new.utils.constants import TEMP_DIR
 from backend_new.utils.classes.dataclasses import SongContext, UIPromptRequest
 from backend_new.utils.classes.exceptions import DataMismatchError
 from backend_new.utils.paths import TEMP_DIR
@@ -105,7 +108,7 @@ class WorkflowManager:
         )
 
         return True
-    
+
     def separate_vocals(self, json_path: Path) -> Generator[UIPromptRequest, None, bool]:
         json_data = read_json_file(json_path)
 

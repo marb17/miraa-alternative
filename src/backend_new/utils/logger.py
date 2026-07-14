@@ -1,7 +1,7 @@
 import logging, coloredlogs
 
 class Logger:
-    def __init__(self, name: str):
+    def __init__(self, name: str, init_message: bool = False):
         self._logger = logging.getLogger(name)
 
         # LOG FILTER
@@ -24,4 +24,5 @@ class Logger:
         self.error = self._logger.error
         self.critical = self._logger.critical
 
-        self._logger.debug("Logger initialized")
+        if init_message:
+            self._logger.debug("Logger initialized")
