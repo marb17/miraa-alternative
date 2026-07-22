@@ -44,7 +44,12 @@ def handle_spotify_no_token_error(func):
                     if e.http_status == 401:
                         resolved = yield UIPromptRequest(
                             type="hidden_request",
-                            message=401
+                            message=401,
+                            extra_info={
+                                "msg": e.msg,
+                                "code": e.code,
+                                "reason": e.reason,
+                            }
                         )
 
                         if resolved:
@@ -57,7 +62,12 @@ def handle_spotify_no_token_error(func):
             if e.http_status == 401:
                 resolved = yield UIPromptRequest(
                     type="hidden_request",
-                    message=401
+                    message=401,
+                    extra_info={
+                        "msg": e.msg,
+                        "code": e.code,
+                        "reason": e.reason,
+                    }
                 )
 
                 if resolved:
@@ -101,6 +111,10 @@ class Downloader:
         self._cache_handler = CacheFileHandler(
             cache_path=CACHE_DIR / ".spotify_cache",
             username="spotipy"
+        )
+        self._no_token_cache_handler = CacheFileHandler(
+            cache_path=CACHE_DIR / ".no_token_spotify_cache",
+            username="spotipy_no_token"
         )
 
 
@@ -158,6 +172,14 @@ class Downloader:
 
             self._sp_token = spotipy.Spotify(auth=access_token)
 
+        cached_cc_token = self._no_token_cache_handler.get_cached_token()
+
+        if not cached_cc_token:
+            token_info = auth_manager_no_token.get_access_token(as_dict=True)
+            self._no_token_cache_handler.save_token_to_cache(token_info)
+        else:
+            auth_manager_no_token.token_info = cached_cc_token
+
         self._sp = spotipy.Spotify(auth_manager=auth_manager_no_token)
         return True
 
@@ -167,7 +189,8 @@ class Downloader:
             return
 
         auth_manager_no_token = SpotifyClientCredentials(client_id=self._env_data["SPOTIFY_CLIENT_ID"],
-                                                         client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"])
+                                                         client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"],
+                                                         cache_handler=self._no_token_cache_handler)
 
         if self._use_token:
 
@@ -189,6 +212,14 @@ class Downloader:
 
             self._sp_token = spotipy.Spotify(auth=access_token)
 
+        cached_cc_token = self._no_token_cache_handler.get_cached_token()
+
+        if not cached_cc_token:
+            token_info = auth_manager_no_token.get_access_token(as_dict=True)
+            self._no_token_cache_handler.save_token_to_cache(token_info)
+        else:
+            auth_manager_no_token.token_info = cached_cc_token
+
         self._sp = spotipy.Spotify(auth_manager=auth_manager_no_token)
 
     @handle_spotify_no_token_error
@@ -201,7 +232,7 @@ class Downloader:
         return self._sp_token.current_user_playing_track()
 
     @handle_spotify_no_token_error
-    def get_user_spotify_queue(self) -> Generator[UIPromptRequest, Any, Any]:
+    def get_user_spotify_queue(self) -> Generator[UIPromptRequest, Any, dict[str, Any]]:
         """
         Gets the current users queue from user's spotify
         :return:

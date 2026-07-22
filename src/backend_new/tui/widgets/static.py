@@ -191,7 +191,7 @@ class SpotifyCurrentlyPlayingWidget(Widget):
             prompt_request = next(playing_song_pipeline)
 
             if prompt_request.type == "hidden_request" and prompt_request.message == 401:
-                self.notify("Expired Token")
+                self.notify(f"Expired Token (current song)")
                 self.app.call_from_thread(self._client_no_cache_authenticate)
                 playing_song_pipeline.send(True)
 
@@ -212,7 +212,7 @@ class SpotifyCurrentlyPlayingWidget(Widget):
             prompt_request = next(queue_pipeline)
 
             if prompt_request.type == "hidden_request" and prompt_request.message == 401:
-                self.notify("Expired Token")
+                self.notify("Expired Token (spotify queue)")
                 self.app.call_from_thread(self._client_no_cache_authenticate)
                 queue_pipeline.send(True)
 

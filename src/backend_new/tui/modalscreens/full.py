@@ -106,7 +106,9 @@ class SpotifyAuthenticateScreen(ModalScreen):
                 self.app.copy_to_clipboard(self.url)
             except Exception as e:
                 self.notify(f"Failed to copy {self.url}, error: {e}")
-            self.notify("Successfully copied URL!")
+                return
+
+            self.notify(f"Successfully copied URL!")
 
     def _update_url(self, url: str):
         self.url = url
