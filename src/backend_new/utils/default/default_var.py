@@ -101,6 +101,7 @@ MODEL_INFO = """\b
 MULTI-STEM SEPARATION (Full Band):
   htdemucs_ft               Elite 4-stem model (Vocals/Drums/Bass/Other). Minimal artifacts.
   htdemucs_6s               6-stem model adds Guitar/Piano. Higher artifact risk.
+  bs-roformer_sw            Elite performance, best overall stems for drums and bass.
 
 \b
 SPECIALIZED CORE UTILITIES:
@@ -108,38 +109,59 @@ SPECIALIZED CORE UTILITIES:
   dereverb                  Strips room reflections, decay, and echo tails from stems.
   crowd_iso                 Separates central performances from background crowd noise.
 """
-AUDIO_MODEL_PRESETS: dict[str, dict[str, str | list[str]]] = {
+from backend_new.utils.classes.dataclasses import AudioSeparatorModel
+AUDIO_MODEL_PRESETS: dict[str, AudioSeparatorModel] = {
     # ENSEMBLES
-    "vocal_full": {"model_name": "vocal_full",
-                   "type": "ensemble",
-                   "rename_order": ["inst", "vocal"]},
-    "vocal_clean": {"model_name": "vocal_clean",
-                    "type": "ensemble",
-                    "rename_order": ["inst", "vocal"]},
-    "instrumental_full": {"model_name": "instrumental_full",
-                          "type": "ensemble",
-                          "rename_order": ["vocal", "inst"]},
-    "instrumental_low_resource": {"model_name": "instrumental_low_resource",
-                                  "type": "ensemble",
-                                  "rename_order": ["vocal", "inst"]},
-
+    "vocal_full": AudioSeparatorModel(
+        name="vocal_full",
+        type="ensemble",
+        rename_order=["inst", "vocal"],
+        gain=3.3,
+    ),
+    "vocal_clean": AudioSeparatorModel(
+        name="vocal_clean",
+        type="ensemble",
+        rename_order=["inst", "vocal"],
+    ),
+    "instrumental_full": AudioSeparatorModel(
+        name="instrumental_full",
+        type="ensemble",
+        rename_order=["vocal", "inst"],
+    ),
+    "instrumental_low_resource": AudioSeparatorModel(
+        name="instrumental_low_resource",
+        type="ensemble",
+        rename_order=["vocal", "inst"],
+    ),
     # SINGLE MODELS
-    "htdemucs_ft": {"model_name": "htdemucs_ft.yaml",
-                    "type": "single",
-                    "rename_order": ["bass", "drums", "other", "vocal"]},
-    "htdemucs_6s": {"model_name": "htdemucs_6s.yaml",
-                    "type": "single",
-                    "rename_order": ["bass", "drums", "other", "vocal", "guitar", "piano"]},
-    "drum_sep": {"model_name": "MDX23C-DrumSep-aufr33-jarredou.ckpt",
-                 "type": "single",
-                 "rename_order": ["kick", "snare", "toms", "hh", "ride", "crash"]},
-    "dereverb": {"model_name": "dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt",
-                 "type": "single",
-                 "rename_order": ["dry", "wet"]},
-    "crowd_iso": {"model_name": "mel_band_roformer_crowd_aufr33_viperx_sdr_8.7144.ckpt",
-                  "type": "single",
-                  "rename_order": ["wet", "dry"]},
-    "bs_roformer_sw": {"model_name": "BS-Roformer-SW.ckpt",
-                       "type": "single",
-                       "rename_order": ["bass", "drums", "other", "vocal", "guitar", "piano"]}
+    "htdemucs_ft": AudioSeparatorModel(
+        name="htdemucs_ft.yaml",
+        type="single",
+        rename_order=["bass", "drums", "other", "vocal"],
+    ),
+    "htdemucs_6s": AudioSeparatorModel(
+        name="htdemucs_6s.yaml",
+        type="single",
+        rename_order=["bass", "drums", "other", "vocal", "guitar", "piano"],
+    ),
+    "drum_sep": AudioSeparatorModel(
+        name="MDX23C-DrumSep-aufr33-jarredou.ckpt",
+        type="single",
+        rename_order=["kick", "snare", "toms", "hh", "ride", "crash"],
+    ),
+    "dereverb": AudioSeparatorModel(
+        name="dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt",
+        type="single",
+        rename_order=["dry", "wet"],
+    ),
+    "crowd_iso": AudioSeparatorModel(
+        name="mel_band_roformer_crowd_aufr33_viperx_sdr_8.7144.ckpt",
+        type="single",
+        rename_order=["wet", "dry"],
+    ),
+    "bs_roformer_sw": AudioSeparatorModel(
+        name="BS-Roformer-SW.ckpt",
+        type="single",
+        rename_order=["bass", "drums", "other", "vocal", "guitar", "piano"],
+    ),
 }

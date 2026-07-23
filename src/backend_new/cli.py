@@ -47,7 +47,7 @@ def separate_audio(file: str, model: ALLOWED_MODEL_NAMES) -> None:
     """
     Separates the audio from the file provided
     """
-    from backend_new.core.processing import VocalSeparation
+    from backend_new.core.processing import AudioSeparation
 
     user_file_path = Path(file)
     if len(user_file_path.parts) == 1:
@@ -62,7 +62,7 @@ def separate_audio(file: str, model: ALLOWED_MODEL_NAMES) -> None:
 
     click.echo(f"Separating {file_path}")
 
-    with VocalSeparation(model_name=model) as separation:
+    with AudioSeparation(model_name=model) as separation:
         list(separation.separate_audio(file_path))
 
 

@@ -23,6 +23,13 @@ class UIPromptRequest:
     extra_info: dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass
+class AudioSeparatorModel:
+    name: str
+    type: str
+    rename_order: list[str]
+    gain: float | int = 0.0
+
 
 @dataclass
 class ExampleSentence:

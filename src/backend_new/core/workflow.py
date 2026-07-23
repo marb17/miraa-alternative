@@ -6,7 +6,7 @@ from typing import Any
 # PYPI LIBRARIES
 from pathlib import Path
 
-from backend_new.core.processing import VocalSeparation
+from backend_new.core.processing import AudioSeparation
 from backend_new.core.translation_analysis import Translator
 from backend_new.extractors.geniusextractor import GeniusExtractor
 # HELPER LIBRARIES
@@ -112,7 +112,7 @@ class WorkflowManager:
     def separate_vocals(self, json_path: Path) -> Generator[UIPromptRequest, None, bool]:
         json_data = read_json_file(json_path)
 
-        with VocalSeparation() as vs:
+        with AudioSeparation() as vs:
             yield from vs.separate_audio(TEMP_DIR/json_data["pre_processing"]["audio_file"])
 
             write_json_file(json_path, {
@@ -339,7 +339,7 @@ class OldWorkflowManager:
         :return: True if already done, False if not
         :rtype: bool
         """
-        from backend_new.core.processing import VocalSeparation
+        from backend_new.core.processing import AudioSeparation
 
         # TODO add vocal sep model chooser
         if song_context_data.json_song_data.get("vocal_separation", {}).get("separated", False) is True:
@@ -359,7 +359,7 @@ class OldWorkflowManager:
             logger.debug(f"Vocal separation already done, skipping")
             return True
         else:
-            with VocalSeparation() as vs:
+            with AudioSeparation() as vs:
                 vs.separate_vocal(
                     f"../.temp/{song_context_data.json_song_data["pre_processing"]["youtube_id"]}.wav")
                 write_json_file(song_context_data.json_file_path, {"separated": True,

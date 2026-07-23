@@ -23,6 +23,7 @@ from backend_new.utils.default.default_var import AUDIO_MODEL_PRESETS
 # PYPI LIBRARIES
 from sudachipy.morpheme import Morpheme
 from sudachipy import dictionary, tokenizer
+from pydub import AudioSegment
 
 import nagisa
 
@@ -41,11 +42,11 @@ ALLOWED_MODEL_NAMES = Literal["vocal_full", "vocal_clean", "instrumental_full", 
                               "drum_sep", "dereverb", "crowd_iso",
                               "bs_reformer_sw"]
 
-class VocalSeparation:
+class AudioSeparation:
     # TODO fix docs here cuz its bad
     def __init__(self, model_name: ALLOWED_MODEL_NAMES = "vocal_full") -> None:
         """
-        Initializes the VocalSeparation object.
+        Initializes the AudioSeparation object.
 
         :param model_name: Model that will be used for separation.
         :type model_name: ALLOWED_MODEL_NAMES
@@ -72,17 +73,17 @@ class VocalSeparation:
         else:
             self._selected_model = None
 
-            if AUDIO_MODEL_PRESETS[self._model_name]["type"] == "ensemble":
+            if AUDIO_MODEL_PRESETS[self._model_name].type == "ensemble":
                 self._selected_model = Separator(output_dir=str(self._output_dir),
                                                  model_file_dir=str(self._model_file_dir),
-                                                 ensemble_preset=AUDIO_MODEL_PRESETS[self._model_name]["model_name"],
+                                                 ensemble_preset=AUDIO_MODEL_PRESETS[self._model_name].name,
                                                  use_autocast=True,
                                                  use_soundfile=False,
                                                  normalization_threshold=0.9,
                                                  mdx_params={"batch_size": 32},
                                                  vr_params={"batch_size": 32},
                                                  mdxc_params={"batch_size": 32})
-            elif AUDIO_MODEL_PRESETS[self._model_name]["type"] == "single":
+            elif AUDIO_MODEL_PRESETS[self._model_name].type == "single":
                 self._selected_model = Separator(output_dir=str(self._output_dir),
                                                  model_file_dir=str(self._model_file_dir),
                                                  use_autocast=True,
@@ -122,10 +123,10 @@ class VocalSeparation:
     def _init_model(self) -> None:
         if self._selected_model is None:
             raise ValueError(f"Model wrapper for {self._model_name} did not initialize properly")
-        if AUDIO_MODEL_PRESETS[self._model_name]["type"] == "ensemble":
+        if AUDIO_MODEL_PRESETS[self._model_name].type == "ensemble":
             self._selected_model.load_model()
-        elif AUDIO_MODEL_PRESETS[self._model_name]["type"] == "single":
-            self._selected_model.load_model(model_filename=AUDIO_MODEL_PRESETS[self._model_name]["model_name"])
+        elif AUDIO_MODEL_PRESETS[self._model_name].type == "single":
+            self._selected_model.load_model(model_filename=AUDIO_MODEL_PRESETS[self._model_name].name)
 
     def separate_audio(self, audio_path: str | Path) -> Generator[UIPromptRequest, None, bool]:
         """
@@ -168,15 +169,33 @@ class VocalSeparation:
 
         output_files = [Path(f) for f in output_files]
 
+        def new_file_name(name: str, as_path: bool = False):
+            if as_path:
+                return Path(f"{str(self._output_dir)}/{win_audio_path.stem}_{name}.wav")
+            else:
+                return f"{str(self._output_dir)}/{win_audio_path.stem}_{name}.wav"
+
         def rename_file(file_path: Path, name: str) -> None:
             if len(file_path.parts) == 1:
                 file_path = TEMP_DIR / file_path
 
-            file_path.rename(f"{str(self._output_dir)}/{win_audio_path.stem}_{name}.wav")
+            file_path.rename(new_file_name(name))
 
         # different models output differently, if flipped recheck constants.py
-        for file, rename_to in zip(output_files, AUDIO_MODEL_PRESETS[self._model_name]["rename_order"]):
+        for file, rename_to in zip(output_files, AUDIO_MODEL_PRESETS[self._model_name].rename_order):
             rename_file(file, rename_to)
+
+        renamed_files = [Path(new_file_name(file.name, as_path=True)) for file in output_files]
+
+        for file in [new_file_name(suffix, as_path=True) for suffix in AUDIO_MODEL_PRESETS[self._model_name].rename_order]:
+            audio = AudioSegment.from_file(file)
+            audio = audio + AUDIO_MODEL_PRESETS[self._model_name].gain
+            audio.export(file, format="wav")
+
+        yield UIPromptRequest(
+            type="log",
+            message=f"Finished separating"
+        )
 
         return True
 # endregion
