@@ -188,7 +188,7 @@ class Translator:
 
         return results
 
-    def romaji_to_script(self, lyrics: str) -> str:
+    def romaji_to_script(self, lyrics: str) -> Generator[UIPromptRequest, None, str]:
         prompt = f"""
         You are an expert Japanese Language Processor specializing in Orthographic Reconstruction. 
 
@@ -212,7 +212,8 @@ class Translator:
         """
 
         with WindowsLLMModel() as llm:
-            data = llm.batch_inference([prompt])[0].strip()
+            data = yield from llm.batch_inference([prompt])
+            data = data[0].strip()
 
         data = self._clean_translation_header_and_unicode(data)
 

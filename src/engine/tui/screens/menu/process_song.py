@@ -1,9 +1,10 @@
 from pathlib import Path
 from typing import Any
+import logging
 
 from textual import events, work, on
 from textual.app import ComposeResult
-from textual.screen import Screen
+from textual.screen import Screen, ModalScreen
 from textual.containers import Vertical, Horizontal, Container
 from textual.widgets import Header, Footer, Label, Button, ContentSwitcher, Select, Static, RichLog, TabbedContent, \
     Tabs, Tab
@@ -11,9 +12,20 @@ from textual.binding import Binding
 
 from engine.core.workflow import WorkflowManager
 from engine.tui.screens.config.config import ProcessesMenu
-from engine.tui.widgets.interactive import FinishedAnyKeyContinue
+from engine.tui.widgets.interactive import FinishedAnyKeyContinue, TableSelect
 from engine.utils.classes.dataclasses import UIPromptRequest
 from engine.utils.functions.filesystem import all_available_temp_json_files, read_config, read_json_file
+
+
+class TextualLogHandler(logging.Handler):
+    """Custom logging handler to route logs to a Textual RichLog widget."""
+    def __init__(self, rich_log: RichLog):
+        super().__init__()
+        self.rich_log = rich_log
+
+    def emit(self, record: logging.LogRecord) -> None:
+        message = self.format(record)
+        self.rich_log.write(message)
 
 
 class ProcessSong(Screen):
@@ -105,6 +117,7 @@ class ProcessSong(Screen):
 
     json_options: list[tuple[str, Path]] = list()
     selected_json_file = None
+    current_process_display = None
 
 
 
@@ -128,8 +141,9 @@ class ProcessSong(Screen):
                     yield Tabs(
                         Tab("Genius", id="genius_metadata"),
                         Tab("Audio Stems", id="audio_separation"),
+                        Tab("Translate", id="translate_lyrics"),
                         Tab("Analysis", id="split_and_tag"),
-                        Tab("Translate", id="translate_lyrics")
+                        id="process_tabs"
                     )
 
                     yield Static(id="current_process_display")
@@ -141,10 +155,16 @@ class ProcessSong(Screen):
 
 
     def _on_mount(self, event: events.Mount) -> None:
+        handler = TextualLogHandler(self.query_one("#process_log", RichLog))
+        handler.setFormatter(logging.Formatter("[%(name)s] %(levelname)s: %(message)s"))
+
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.DEBUG)
+        root_logger.addHandler(handler)
+
         self.query_one("#choose_json", Vertical).border_title = "Song Processing"
         self.query_one("#options", Vertical).border_title = "Options"
         self.update_json_select()
-
 
 
     @work(thread=True)
@@ -163,6 +183,9 @@ class ProcessSong(Screen):
     def run_work(self) -> None:
         config = read_config()["skip_processes"]
         song_data = read_json_file(self.selected_json_file)
+
+        self.current_process_display = "genius_metadata"
+        self.app.call_from_thread(self.update_ui_tabs, self.current_process_display)
 
         if song_data.get("genius_data"):
             self.app.call_from_thread(self.update_ui_for_prompt, UIPromptRequest(
@@ -186,6 +209,9 @@ class ProcessSong(Screen):
                         else:
                             ...
 
+        self.current_process_display = "audio_separation"
+        self.app.call_from_thread(self.update_ui_tabs, self.current_process_display)
+
         if song_data.get("vocal_separation", {}).get("stems", {}).get("vocal"):
             self.app.call_from_thread(self.update_ui_for_prompt, UIPromptRequest(
                 type="log",
@@ -207,6 +233,9 @@ class ProcessSong(Screen):
                             ...
                         else:
                             ...
+
+        self.current_process_display = "translate_lyrics"
+        self.app.call_from_thread(self.update_ui_tabs, self.current_process_display)
 
         if song_data.get("translated_lyrics"):
             self.app.call_from_thread(self.update_ui_for_prompt, UIPromptRequest(
@@ -237,15 +266,79 @@ class ProcessSong(Screen):
             message=""
         ))
 
-    def update_ui_for_prompt(self, prompt_request: UIPromptRequest) -> None:
+
+    class GeniusSelectSong(ModalScreen):
+        DEFAULT_CSS = """
+        #fullscreen {
+            height: 100%;
+            width: 100%;
+            
+            hatch: right $accent 10%;
+            
+            align: center middle;
+            content-align: center middle;
+        }
+        
+        TableSelect {
+            width: 90%;
+            height: auto;
+        }
+        """
+
+        def __init__(self, genius_data, song_reference: str = None):
+            self.genius_data = genius_data
+            self.song_reference = song_reference
+            super().__init__()
+
+        def compose(self) -> ComposeResult:
+            with Container(id="fullscreen"):
+                yield TableSelect(id="genius_select_song")
+
+        def _on_mount(self, event: events.Mount) -> None:
+            table = self.query_one("#genius_select_song", TableSelect)
+
+            table.add_columns(["Title", "Artist", "Lyrics Release Date", "Lyrics Completed"])
+            table.add_rows(
+                [
+                    [song["result"]["title"],
+                     song['result']['primary_artist']['name'],
+                     song.get("result", {}).get("release_date_components", {}).get('year', 'Unknown'),
+                     song["result"]["lyrics_state"]]
+
+                    for song in self.genius_data
+                ]
+            )
+
+            table.table_header_content = f"Please choose the matching song: (do not choose any romanized or translated songs)\n{self.song_reference}"
+
+        @on(TableSelect.Submitted)
+        def handle_submit(self, event: TableSelect.Submitted) -> None:
+            self.dismiss(event.value)
+
+
+    def update_ui_for_prompt(self, prompt_request: UIPromptRequest) -> Any:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
 
         if prompt_request.type == "log":
             self.query_one("#process_log", RichLog).write(prompt_request.message)
+            return True
         elif prompt_request.type == "hidden_request":
             if prompt_request.sub_type == "__finished__":
                 switcher.current = "finished"
+                return True
+        elif prompt_request.type == "confirm":
+            return True
+        elif prompt_request.type == "select":
+            return self.app.push_screen_wait(self.GeniusSelectSong(prompt_request.choices, prompt_request.extra_info.get("song_reference")))
 
+
+    def update_ui_tabs(self, value: str):
+        self.query_one("#process_tabs", Tabs).active = value
+
+    @on(Tabs.TabActivated, "#process_tabs")
+    def refuse_tab_change(self, event: Tabs.TabActivated) -> None:
+        event.stop()
+        self.update_ui_tabs(self.current_process_display)
 
 
     @on(Button.Pressed, "#confirm_json")
@@ -261,7 +354,6 @@ class ProcessSong(Screen):
         self.query_one("#main_content_switcher", ContentSwitcher).current = "process_menu"
 
         self.run_work()
-
 
 
     def action_self_dismiss(self, value: Any) -> None:

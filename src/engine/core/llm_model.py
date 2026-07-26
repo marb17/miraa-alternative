@@ -157,6 +157,7 @@ class WindowsLLMModel:
             free_mem_bytes = total_mem - (allocated_mem + reserved_mem)
             self._free_vram = free_mem_bytes / (1024 ** 3)
             logger.debug(f"Available VRAM: {self._free_vram}")
+
         else:
             logger.debug("Model already initialized, skipping")
 
@@ -188,13 +189,16 @@ class WindowsLLMModel:
         if self._pipe is None:
             self.init_model()
 
-        logger.debug(f"How many prompts to process: {len(prompts)}")
+        yield UIPromptRequest(type="log",
+                              message=f"How many prompts to process: {len(prompts)}")
         # region batch sizing
         if batch_size > 1:
-            logger.info(f"Manual Batch size of {batch_size}")
+            yield UIPromptRequest(type="log",
+                                  message=f"Manual Batch size of {batch_size}")
             pass
         if batch_size == 0:
-            logger.info("No batching")
+            yield UIPromptRequest(type="log",
+                                  message="No batching")
             batch_size = len(prompts)
         if batch_size == -1:
             # automatic sizing

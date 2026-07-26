@@ -73,12 +73,11 @@ class WorkflowManager:
         )
 
         with GeniusExtractor() as genius:
-            genius_data = genius.return_metadata(
+            genius_data = yield from genius.return_metadata(
                 title=title,
-                artist=artist
+                artist=artist,
+                json_data=json_data
             )
-
-        write_json_file(json_file, genius_data, ["genius_data"])
 
         if not contains_japanese(genius_data.get("lyrics", "")):
             response = yield UIPromptRequest(
@@ -94,11 +93,19 @@ class WorkflowManager:
             logger.warning("Lyrics are romanized, using LLM to convert to Japanese script")
 
             with Translator() as translator:
-                script_lyrics = translator.romaji_to_script(genius_data["lyrics"])
+                script_lyrics = yield from translator.romaji_to_script(genius_data["lyrics"])
+
+            logger.warning(
+                "before writes"
+            )
+
+            write_json_file(json_file, genius_data, ["genius_data"])
 
             write_json_file(json_file, script_lyrics, ["lyrics_main"])
             write_json_file(json_file, genius_data["lyrics"], ["lyrics_sub"])
         else:
+            write_json_file(json_file, genius_data, ["genius_data"])
+
             write_json_file(json_file, genius_data["lyrics"], ["lyrics_main"])
             write_json_file(json_file, "", ["lyrics_sub"])
 
