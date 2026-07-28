@@ -1,6 +1,7 @@
 import os
 from typing import Any
 
+from PIL import ContainerIO
 from dotenv import set_key, load_dotenv
 from textual import events, on
 from textual.app import ComposeResult
@@ -477,6 +478,67 @@ class EnvironmentVariablesMenu(Horizontal):
             ready_to_move_callback(False)
 
 
+class DangerZoneMenu(Horizontal):
+    DEFAULT_CSS = """
+    #main_container {
+        hatch: right $accent 10%;
+        
+        height: 100%;
+        width: 100%;
+        
+        border: solid;
+    }
+    
+    .section_container {
+        height: auto;
+        border: solid $secondary;
+        border-title-style: bold;
+        border-title-color: $primary;
+        
+        height: auto;
+        width: 100%;
+        
+        align: center middle;
+        content-align: center middle;
+    }
+    
+    #button_buttom {
+        width: 100%;
+        height: auto;
+        
+        align: right middle;
+        content-align: right middle;
+        
+        border: solid;
+        
+        dock: bottom;
+    }
+    
+    ConfigOption {
+        height: auto;
+        width: auto;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        with Container(id="main_container"):
+            with Container(classes="section_container", id="temp_dir"):
+                yield Button("Delete Temp Dir", id="delete_temp_dir", variant="error")
+
+            with Container(id="button_bottom"):
+                yield ConfigOption(
+                    label="Enable Buttons",
+                    widget_id="enable_buttons",
+                    config_type="switch",
+                    enable_config_write=False,
+                    default_value=False
+                )
+
+
+    def _on_mount(self, event: events.Mount) -> None:
+        self.query_one("#temp_dir", Container).border_title = ".temp Directory"
+
+
 class ConfigMenu(Screen):
     BINDINGS = [
         Binding("ctrl+x", "app.pop_screen", "Exit Menu", priority=True)
@@ -496,6 +558,8 @@ class ConfigMenu(Screen):
                 yield DownloadMenu()
             with TabPane(".env", id="env"):
                 yield EnvironmentVariablesMenu()
+            with TabPane("Danger Zone", id="danger_zone"):
+                yield DangerZoneMenu()
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
         if self._switching_internally:

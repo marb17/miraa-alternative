@@ -44,7 +44,7 @@ class ProcessSong(Screen):
         hatch: right $accent 10%;
     }
 
-    #choose_json {
+    #choose_json {    
         height: auto;
         
         border: solid $secondary;
@@ -77,6 +77,8 @@ class ProcessSong(Screen):
         
         align: center middle;
         content-align: center middle;
+        
+        hatch: right $accent 10%;
     }
     
     #options {

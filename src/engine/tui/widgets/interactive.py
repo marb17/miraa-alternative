@@ -491,8 +491,28 @@ class ConfigOption(Widget):
                  placeholder: str = "",
                  json_keys: list[str] = None,
                  enable_config_write: bool = True,
+                 default_value: Any = None,
                  input_password: bool = False,
                  *args, **kwargs) -> None:
+
+        """
+        :param config_type: The option type
+        :type config_type: Literal["switch", "input_int", "input_float", "input_str", "checkbox"]
+        :param label: The label, depends on what config type is used
+        :type label: str
+        :param widget_id: The textual widget ID
+        :type widget_id: str
+        :param placeholder: The placeholder for input types
+        :type placeholder: str
+        :param json_keys: The keys leading to an option, (JSON file)
+        :type json_keys: list[str]
+        :param enable_config_write: Enable writing to a JSON file
+        :type enable_config_write: bool
+        :param default_value: The default value to use if enable_config_write if False
+        :type default_value: bool
+        :param input_password: Hides text in inputs
+        :type input_password: bool
+        """
 
         super().__init__(id=widget_id, *args, **kwargs)
         self.config_type = config_type
@@ -503,6 +523,7 @@ class ConfigOption(Widget):
         else:
             self.json_keys = None
         self.enable_config_write = enable_config_write if json_keys else False
+        self.default_value = default_value if not self.enable_config_write else None
         self._password = input_password
 
 
@@ -546,15 +567,18 @@ class ConfigOption(Widget):
 
     @work(thread=True)
     def refresh_value(self) -> None:
-        config_data = read_config()
-        if self.json_keys:
-            for key in self.json_keys:
-                config_data = config_data[key]
+        if self.enable_config_write:
+            config_data = read_config()
+            if self.json_keys:
+                for key in self.json_keys:
+                    config_data = config_data[key]
 
-        if isinstance(config_data, dict) or isinstance(config_data, list):
-            raise Exception("Wrong key traversal")
+            if isinstance(config_data, dict) or isinstance(config_data, list):
+                raise Exception("Wrong key traversal")
 
-        self.value = config_data
+            self.value = config_data
+        else:
+            self.value = self.default_value
 
 
 
