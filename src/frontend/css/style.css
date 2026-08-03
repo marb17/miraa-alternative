@@ -1,0 +1,104 @@
+body{
+    margin:0;
+    padding:0;
+    background-color: #e4e4e4;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+}
+
+#app {
+    margin:0;
+    padding:0;
+    background-color: #e4e4e4;
+    position:relative;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    transition: background-color 0.4s ease-out;
+}
+
+#circlecontainer{
+
+    position: absolute;
+
+    right: -40%;
+    top: 50%;
+    transform: translateY(-50%);
+
+    width: 1500px;
+    height: 1500px;
+
+    transition: transform 0.4s ease-out;
+}
+
+#circle{
+    position: absolute;
+
+    width: 1450px;
+    height: 1450px;
+
+    border-radius: 50%;
+    background-color: #887aab;
+
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+
+#circleoutline{
+
+    position: absolute;
+
+    width: 1500px;
+    height: 1500px;
+
+    border-radius: 50%;
+    border: 3px solid #4b3b6d;
+    background-color: transparent;
+    transition: background-color 0.4s ease-out;
+    transition: border 0.4s ease-out;
+}
+
+#titletext{
+    font-family: "Noto Sans", sans-serif;
+    font-weight: 676; /*haha 676 */
+    font-size: 16vh;
+}
+
+
+#titlecontainer{
+    width: 40vw;
+    height: 35vw;
+    background-color: transparent;
+    display:flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: flex-start;
+    gap: 0px;
+    line-height: 67px; /* haha 67 */
+    transition: opacity 0.4s ease-out;
+
+    position:absolute;
+    top: 38%;
+    left: 8.5%;
+}
+
+.titleparagraph{
+    font-family: "Miranda Sans", sans-serif;
+    color: #555555;
+    font-size:7vh;
+    font-weight: bold;
+    margin:0px;
+}
+
+#clickanywheretostart{
+    font-family: "Miranda Sans", sans-serif;
+    color: #acabab;
+    font-size:2vh;
+    font-weight: lighter;
+
+    margin-top: 90vh;
+    text-align: center;
+}
