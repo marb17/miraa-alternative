@@ -22,7 +22,8 @@ body{
 
     position: absolute;
 
-    right: -40%;
+    /*right: -40%;*/
+    left: 50%;
     top: 50%;
     transform: translateY(-50%);
 
