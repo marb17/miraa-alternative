@@ -10,6 +10,7 @@ from typing import Any
 from collections.abc import Generator
 
 import requests.exceptions
+from typing import Literal
 from spotipy import cache_handler, CacheFileHandler, SpotifyException
 
 # HELPER LIBRARIES
@@ -275,7 +276,95 @@ class Downloader:
                 "artist": dict_metadata["artists"][0]["name"]}
 
 
-    def download_song(self, limit: int = 10,
+    def download_song(self, youtube_id: str,
+                      limit: int = 10,
+                      retry_count: int = 3,
+                      retry_sleep: float = 5,
+                      download_type: Literal['audio', 'video'] = "audio") -> Generator[Any, dict[str, Any], bool | str]:
+        class YTInfoLogger:
+            def __init__(self, input_queue: queue.Queue):
+                self.log_queue = input_queue
+
+            def debug(self, msg):
+                self.log_queue.put(("log", msg))
+
+            def info(self, msg):
+                self.log_queue.put(("log", msg))
+
+            def error(self, msg):
+                self.log_queue.put(("log", msg))
+
+            def warning(self, msg):
+                self.log_queue.put(("log", msg))
+
+        log_queue = queue.Queue()
+
+        match download_type:
+            case "audio":
+                ydl_opts = {'format': 'm4a/bestaudio/best',
+                            "logger": YTInfoLogger(log_queue),
+                            'paths': {'home': f'{str(TEMP_DIR)}'},
+                            'outtmpl': '%(id)s.%(ext)s',
+                            'postprocessors': [{
+                                'key': 'FFmpegExtractAudio',
+                                'preferredcodec': 'wav',
+                            }]}
+            case "video":
+                ydl_opts = {'format': 'mp4/bestvideo/best',
+                            "logger": YTInfoLogger(log_queue),
+                            'paths': {'home': f'{str(TEMP_DIR)}'},
+                            'outtmpl': '%(id)s.%(ext)s',}
+            case _:
+                ydl_opts = {'format': 'm4a/bestaudio/best',
+                            "logger": YTInfoLogger(log_queue),
+                            'paths': {'home': f'{str(TEMP_DIR)}'},
+                            'outtmpl': '%(id)s.%(ext)s',
+                            'postprocessors': [{
+                                'key': 'FFmpegExtractAudio',
+                                'preferredcodec': 'wav',
+                            }]}
+
+        success_downloading = False
+
+        yield UIPromptRequest(type="info",
+                              message=f"Downloading {youtube_id}")
+
+        def _target_download():
+            nonlocal success_downloading
+            for _ in range(retry_count):
+                try:
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        ydl.download([youtube_id])
+                    success_downloading = True
+                    break
+                except Exception as e:
+                    log_queue.put(("log", e))
+                    sleep(retry_sleep)
+
+            log_queue.put(("__done__", ""))
+
+
+        downloader_thread = threading.Thread(target=_target_download)
+        downloader_thread.start()
+
+        while downloader_thread.is_alive() or not log_queue.empty():
+            try:
+                msg_type, msg_text = log_queue.get(timeout=0.1)
+
+                if msg_type == "__done__":
+                    break
+
+                # Yield the message smoothly straight back up to your Textual screen UI!
+                yield UIPromptRequest(type=msg_type, message=msg_text)
+
+            except queue.Empty:
+                continue
+
+        if not success_downloading:
+            raise DownloadError(f"Could not download {youtube_id}")
+
+
+    def query_and_download_song(self, limit: int = 10,
                       retry_count: int = 3,
                       retry_sleep: float = 5) -> Generator[Any, dict[str, Any], bool | str]:
         # SPOTIFY SECTION
@@ -433,71 +522,8 @@ class Downloader:
         except FileNotFoundError:
             pass
 
-        class YTInfoLogger():
-            def __init__(self, input_queue: queue.Queue):
-                self.log_queue = input_queue
+        self.download_song(youtube_id, limit=limit, retry_count=retry_count, retry_sleep=retry_sleep)
 
-            def debug(self, msg):
-                self.log_queue.put(("log", msg))
-
-            def info(self, msg):
-                self.log_queue.put(("log", msg))
-
-            def error(self, msg):
-                self.log_queue.put(("log", msg))
-
-            def warning(self, msg):
-                self.log_queue.put(("log", msg))
-
-        log_queue = queue.Queue()
-
-        ydl_opts = {'format': 'm4a/bestaudio/best',
-                    "logger": YTInfoLogger(log_queue),
-                    'paths': {'home': f'{str(TEMP_DIR)}'},
-                    'outtmpl': '%(id)s.%(ext)s',
-                    'postprocessors': [{
-                        'key': 'FFmpegExtractAudio',
-                        'preferredcodec': 'wav',
-                    }]}
-
-        success_downloading = False
-
-        yield UIPromptRequest(type="info",
-                              message=f"Downloading {youtube_id}")
-
-        def _target_download():
-            nonlocal success_downloading
-            for _ in range(retry_count):
-                try:
-                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        ydl.download([youtube_id])
-                    success_downloading = True
-                    break
-                except Exception as e:
-                    log_queue.put(("log", e))
-                    sleep(retry_sleep)
-
-            log_queue.put(("__done__", ""))
-
-
-        downloader_thread = threading.Thread(target=_target_download)
-        downloader_thread.start()
-
-        while downloader_thread.is_alive() or not log_queue.empty():
-            try:
-                msg_type, msg_text = log_queue.get(timeout=0.1)
-
-                if msg_type == "__done__":
-                    break
-
-                # Yield the message smoothly straight back up to your Textual screen UI!
-                yield UIPromptRequest(type=msg_type, message=msg_text)
-
-            except queue.Empty:
-                continue
-
-        if not success_downloading:
-            raise DownloadError(f"Could not download {youtube_id}")
         # FINAL WRITE
 
         final_data = {

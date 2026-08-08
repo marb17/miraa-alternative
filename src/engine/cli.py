@@ -1,9 +1,11 @@
 # STANDARD LIBRARIES
 import json
 from pathlib import Path
+from typing import Literal
 
 # HELPER LIBRARY
 from engine.core.processing import ALLOWED_MODEL_NAMES
+from engine.extractors import downloader
 from engine.utils.functions.filesystem import read_json_file
 
 # CONSTANTS
@@ -25,12 +27,16 @@ def main():
 
 @main.command()
 @click.argument("url")
-@click.option("--rename-id", is_flag=True, default=False, help="Rename the video file to the youtube ID")
-def download_audio(url: str, rename_id: bool) -> None:
+@click.option("--output_type",
+              type=click.Choice(["audio", "video"]),
+              default="audio",
+              help=f"Whether to download audio or video",)
+def download_audio(url: str, output_type: Literal["audio", "video"]) -> None:
     """
     Downloads the audio from YouTube, always outputs .wav and outputs to .temp
     """
-    # TODO gotta redo this
+    with downloader.Downloader() as dl:
+        result = list(dl.download_song(url, download_type=output_type))
 
 @main.command()
 @click.argument("file",

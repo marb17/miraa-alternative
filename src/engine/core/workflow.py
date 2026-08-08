@@ -54,11 +54,7 @@ class WorkflowManager:
 
         with Downloader() as dl:
             dl.cache_authenticate()
-            yield from dl.download_song(
-                limit=self._config["downloader"]["view_limit"],
-                retry_count=self._config["downloader"]["retry_count"],
-                retry_sleep=self._config["downloader"]["retry_sleep"]
-            )
+            yield from dl.query_and_download_song()
 
         return True
 
