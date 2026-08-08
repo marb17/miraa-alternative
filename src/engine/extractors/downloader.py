@@ -301,28 +301,23 @@ class Downloader:
 
         match download_type:
             case "audio":
-                ydl_opts = {'format': 'm4a/bestaudio/best',
-                            "logger": YTInfoLogger(log_queue),
-                            'paths': {'home': f'{str(TEMP_DIR)}'},
-                            'outtmpl': '%(id)s.%(ext)s',
-                            'postprocessors': [{
-                                'key': 'FFmpegExtractAudio',
-                                'preferredcodec': 'wav',
-                            }]}
+                ydl_opts = {
+                    'format': 'm4a/bestaudio/best',
+                    "logger": YTInfoLogger(log_queue),
+                    'paths': {'home': f'{str(TEMP_DIR)}'},
+                    'outtmpl': '%(id)s.%(ext)s',
+                    'postprocessors': [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'wav',
+                    }]}
             case "video":
-                ydl_opts = {'format': 'mp4/bestvideo/best',
-                            "logger": YTInfoLogger(log_queue),
-                            'paths': {'home': f'{str(TEMP_DIR)}'},
-                            'outtmpl': '%(id)s.%(ext)s',}
-            case _:
-                ydl_opts = {'format': 'm4a/bestaudio/best',
-                            "logger": YTInfoLogger(log_queue),
-                            'paths': {'home': f'{str(TEMP_DIR)}'},
-                            'outtmpl': '%(id)s.%(ext)s',
-                            'postprocessors': [{
-                                'key': 'FFmpegExtractAudio',
-                                'preferredcodec': 'wav',
-                            }]}
+                ydl_opts = {
+                    'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                    'merge_output_format': 'mp4',
+                    "logger": YTInfoLogger(log_queue),
+                    'paths': {'home': f'{str(TEMP_DIR)}'},
+                    'outtmpl': '%(id)s.%(ext)s',
+                }
 
         success_downloading = False
 
