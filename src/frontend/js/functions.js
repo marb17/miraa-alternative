@@ -17,8 +17,16 @@ function delay(ms){
 
 
 // this is a temporary way to go back to the first page as i havent added a proper way to return. Terrible functionality btw just reload the page when u come
-function returnback() {
+function returnpage1() {
         window.location.href="page1.html";
+}
+
+function returnpage2() {
+    window.location.href="page2.html";
+}
+
+function returnpage3() {
+    window.location.href="page3.html";
 }
 
 // this function starts the transition for the first to second page
