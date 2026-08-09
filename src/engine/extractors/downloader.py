@@ -517,7 +517,7 @@ class Downloader:
         except FileNotFoundError:
             pass
 
-        self.download_song(youtube_id, limit=limit, retry_count=retry_count, retry_sleep=retry_sleep)
+        yield from self.download_song(youtube_id, limit=limit, retry_count=retry_count, retry_sleep=retry_sleep)
 
         # FINAL WRITE
 

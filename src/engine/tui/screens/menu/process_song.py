@@ -3,6 +3,7 @@ from typing import Any
 import logging
 
 from textual import events, work, on
+from textual._context import NoActiveAppError
 from textual.app import ComposeResult
 from textual.screen import Screen, ModalScreen
 from textual.containers import Vertical, Horizontal, Container
@@ -25,7 +26,10 @@ class TextualLogHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord) -> None:
         message = self.format(record)
-        self.rich_log.write(message)
+        try:
+            self.rich_log.write(message)
+        except NoActiveAppError:
+            pass
 
 
 class ProcessSong(Screen):
