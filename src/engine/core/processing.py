@@ -28,7 +28,8 @@ from engine.utils.default.default_var import AUDIO_MODEL_PRESETS
 # import nagisa
 
 from pydub import AudioSegment
-from lyric_align import align, Segment
+# from lyric_align import align, Segment
+import stable_whisper
 
 from engine.utils.logger import Logger
 logger = Logger(__name__)
@@ -209,52 +210,100 @@ class ForcedAlignment:
         ...
 
     def force_align_lyrics(self, audio_file: Path, json_data_file: Path) -> Any:
-        lyrics = read_json_file(json_data_file).get("lyrics_main", "")
-        if lyrics == "":
-            raise Exception(f"No lyrics found for {audio_file}")
-
         env = os.environ.copy()
         env["PYTHONUTF8"] = "1"
-        env["HF_HOME"] = r"D:\python\miraa-alternative\src\.temp\hf_cache"
-        env["HF_HOME"] = str(MODEL_DIR / "faster_whisper")
+        env["HF_HOME"] = str(MODEL_DIR / "stable_whisper")
 
-        temporary_lyrics_file = Path(json_data_file.parent / f"{json_data_file.stem}_lyrics.txt")
-        output_lrc_file = Path(json_data_file.parent / f"{json_data_file.stem}_lyrics.lrc")
-        # output_lrc_file = Path(json_data_file.parent / f"{json_data_file.stem}_lyrics.elrc")
+        model = stable_whisper.load_model("large-v2",
+                                          download_root=str(MODEL_DIR / "stable_whisper"),
+                                          device="cuda")
 
-        temporary_lyrics_file.write_text(lyrics, encoding="utf-8")
+        lyrics = read_json_file(json_data_file).get("lyrics_main", "").split("\n")
 
-        command_to_exec = [
-            "lyric-align",
+        mapping_index = list()
+
+        for lyric in lyrics:
+            if lyric.startswith("[") and lyric.endswith("]"):
+                mapping_index.append((lyric, "skip"))
+            elif not lyric:
+                mapping_index.append((lyric, "skip"))
+            else:
+                mapping_index.append((lyric, "do"))
+
+        process_lyrics = [lyric[0] for lyric in mapping_index if lyric[1] == "do"]
+        process_lyrics = "\n".join(process_lyrics)
+
+        # for lyric in process_lyrics: print(lyric)
+        print(process_lyrics)
+
+        result = model.align(str(audio_file), process_lyrics, 
+                             language="ja",
+                             vad=True,
+                             vad_threshold=0.5, 
+                             original_split=True,
+                             min_word_dur=0.08,
+                             # failure_threshold=0.3,
+                             # fast_mode=True
+                             )
+
+        result = model.refine(
             str(audio_file),
-            str(temporary_lyrics_file),
-            # "--format", "elrc",
-            "--format", "lrc",
-            "--output", str(output_lrc_file),
-            "--model", "large-v2",
-            "--device", "cuda",
-            # "--no-vad",
-            "--pairing", "2",
-            "--interpolate",
-            # "--threshold", "0.03",
-            "--window", "2"
-        ]
+            result,
+            precision=0.05,
+        )
 
-        subprocess.run(command_to_exec, check=True, env=env)
+        result.save_as_json(str(Path(json_data_file.parent / f"{json_data_file.stem}_lyrics")))
 
-        temporary_lyrics_file.unlink()
-
-        print(lyrics)
+    # def force_align_lyrics(self, audio_file: Path, json_data_file: Path) -> Any:
+    #     lyrics = read_json_file(json_data_file).get("lyrics_main", "")
+    #     if lyrics == "":
+    #         raise Exception(f"No lyrics found for {audio_file}")
+    #
+    #     env = os.environ.copy()
+    #     env["PYTHONUTF8"] = "1"
+    #     env["HF_HOME"] = r"D:\python\miraa-alternative\src\.temp\hf_cache"
+    #     env["HF_HOME"] = str(MODEL_DIR / "faster_whisper")
+    #
+    #     temporary_lyrics_file = Path(json_data_file.parent / f"{json_data_file.stem}_lyrics.txt")
+    #     output_lrc_file = Path(json_data_file.parent / f"{json_data_file.stem}_lyrics.lrc")
+    #     # output_lrc_file = Path(json_data_file.parent / f"{json_data_file.stem}_lyrics.elrc")
+    #
+    #     temporary_lyrics_file.write_text(lyrics, encoding="utf-8")
+    #
+    #     command_to_exec = [
+    #         "lyric-align",
+    #         str(audio_file),
+    #         str(temporary_lyrics_file),
+    #         # "--format", "elrc",
+    #         "--format", "lrc",
+    #         "--output", str(output_lrc_file),
+    #         "--model", "large-v2",
+    #         "--device", "cuda",
+    #         # "--no-vad",
+    #         "--pairing", "2",
+    #         "--interpolate",
+    #         # "--threshold", "0.03",
+    #         "--window", "2"
+    #     ]
+    #
+    #     subprocess.run(command_to_exec, check=True, env=env)
+    #
+    #     temporary_lyrics_file.unlink()
+    #
+    #     print(lyrics)
 
 if __name__ == "__main__":
     fa = ForcedAlignment()
-    fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\aRDURmIYBZ4_vocal.wav"),
-                          Path(r"D:\python\miraa-alternative\src\.temp\Mela! - Ryokuoushoku Shakai.json"))
-    fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\d6i4AtCxrDo_vocal.wav"),
-                          Path(r"D:\python\miraa-alternative\src\.temp\Haikei Shounenyo - Hump Back.json"))
-    fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\GQ3V50XoLOM_vocal.wav"),
-                          Path(r"D:\python\miraa-alternative\src\.temp\ライラック - 美波.json"))
-
+    # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\aRDURmIYBZ4_vocal.wav"),
+    #                       Path(r"D:\python\miraa-alternative\src\.temp\Mela! - Ryokuoushoku Shakai.json"))
+    # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\d6i4AtCxrDo_vocal.wav"),
+    #                       Path(r"D:\python\miraa-alternative\src\.temp\Haikei Shounenyo - Hump Back.json"))
+    # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\GQ3V50XoLOM_vocal.wav"),
+    #                       Path(r"D:\python\miraa-alternative\src\.temp\ライラック - 美波.json"))
+    fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\QLBfxG0cenQ_vocal.wav"),
+                          Path(r"D:\python\miraa-alternative\src\.temp\想い人 - Ryokuoushoku Shakai.json"))
+    fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\vOLncha7MqM_vocal.wav"),
+                          Path(r"D:\python\miraa-alternative\src\.temp\君のせい - the peggies.json"))
 
 # region japanese morphological analyzer
 # class TaggedData:
