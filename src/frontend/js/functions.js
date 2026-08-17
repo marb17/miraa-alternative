@@ -3,7 +3,8 @@ let StartUp = false;
 let inpage3=false;
 let response;
 let data;
-let lyric;
+let lyricArray;
+let formattedLyrics;
 
 const circlec = document.getElementById("circlecontainer");
 const appbackground=document.getElementById("app");
@@ -43,7 +44,7 @@ async function StartMenuTransition() {
     appbackground.style.backgroundColor = "#887aab";
     circleout.style.backgroundColor = "#887aab";
     circleout.style.border = "#887aab";
-    clickanywhere.style.color="#887aab";
+    clickanywhere.style.color= "#887aab";
     titletextcontainer.style.opacity = 0;
     await delay(400);
     window.location.href= "page2.html";
@@ -53,11 +54,16 @@ async function EnterPage3(){
     try {
         response = await fetch('../../../test_data/output/Haikei Shounenyo - Hump Back.json');
         data = await response.json();
-        lyric = data.translated_lyrics;
+        lyricArray = data.translated_lyrics;
 
-        console.log(lyric);
+        console.log(lyricArray);
+        formattedLyrics = lyricArray.join('<br>')+ '<br><br>&nbsp;';
     } catch (error) {
+
         console.error("Failed to load lyrics:", error);
     }
-    lyrics.textContent =lyric;
-}
+    lyrics.innerHTML = formattedLyrics;
+} // for future reference : Basically, this line of code above takes the text from the json file's array thing
+// then it combined all of the items in the array, and adds a <br> between each single item (in this case on line of lyrics)
+// then the .innerHTML is used to treat the entire line of every item and <br> as a line of html code, thus causing
+// all of the lines to be neatly formatted and separated.
