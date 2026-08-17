@@ -35,3 +35,8 @@ class InvalidDictDefinitionFormatError(Exception):
 
     def logger_invalid_dict_format(self):
         self.logger.critical(f"InvalidDictDefinitionFormatError: {self.message}")
+
+
+# DATABASE
+class DatabaseError(Exception):
+    pass

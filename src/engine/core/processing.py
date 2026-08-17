@@ -236,21 +236,24 @@ class ForcedAlignment:
         # for lyric in process_lyrics: print(lyric)
         print(process_lyrics)
 
-        result = model.align(str(audio_file), process_lyrics, 
+        # transcription =
+
+        result = model.align(str(audio_file), process_lyrics,
                              language="ja",
                              vad=True,
-                             vad_threshold=0.5, 
+                             vad_threshold=0.5,
                              original_split=True,
                              min_word_dur=0.08,
+                             no_speech_threshold=1,
                              # failure_threshold=0.3,
-                             # fast_mode=True
+                             # fast_mode=True,
                              )
 
-        result = model.refine(
-            str(audio_file),
-            result,
-            precision=0.05,
-        )
+        # result = model.refine(
+        #     str(audio_file),
+        #     result,
+        #     precision=0.05,
+        # )
 
         result.save_as_json(str(Path(json_data_file.parent / f"{json_data_file.stem}_lyrics")))
 
@@ -294,16 +297,16 @@ class ForcedAlignment:
 
 if __name__ == "__main__":
     fa = ForcedAlignment()
-    # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\aRDURmIYBZ4_vocal.wav"),
-    #                       Path(r"D:\python\miraa-alternative\src\.temp\Mela! - Ryokuoushoku Shakai.json"))
+    fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\aRDURmIYBZ4_vocal.wav"),
+                          Path(r"D:\python\miraa-alternative\src\.temp\Mela! - Ryokuoushoku Shakai.json"))
     # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\d6i4AtCxrDo_vocal.wav"),
     #                       Path(r"D:\python\miraa-alternative\src\.temp\Haikei Shounenyo - Hump Back.json"))
     # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\GQ3V50XoLOM_vocal.wav"),
     #                       Path(r"D:\python\miraa-alternative\src\.temp\ライラック - 美波.json"))
-    fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\QLBfxG0cenQ_vocal.wav"),
-                          Path(r"D:\python\miraa-alternative\src\.temp\想い人 - Ryokuoushoku Shakai.json"))
-    fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\vOLncha7MqM_vocal.wav"),
-                          Path(r"D:\python\miraa-alternative\src\.temp\君のせい - the peggies.json"))
+    # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\QLBfxG0cenQ_vocal.wav"),
+    #                       Path(r"D:\python\miraa-alternative\src\.temp\想い人 - Ryokuoushoku Shakai.json"))
+    # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\vOLncha7MqM_vocal.wav"),
+    #                       Path(r"D:\python\miraa-alternative\src\.temp\君のせい - the peggies.json"))
 
 # region japanese morphological analyzer
 # class TaggedData:

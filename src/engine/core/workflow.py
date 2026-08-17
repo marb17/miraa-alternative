@@ -22,6 +22,8 @@ from engine.utils.paths import TEMP_DIR
 
 from engine.utils.logger import Logger
 
+import torch
+
 logger = Logger(__name__)
 
 class WorkflowManager:
@@ -31,6 +33,10 @@ class WorkflowManager:
         """
         self._env_data = load_env_file()
         self._config = read_config()
+
+        # temporary gpu check
+        if not torch.cuda.is_available():
+            raise Exception("CUDA not available")
 
     def __enter__(self):
         return self

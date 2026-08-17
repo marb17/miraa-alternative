@@ -5,6 +5,14 @@ from typing import Literal, Any
 
 
 @dataclass
+class DatabaseEntry:
+    title: str
+    artist: str
+    json_path: Path
+    song_path: Path
+
+
+@dataclass
 class SongContext:
     json_song_data: dict
     json_file_path: Path
