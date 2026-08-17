@@ -14,6 +14,10 @@ document.addEventListener( "keydown", (keypress) => {
 
 document.addEventListener( "keydown", (keypress) => {
     if (keypress.key === "3") {
-        returnpage3();
+        returnpage3()
     }
-}) // temporary way to go to third page
+}) //// temporary way to go to third page
+
+if (window.location.pathname.includes("page3.html")) {
+    EnterPage3();
+}

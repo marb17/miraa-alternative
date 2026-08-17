@@ -1,12 +1,16 @@
 // Below declares all used variables
 let StartUp = false;
-
+let inpage3=false;
+let response;
+let data;
+let lyric;
 
 const circlec = document.getElementById("circlecontainer");
 const appbackground=document.getElementById("app");
 const circleout=document.getElementById("circleoutline");
 const clickanywhere = document.getElementById("clickanywheretostart");
 const titletextcontainer = document.getElementById("titlecontainer");
+const lyrics = document.getElementById("lyrics");
 // Above declares all used variables
 
 // Below are all the functions that will be used
@@ -27,6 +31,7 @@ function returnpage2() {
 
 function returnpage3() {
     window.location.href="page3.html";
+    inpage3=true;
 }
 
 // this function starts the transition for the first to second page
@@ -42,4 +47,17 @@ async function StartMenuTransition() {
     titletextcontainer.style.opacity = 0;
     await delay(400);
     window.location.href= "page2.html";
+}
+
+async function EnterPage3(){
+    try {
+        response = await fetch('../../../test_data/output/Haikei Shounenyo - Hump Back.json');
+        data = await response.json();
+        lyric = data.translated_lyrics;
+
+        console.log(lyric);
+    } catch (error) {
+        console.error("Failed to load lyrics:", error);
+    }
+    lyrics.textContent =lyric;
 }

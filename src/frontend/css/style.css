@@ -199,13 +199,20 @@ body{
     overflow: hidden;
 }
 
-#rectangle-object{
+#lyrics-container{
     margin:0;
     padding:0;
     background-color: #403465;
     position:relative;
     height: 100vh;
     width: 40vw;
+
+    display:flex;
+}
+
+
+#lyrics{
+    font-family: "Noto Sans", sans-serif;
 }
 
 
