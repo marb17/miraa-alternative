@@ -12,11 +12,116 @@
     }
 }
 
+#bodypage1{
+    margin:0;
+    padding:0;
+    background-color: #e4e4e4;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
 
 
+#titlecontainer{
+    height:95vh;
+    width: 95vw;
+    margin: auto;
+    display:hidden;
 
+    display:grid;
+    grid-template-columns: repeat(6, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    gap:1vh;
 
-/* below is styling for first page */
+    outline: 2px solid #151515;
+}
+
+.titletext{
+    font-size: 13vh;
+    color: #151515;
+    font-family: "Readex Pro", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: bold;
+    font-style: normal;
+    margin : 0;
+    line-height: 1;
+
+}
+
+#titletext1{
+    grid-column: 1/span 2;
+    grid-row:1/span 3;
+
+    align-self : center;
+    justify-self : center;
+}
+
+#titletext2{
+    grid-column: 5/span 4;
+    grid-row: 8/span 1;
+
+    font-family: "Readex Pro", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: bold;
+    font-style: normal;
+    margin : 0;
+    line-height: 1;
+    font-size: 5vh;
+
+    justify-self: center;
+
+    z-index: 5;
+}
+
+#clickanywheretostart{
+
+    font-family: "Readex Pro", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: lighter;
+    font-style: normal;
+    margin : 0;
+    line-height: 1;
+    font-size: 3vh;
+    justify-self: center;
+
+    grid-column: 4/ span1;
+    grid-row: 5/span 1;
+
+    z-index: 5;
+}
+
+.circle{
+    border-radius: 50%;
+}
+
+#circlepage1{
+    width: 100vw;
+    height: 100vw;
+    background-color: #acacac;
+    position: absolute;
+    top: 20%;
+    left: 50%;
+}
+
+#aboutparagraph{
+
+    font-family: "Readex Pro", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: lighter;
+    line-height: 1;
+    font-size: 2.5vh;
+
+    grid-column: 1/span 2;
+    grid-row: 7/span 2;
+
+    align-self : start;
+    justify-self : center;
+}
+/* old stuff. dont delete, i use this for future references since i still have no clue on how stuff works
 body{
     margin:0;
     padding:0;
@@ -41,7 +146,7 @@ body{
 
     position: absolute;
 
-    /*right: -40%;*/
+    right: -40%;
     left: 50%;
     top: 50%;
     transform: translateY(-50%);
@@ -83,7 +188,7 @@ body{
 
 #titletext{
     font-family: "Noto Sans", sans-serif;
-    font-weight: 676; /*haha 676 */
+    font-weight: 676; /*haha 676
     font-size: 16vh;
 }
 
@@ -97,7 +202,7 @@ body{
     align-items: flex-end;
     justify-content: flex-start;
     gap: 0px;
-    line-height: 67px; /* haha 67 */
+    line-height: 67px; /* haha 67
     transition: opacity 0.4s ease-out;
 
     position:absolute;
@@ -123,7 +228,7 @@ body{
     text-align: center;
 }
 
-/* below is styling for the second page */
+/* below is styling for the second page
 
 @keyframes slideInFromBottomRight {
     from { transform: translate(40vw, 40vh);}
@@ -180,7 +285,7 @@ body{
 }
 
 
-/* below is styling for third page */
+/* below is styling for third page
 
 @keyframes slideInFromRight {
     from { transform: translateX(50vw) translateY(-50%);}
@@ -215,7 +320,7 @@ body{
 
 #lyrics-container::-webkit-scrollbar {
     display: none;
-} /* hides ugly scrollbar borders. only works for some browsers (*/
+} /* hides ugly scrollbar borders. only works for some browsers (
 
 
 
@@ -245,4 +350,20 @@ body{
 
     animation: spin 25s infinite linear;
     filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.3));
+}
+
+#player-containe{
+    background-color: black;
+    height:20vh;
+    width:100vw;
+    margin-bottom:0;
+}
+
+#temporaryblocktest{
+    position:fixed;
+    bottom: 0;
+    background-color: #000000;
+    height: 10vh;
+    width: 100vw;
+
 }
