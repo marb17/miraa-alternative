@@ -5,6 +5,10 @@ let response;
 let data;
 let lyricArray;
 let formattedLyrics;
+let mouseX = window.innerWidth / 2;
+let mouseY = window.innerHeight / 2;
+let gridX = window.innerWidth / 2;
+let gridY = window.innerHeight / 2;
 
 const circlec = document.getElementById("circlecontainer");
 const appbackground=document.getElementById("app");
@@ -12,7 +16,50 @@ const circleout=document.getElementById("circleoutline");
 const clickanywhere = document.getElementById("clickanywheretostart");
 const titletextcontainer = document.getElementById("titlecontainer");
 const lyrics = document.getElementById("lyrics");
+const gridbg = document.getElementById("grid");
+const gridease = 0.01; // this value causes the grid movement to lag behind (for smoothness)
 // Above declares all used variables
+
+function gridmove() {
+    gridX += (mouseX - gridX)*gridease;
+    gridY += (mouseY - gridY)*gridease;
+
+    gridbg.style.transform = `translate3d(${gridX}px, ${ gridY}px, 0) translate(-50%, -50%)`;
+    requestAnimationFrame(gridmove);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Below are all the functions that will be used
 

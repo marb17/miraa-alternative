@@ -21,3 +21,10 @@ document.addEventListener( "keydown", (keypress) => {
 if (window.location.pathname.includes("page3.html")) {
     EnterPage3();
 }
+
+
+window.addEventListener('mousemove', (event) => {
+    mouseX = event.clientX; //finds cursor x position
+    mouseY = event.clientY; //finds cursor y positont
+});
+gridmove();
