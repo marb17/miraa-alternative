@@ -1,6 +1,8 @@
 // Below declares all used variables
 let StartUp = false;
 let inpage3=false;
+let inpage1 = true;
+let inpage2 = false;
 let response;
 let data;
 let lyricArray;
@@ -9,6 +11,7 @@ let mouseX = window.innerWidth / 2;
 let mouseY = window.innerHeight / 2;
 let gridX = window.innerWidth / 2;
 let gridY = window.innerHeight / 2;
+let CurrentPage = 1;
 
 const circlec = document.getElementById("circlecontainer");
 const appbackground=document.getElementById("app");
@@ -18,6 +21,7 @@ const titletextcontainer = document.getElementById("titlecontainer");
 const lyrics = document.getElementById("lyrics");
 const gridbg = document.getElementById("grid");
 const gridease = 0.01; // this value causes the grid movement to lag behind (for smoothness)
+const searchresults = document.getElementById("searchresults");
 // Above declares all used variables
 
 function gridmove() {
@@ -28,8 +32,22 @@ function gridmove() {
     requestAnimationFrame(gridmove);
 }
 
+function Page1ToPage2(){
+    if (!window.location.pathname.includes("page1.html")) return;
+    goToPage2();
+}
 
+function goToPage1() {
+    window.location.href="page1.html";
+}
 
+function goToPage2(){
+    window.location.href="page2.html";
+}
+
+function goToPage3() {
+    window.location.href = "page3.html";
+}
 
 
 
@@ -68,34 +86,20 @@ function delay(ms){
 } // function to create delay in milliseconds
 
 
-// this is a temporary way to go back to the first page as i havent added a proper way to return. Terrible functionality btw just reload the page when u come
-function returnpage1() {
-        window.location.href="page1.html";
-}
-
-function returnpage2() {
-    window.location.href="page2.html";
-}
-
-function returnpage3() {
-    window.location.href="page3.html";
-    inpage3=true;
-}
-
 // this function starts the transition for the first to second page
-async function StartMenuTransition() {
-    if (StartUp === true) return;
-    console.log("StartMenu");
-    StartUp = true;
-    circlec.style.transform = "translate(-100%, -50%)";
-    appbackground.style.backgroundColor = "#887aab";
-    circleout.style.backgroundColor = "#887aab";
-    circleout.style.border = "#887aab";
-    clickanywhere.style.color= "#887aab";
-    titletextcontainer.style.opacity = 0;
-    await delay(400);
-    window.location.href= "page2.html";
-}
+// async function StartMenuTransition() {
+//    if (StartUp === true) return;
+//    console.log("StartMenu");
+//    StartUp = true;
+//    circlec.style.transform = "translate(-100%, -50%)";
+//    appbackground.style.backgroundColor = "#887aab";
+//    circleout.style.backgroundColor = "#887aab";
+//    circleout.style.border = "#887aab";
+ //   clickanywhere.style.color= "#887aab";
+ //   titletextcontainer.style.opacity = 0;
+ //   await delay(400);
+//    window.location.href= "page2.html";
+
 
 async function EnterPage3(){
     try {
