@@ -6,10 +6,12 @@ from typing import Literal, Any
 
 @dataclass
 class DatabaseEntry:
-    title: str
-    artist: str
     json_path: Path
-    song_path: Path
+
+    id: int = field(default=None)
+    title: str = field(default=None)
+    artist: str = field(default=None)
+    youtube_id: str = field(default=None)
 
 
 @dataclass
