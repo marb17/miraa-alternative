@@ -77,7 +77,7 @@
     height:95vh;
     width: 95vw;
     margin: auto;
-    display: none;
+    opacity: 0;
 
         display: grid;
         grid-template-columns: repeat(6, 1fr);
@@ -187,12 +187,12 @@
     height:95vh;
     width: 95vw;
     margin: auto;
-    display: none;
+    opacity: 0;
 
     display: grid;
     grid-template-columns: repeat(6, 1fr);
     grid-template-rows: repeat(3, 1fr) auto auto repeat(3,1fr);
-    gap: 0px;
+    gap: 0;
 
     outline: 2px solid #151515;
 }
