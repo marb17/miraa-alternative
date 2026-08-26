@@ -21,6 +21,7 @@ const titletextcontainer = document.getElementById("titlecontainer");
 const lyrics = document.getElementById("lyrics");
 const gridbg = document.getElementById("grid");
 const gridease = 0.01; // this value causes the grid movement to lag behind (for smoothness)
+const searchinput = document.getElementById("searchinput");
 const searchresults = document.getElementById("searchresults");
 // Above declares all used variables
 

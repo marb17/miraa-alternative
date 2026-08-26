@@ -34,17 +34,14 @@ window.addEventListener('mousemove', (event) => {
 });
 if (gridbg) {
     gridmove();
-}
+};
 
-if (window.location.pathname.includes("page2.html")) {
-    document.addEventListener("keydown", (keypress) => {
-        if (keypress.key === "p") {
-            if (!searchresults) return;
-            searchresults.style.animation =
-                "boxExpand 0.6s cubic-bezier(0.7410154978434245, 0.09296875000000004, 0.27351557413736977, 0.795468839009603) forwards";
+searchinput.addEventListener("submit", function(event) {
+    const query = event.target.value;
+    console.log(query);
+    event.preventDefault();
 
-        }
-
-    });
-
-}
+    if (!searchresults) return;
+    searchresults.style.animation =
+        "boxExpand 0.6s cubic-bezier(0.7410154978434245, 0.09296875000000004, 0.27351557413736977, 0.795468839009603) forwards";
+})
