@@ -14,6 +14,8 @@ import sys
 import multiprocessing
 import subprocess
 
+import whisper
+
 from engine.utils.classes.dataclasses import UIPromptRequest
 # HELPER LIBRARIES
 from engine.utils.functions.filesystem import read_json_file
@@ -28,8 +30,9 @@ from engine.utils.default.default_var import AUDIO_MODEL_PRESETS
 # import nagisa
 
 from pydub import AudioSegment
-# from lyric_align import align, Segment
+import whisperx
 import stable_whisper
+from stable_whisper.audio import load_audio
 
 from engine.utils.logger import Logger
 logger = Logger(__name__)
@@ -212,11 +215,20 @@ class ForcedAlignment:
     def force_align_lyrics(self, audio_file: Path, json_data_file: Path) -> Any:
         env = os.environ.copy()
         env["PYTHONUTF8"] = "1"
-        env["HF_HOME"] = str(MODEL_DIR / "stable_whisper")
+        env["HF_HOME"] = str(MODEL_DIR / "whisperx")
 
-        model = stable_whisper.load_model("large-v2",
-                                          download_root=str(MODEL_DIR / "stable_whisper"),
-                                          device="cuda")
+        # model = whisperx.load_model("kotoba-tech/kotoba-whisper-bilingual-v1.0-faster",
+        #                                   download_root=str(MODEL_DIR / "whisperx"),
+        #                                   device="cuda")
+        model = stable_whisper.load_hf_whisper("kotoba-tech/kotoba-whisper-bilingual-v1.0",
+                                          download_root=str(MODEL_DIR / "whisperx"),
+                                          # device="cpu",
+                                          device="cuda",
+                                          # compute_type="bfloat16",
+                                          # cpu_threads=4,
+                                          )
+
+        audio = load_audio(str(audio_file))
 
         lyrics = read_json_file(json_data_file).get("lyrics_main", "").split("\n")
 
@@ -231,23 +243,25 @@ class ForcedAlignment:
                 mapping_index.append((lyric, "do"))
 
         process_lyrics = [lyric[0] for lyric in mapping_index if lyric[1] == "do"]
-        process_lyrics = "\n".join(process_lyrics)
+        process_lyrics = "".join(process_lyrics)
+        # process_lyrics = "\n".join(process_lyrics)
 
         # for lyric in process_lyrics: print(lyric)
         print(process_lyrics)
 
-        # transcription =
 
-        result = model.align(str(audio_file), process_lyrics,
+        result = model.align(audio, process_lyrics,
                              language="ja",
                              vad=True,
                              vad_threshold=0.5,
                              original_split=True,
                              min_word_dur=0.08,
-                             no_speech_threshold=1,
+                             # no_speech_threshold=1,
                              # failure_threshold=0.3,
                              # fast_mode=True,
                              )
+
+        print(result)
 
         # result = model.refine(
         #     str(audio_file),
@@ -255,45 +269,8 @@ class ForcedAlignment:
         #     precision=0.05,
         # )
 
-        result.save_as_json(str(Path(json_data_file.parent / f"{json_data_file.stem}_lyrics")))
+        # result.save_as_json(str(Path(json_data_file.parent / f"{json_data_file.stem}_lyrics")))
 
-    # def force_align_lyrics(self, audio_file: Path, json_data_file: Path) -> Any:
-    #     lyrics = read_json_file(json_data_file).get("lyrics_main", "")
-    #     if lyrics == "":
-    #         raise Exception(f"No lyrics found for {audio_file}")
-    #
-    #     env = os.environ.copy()
-    #     env["PYTHONUTF8"] = "1"
-    #     env["HF_HOME"] = r"D:\python\miraa-alternative\src\.temp\hf_cache"
-    #     env["HF_HOME"] = str(MODEL_DIR / "faster_whisper")
-    #
-    #     temporary_lyrics_file = Path(json_data_file.parent / f"{json_data_file.stem}_lyrics.txt")
-    #     output_lrc_file = Path(json_data_file.parent / f"{json_data_file.stem}_lyrics.lrc")
-    #     # output_lrc_file = Path(json_data_file.parent / f"{json_data_file.stem}_lyrics.elrc")
-    #
-    #     temporary_lyrics_file.write_text(lyrics, encoding="utf-8")
-    #
-    #     command_to_exec = [
-    #         "lyric-align",
-    #         str(audio_file),
-    #         str(temporary_lyrics_file),
-    #         # "--format", "elrc",
-    #         "--format", "lrc",
-    #         "--output", str(output_lrc_file),
-    #         "--model", "large-v2",
-    #         "--device", "cuda",
-    #         # "--no-vad",
-    #         "--pairing", "2",
-    #         "--interpolate",
-    #         # "--threshold", "0.03",
-    #         "--window", "2"
-    #     ]
-    #
-    #     subprocess.run(command_to_exec, check=True, env=env)
-    #
-    #     temporary_lyrics_file.unlink()
-    #
-    #     print(lyrics)
 
 if __name__ == "__main__":
     fa = ForcedAlignment()

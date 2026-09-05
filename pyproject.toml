@@ -14,9 +14,8 @@ dependencies = [
     "gdown",
     "pyperclip",
     "rapidfuzz",
-#    "lyric-align",
-#    "faster-whisper",
-    "whisperx",
+    "openai-whisper",
+    "stable-whisper",
 
     # force a only windows instasll
     "pywin32 >= 300; platform_system == 'Windows'",
