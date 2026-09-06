@@ -466,7 +466,7 @@ class Downloader:
                     sleep(retry_sleep)
                     info = None
 
-            if info is None:
+            if info is None or info == []:
                 # TODO add fall back query
                 raise DownloadError(f"Could not extract info from {youtube_query}")
             info = ydl.sanitize_info(info)
@@ -475,6 +475,10 @@ class Downloader:
             persistent_choices = [
                                   {"type": "__nav__", "display": "New Query", "value": "__new__"}
             ]
+
+            if not results:
+                # TODO add fall back query
+                raise DownloadError(f"Could not find song from {info["id"]}")
 
             formatted_choices = []
             for list_idx, track in enumerate(results):
@@ -500,6 +504,7 @@ class Downloader:
                     sub_type="youtube"
                 )
 
+
             user_choice = formatted_choices[user_choice["value"]]
             youtube_id = user_choice["id"]
             youtube_metadata = user_choice["metadata"]
@@ -511,7 +516,7 @@ class Downloader:
         except FileNotFoundError:
             pass
 
-        yield from self.download_song(youtube_id, limit=limit, retry_count=retry_count, retry_sleep=retry_sleep)
+        yield from self.download_song(youtube_id, retry_count=retry_count, retry_sleep=retry_sleep)
 
         # FINAL WRITE
 

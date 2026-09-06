@@ -78,7 +78,7 @@ class WorkflowManager:
                 json_data=json_data
             )
 
-        if not contains_japanese(genius_data.get("lyrics", "")):
+        if not contains_japanese(genius_data.get("lyrics", ""), threshold=0.02):
             response = yield UIPromptRequest(
                 type="confirm",
                 message="The lyrics are romanized, using a LLM to convert into Japanese scripts.",
@@ -155,10 +155,13 @@ class WorkflowManager:
         )
 
         with ForcedAlignment() as fa:
-            fa.force_align_lyrics(
+            segments = fa.force_align_lyrics(
                 vocal_audio_file,
                 json_path
             )
+
+        python_segments = [seg.to_dict() for seg in segments]
+        write_json_file(json_path, python_segments, ["timestamps"])
 
         return True
 

@@ -8,7 +8,7 @@ file_path = Path(r"D:\python\miraa-alternative\src\.temp\temp.json")
 
 data = read_json_file(file_path)
 file_path.write_text(json.dumps(data, indent=4))
-
+5
 playsound3.playsound(Path(r"D:\python\miraa-alternative\src\.temp\d6i4AtCxrDo.wav"), block=False)
 start_time = time.time()
 

@@ -312,6 +312,14 @@ if __name__ == "__main__":
     #                       Path(r"D:\python\miraa-alternative\src\.temp\Mela! - Ryokuoushoku Shakai.json"))
     data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\d6i4AtCxrDo_vocal.wav"),
                           Path(r"D:\python\miraa-alternative\src\.temp\Haikei Shounenyo - Hump Back.json"))
+    # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\qs4Q4cQxyU4_vocal.wav"),
+    #                       Path(r"D:\python\miraa-alternative\src\.temp\Wherever you are - ONE OK ROCK.json"))
+    # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\1zwaZkOXXqw_vocal.wav"),
+    #                       Path(r"D:\python\miraa-alternative\src\.temp\DADDY ! DADDY ! DO ! - Masayuki Suzuki.json"))
+    # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\phwvj0_XM4k_vocal.wav"),
+    #                       Path(r"D:\python\miraa-alternative\src\.temp\JET - POLKADOT STINGRAY.json"))
+
+
     # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\GQ3V50XoLOM_vocal.wav"),
     #                       Path(r"D:\python\miraa-alternative\src\.temp\ライラック - 美波.json"))
     # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\QLBfxG0cenQ_vocal.wav"),
