@@ -230,7 +230,7 @@ class ForcedAlignment:
         # for lyric in process_lyrics: print(lyric)
         print(process_lyrics)
 
-        temp_lyric_path = Path(json_data_file.parent / f"{json_data_file.stem}_lyrics.txt)")
+        temp_lyric_path = Path(json_data_file.parent / f"{json_data_file.stem}_lyrics.txt")
         temp_lyric_path.write_text(process_lyrics,
                                    encoding="utf-8")
 
@@ -241,7 +241,7 @@ class ForcedAlignment:
              "--no-vad",
              "--pairing", "auto",
              "--interpolate",
-             "--window", "4",
+             "--window", "3",
              ]
         )
 
