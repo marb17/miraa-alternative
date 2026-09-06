@@ -129,12 +129,12 @@ class Downloader:
 
     #TODO fix dup lines
     # @handle_spotify_no_connection_error
-    def authenticate(self, force_cache: bool = False) -> Generator[UIPromptRequest, None, bool]:
+    def authenticate(self, force_cache: bool = False) -> Generator[UIPromptRequest, None, bool | None]:
         """
         Initializes the spotipy client
         """
         if self._sp and self._sp_token:
-            return
+            return None
 
         auth_manager_no_token = SpotifyClientCredentials(client_id=self._env_data["SPOTIFY_CLIENT_ID"],
                                                 client_secret=self._env_data["SPOTIFY_CLIENT_SECRET"])

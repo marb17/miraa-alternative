@@ -124,16 +124,16 @@ class HomeScreen(Screen):
         else:
             self.start_app()
 
-        self.check_can_process_song()
-        self.is_connected_to_internet()
-        self.set_interval(0.5, self.is_connected_to_internet)
-        self.set_interval(0.5, self.check_can_process_song)
 
     def after_init_finished(self, result: Any = None) -> None:
         self.start_app()
 
     def start_app(self) -> None:
         self.authenticate_spotify()
+        self.check_can_process_song()
+        self.is_connected_to_internet()
+        self.set_interval(0.5, self.is_connected_to_internet)
+        self.set_interval(0.5, self.check_can_process_song)
 
 
 

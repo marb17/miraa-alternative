@@ -336,6 +336,7 @@ class ProcessSong(Screen):
             return True
         elif prompt_request.type == "select":
             return self.app.push_screen_wait(self.GeniusSelectSong(prompt_request.choices, prompt_request.extra_info.get("song_reference")))
+        return False
 
 
     def update_ui_tabs(self, value: str):

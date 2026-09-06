@@ -6,7 +6,7 @@ from typing import Any
 # PYPI LIBRARIES
 from pathlib import Path
 
-from engine.core.processing import AudioSeparation
+from engine.core.processing import AudioSeparation, ForcedAlignment
 from engine.core.translation_analysis import Translator
 from engine.extractors.geniusextractor import GeniusExtractor
 # HELPER LIBRARIES
@@ -64,7 +64,7 @@ class WorkflowManager:
 
         return True
 
-    def extract_genius_metadata(self, json_file: Path) -> Generator[Any, bool, bool]:
+    def extract_genius_metadata(self, json_file: Path) -> Generator[UIPromptRequest, bool, bool]:
         json_data = read_json_file(json_file)
 
         title, artist = json_data["pre_processing"]["raw_metadata"]["name"], json_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
@@ -128,8 +128,8 @@ class WorkflowManager:
                 "stems": {
                     "vocal": True
                 },
-                "vocal_file": f"{json_data["pre_processing"]["youtube_id"]}_vocal",
-                "inst_file": f"{json_data["pre_processing"]["youtube_id"]}_inst"},
+                "vocal_file": f"{json_data["pre_processing"]["youtube_id"]}_vocal.wav",
+                "inst_file": f"{json_data["pre_processing"]["youtube_id"]}_inst.wav"},
 
             ["vocal_separation"])
 
@@ -142,6 +142,23 @@ class WorkflowManager:
             translated_lyrics = yield from tl.translate_lyrics(json_data["lyrics_main"])
 
         write_json_file(json_path, translated_lyrics, ["translated_lyrics"])
+
+        return True
+
+    def force_align_lyrics(self, json_path: Path) -> Generator[UIPromptRequest, None, bool]:
+        json_data = read_json_file(json_path)
+        vocal_audio_file = Path(json_path.parent / json_data["vocal_separation"]["vocal_file"])
+
+        yield UIPromptRequest(
+            type="log",
+            message=f"Force aligning the lyrics"
+        )
+
+        with ForcedAlignment() as fa:
+            fa.force_align_lyrics(
+                vocal_audio_file,
+                json_path
+            )
 
         return True
 

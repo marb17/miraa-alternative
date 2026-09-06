@@ -3,15 +3,32 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Any
 
+@dataclass
+class LyricSegment:
+    line: str
+    start: float
+    end: float
+    score: float
+    matched: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "line": self.line,
+            "start": self.start,
+            "end": self.end,
+            "score": self.score,
+            "matched": self.matched
+        }
+
 
 @dataclass
 class DatabaseEntry:
     json_path: Path
 
-    id: int = field(default=None)
-    title: str = field(default=None)
-    artist: str = field(default=None)
-    youtube_id: str = field(default=None)
+    id: int
+    title: str
+    artist: str
+    youtube_id: str
 
 
 @dataclass

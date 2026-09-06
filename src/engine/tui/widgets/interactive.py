@@ -9,7 +9,6 @@ from textual.message import Message
 from textual.visual import SupportsVisual, Visual
 from textual.widget import Widget
 from textual.widgets import Label, Input, Button, DataTable, Static, Switch, Checkbox
-from textual.widgets._data_table import CellType
 
 from engine.utils.functions.filesystem import write_config, read_config
 
@@ -304,7 +303,7 @@ class TableSelect(Widget):
         data_table_widget = self.query_one("#input_table", DataTable)
         data_table_widget.add_columns(*columns)
 
-    def add_rows(self, rows: Iterable[Iterable[CellType]]) -> None:
+    def add_rows(self, rows: Iterable[Iterable[str]]) -> None:
         data_table_widget = self.query_one("#input_table", DataTable)
         data_table_widget.add_rows(rows)
 

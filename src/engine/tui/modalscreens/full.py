@@ -96,6 +96,7 @@ class SpotifyAuthenticateScreen(ModalScreen):
 
         elif event.triggered_by == "btn_skip":
             write_config(False, ["spotify_downloader", "token"])
+            self.app.read_config_worker()
             self.dismiss()
 
     def _on_key(self, event: events.Key) -> None:

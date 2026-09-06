@@ -222,9 +222,15 @@ class SpotifyCurrentlyPlayingWidget(Widget):
 
 
     def handle_start_updating(self):
+        if not self.app.use_spotify_token:
+            return
+
         self.update_timer.resume()
 
     def handle_stop_updating(self) -> None:
+        if not self.app.use_spotify_token:
+            return
+
         self.update_timer.pause()
 
 

@@ -4,26 +4,23 @@ from engine.utils.functions.filesystem import read_json_file
 import playsound3
 import time
 
-file_path = Path(r"D:\python\miraa-alternative\src\.temp\test.json")
+file_path = Path(r"D:\python\miraa-alternative\src\.temp\temp.json")
 
 data = read_json_file(file_path)
 file_path.write_text(json.dumps(data, indent=4))
 
-segements = data.get("segments")
-print(segements)
-
-playsound3.playsound(Path(r"D:\python\miraa-alternative\src\.temp\aRDURmIYBZ4.wav"), block=False)
+playsound3.playsound(Path(r"D:\python\miraa-alternative\src\.temp\d6i4AtCxrDo.wav"), block=False)
 start_time = time.time()
 
 last_seg_start = 0
 
 while True:
-    if time.time() - start_time > segements[0].get("end"):
-        segements.pop(0)
+    if time.time() - start_time > data[0].get("end"):
+        data.pop(0)
 
-    if time.time() - start_time > segements[0].get("start") and last_seg_start != segements[0].get("start"):
-        last_seg_start = segements[0].get("start")
-        print(segements[0]["text"])
+    if time.time() - start_time > data[0].get("start") and last_seg_start != data[0].get("start"):
+        last_seg_start = data[0].get("start")
+        print(data[0]["line"])
 
     # print(time.time() - start_time)
     time.sleep(0.05)

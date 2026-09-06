@@ -1,4 +1,5 @@
 # STANDARD LIBRARIES
+import json
 import os
 import time
 import gc
@@ -14,7 +15,7 @@ import sys
 import multiprocessing
 import subprocess
 
-from engine.utils.classes.dataclasses import UIPromptRequest
+from engine.utils.classes.dataclasses import UIPromptRequest, LyricSegment
 # HELPER LIBRARIES
 from engine.utils.functions.filesystem import read_json_file
 
@@ -207,9 +208,30 @@ class ForcedAlignment:
     def __init__(self):
         ...
 
-    def force_align_lyrics(self, audio_file: Path, json_data_file: Path) -> Any:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        gc.collect()
+
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
+
+        return False
+
+    def force_align_lyrics(self, audio_file: Path, json_data_file: Path) -> list[LyricSegment]:
         os.environ["PYTHONUTF8"] = "1"
         os.environ["HF_HOME"] = str(MODEL_DIR / "faster_whisper")
+
+        # silence added audio file
+        temp_audio_file = Path(audio_file.parent / f"{audio_file.stem}_temp.wav")
+        audio = AudioSegment.from_wav(audio_file)
+        silence = AudioSegment.silent(duration=1000)
+        combined = silence + audio
+        combined.export(str(temp_audio_file), format="wav")
+
 
         lyrics = read_json_file(json_data_file).get("lyrics_main", "").split("\n")
 
@@ -217,47 +239,97 @@ class ForcedAlignment:
 
         for lyric in lyrics:
             if lyric.startswith("[") and lyric.endswith("]"):
-                mapping_index.append((lyric, "skip"))
+                mapping_index.append((lyric, False))
             elif not lyric:
-                mapping_index.append((lyric, "skip"))
+                mapping_index.append((lyric, False))
             else:
-                mapping_index.append((lyric, "do"))
+                mapping_index.append((lyric, True))
 
-        process_lyrics = [lyric[0] for lyric in mapping_index if lyric[1] == "do"]
-        # process_lyrics = "".join(process_lyrics)
+        process_lyrics = [lyric[0] for lyric in mapping_index if lyric[1]]
         process_lyrics = "\n".join(process_lyrics)
 
-        # for lyric in process_lyrics: print(lyric)
-        print(process_lyrics)
-
         temp_lyric_path = Path(json_data_file.parent / f"{json_data_file.stem}_lyrics.txt")
+        temp_holding_file = Path(json_data_file.parent / f"{json_data_file.stem}_holding.json")
         temp_lyric_path.write_text(process_lyrics,
                                    encoding="utf-8")
 
-        subprocess.run(
-            ["lyric-align", str(audio_file), str(temp_lyric_path), "-o", str(temp_lyric_path),
+        data = list()
+
+        args_to_run = [
+            ["lyric-align", str(audio_file), str(temp_lyric_path), "-o", str(temp_holding_file),
              "--model", "large-v3",
              "--device", "cuda",
              "--no-vad",
              "--pairing", "auto",
              "--interpolate",
              "--window", "3",
-             ]
-        )
+             ],
+            ["lyric-align", str(temp_audio_file), str(temp_lyric_path), "-o", str(temp_holding_file),
+             "--model", "large-v3",
+             "--device", "cuda",
+             "--no-vad",
+             "--pairing", "auto",
+             "--interpolate",
+             "--window", "3",
+             ],
+        ]
+
+        for arg in args_to_run:
+            subprocess.run(
+                arg, check=True
+            )
+            data.append(read_json_file(temp_holding_file))
+
+        # for silence compensation
+        for item in data[1]:
+            item["start"] = max(0.0, item["start"] - 1.0)
+            item["end"] = max(0.0, item["end"] - 1.0)
+
+        final_aligned = list()
+        for passes in zip(*data):
+            score_sum = max(0.01, sum(p["score"] for p in passes))
+            weighted_start = sum(p["start"] * p["score"] for p in passes)
+            start = round(weighted_start / score_sum, 2)
+
+            weighted_end = sum(p["end"] * p["score"] for p in passes)
+            end = round(weighted_end / score_sum, 2)
+
+            score = round(score_sum / len(list(passes)), 2)
+
+            final_aligned.append(
+                LyricSegment(
+                    passes[0]["line"],
+                    start,
+                    end,
+                    score,
+                    all(p["matched"] for p in passes)
+                )
+            )
+
+        temp_holding_file.unlink()
+        temp_lyric_path.unlink()
+        temp_audio_file.unlink()
+
+        return final_aligned
 
 
 if __name__ == "__main__":
     fa = ForcedAlignment()
-    fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\aRDURmIYBZ4_vocal.wav"),
-                          Path(r"D:\python\miraa-alternative\src\.temp\Mela! - Ryokuoushoku Shakai.json"))
-    # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\d6i4AtCxrDo_vocal.wav"),
-    #                       Path(r"D:\python\miraa-alternative\src\.temp\Haikei Shounenyo - Hump Back.json"))
+    # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\aRDURmIYBZ4_vocal.wav"),
+    #                       Path(r"D:\python\miraa-alternative\src\.temp\Mela! - Ryokuoushoku Shakai.json"))
+    data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\d6i4AtCxrDo_vocal.wav"),
+                          Path(r"D:\python\miraa-alternative\src\.temp\Haikei Shounenyo - Hump Back.json"))
     # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\GQ3V50XoLOM_vocal.wav"),
     #                       Path(r"D:\python\miraa-alternative\src\.temp\ライラック - 美波.json"))
     # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\QLBfxG0cenQ_vocal.wav"),
     #                       Path(r"D:\python\miraa-alternative\src\.temp\想い人 - Ryokuoushoku Shakai.json"))
     # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\vOLncha7MqM_vocal.wav"),
     #                       Path(r"D:\python\miraa-alternative\src\.temp\君のせい - the peggies.json"))
+
+    parsed = [d.to_dict() for d in data]
+    temp = Path(r"D:\python\miraa-alternative\src\.temp\temp.json")
+    temp.write_text(json.dumps(parsed, ensure_ascii=False), encoding="utf-8")
+
 
 # region japanese morphological analyzer
 # class TaggedData:

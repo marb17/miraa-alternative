@@ -13,7 +13,7 @@ from engine.tui.screens.config.config import ConfigMenu, DownloadMenu
 from engine.tui.screens.menu.process_song import ProcessSong
 
 from engine.utils.functions.filesystem import read_config
-
+from engine.utils.paths import CONFIG_FILE
 
 
 class MiraaInterface(App):
@@ -62,6 +62,7 @@ class MiraaInterface(App):
 
         self.is_connected_to_internet()
         self.set_interval(3, self.is_connected_to_internet)
+
 
 
 
