@@ -1,4 +1,3 @@
-from textwrap import wrap
 from typing import Iterable
 
 from rich.text import Text

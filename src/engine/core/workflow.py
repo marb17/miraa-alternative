@@ -1,28 +1,23 @@
 # STANDARD LIBRARIES
-from concurrent.futures.thread import ThreadPoolExecutor
 from collections.abc import Generator
-from typing import Any
-
+from concurrent.futures.thread import ThreadPoolExecutor
 # PYPI LIBRARIES
 from pathlib import Path
+from typing import Any
+
+import torch
 
 from engine.core.processing import AudioSeparation, ForcedAlignment
 from engine.core.translation_analysis import Translator
 from engine.extractors.geniusextractor import GeniusExtractor
+from engine.utils.classes.dataclasses import SongContext, UIPromptRequest
+from engine.utils.classes.exceptions import DataMismatchError
+from engine.utils.functions.filesystem import read_json_file, write_json_file, read_config, load_env_file
 # HELPER LIBRARIES
 # from engine.utils.helper_funcs import questionary_select
 from engine.utils.functions.other import contains_japanese
-from engine.utils.functions.filesystem import read_json_file, write_json_file, read_config, load_env_file
-
-from engine.utils.classes.exceptions import DataMismatchError
-from engine.utils.paths import TEMP_DIR
-from engine.utils.classes.dataclasses import SongContext, UIPromptRequest
-from engine.utils.classes.exceptions import DataMismatchError
-from engine.utils.paths import TEMP_DIR
-
 from engine.utils.logger import Logger
-
-import torch
+from engine.utils.paths import TEMP_DIR
 
 logger = Logger(__name__)
 
@@ -55,7 +50,8 @@ class WorkflowManager:
             torch.cuda.empty_cache()
             torch.cuda.ipc_collect()
 
-    def download_new_song(self) -> Generator[Any, dict[str, Any], bool]:
+    @staticmethod
+    def download_new_song() -> Generator[Any, dict[str, Any], bool]:
         from engine.extractors.downloader import Downloader
 
         with Downloader() as dl:
@@ -64,7 +60,8 @@ class WorkflowManager:
 
         return True
 
-    def extract_genius_metadata(self, json_file: Path) -> Generator[UIPromptRequest, bool, bool]:
+    @staticmethod
+    def extract_genius_metadata(json_file: Path) -> Generator[UIPromptRequest, bool, bool]:
         json_data = read_json_file(json_file)
 
         title, artist = json_data["pre_processing"]["raw_metadata"]["name"], json_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
@@ -118,7 +115,8 @@ class WorkflowManager:
 
         return True
 
-    def separate_vocals(self, json_path: Path) -> Generator[UIPromptRequest, None, bool]:
+    @staticmethod
+    def separate_vocals(json_path: Path) -> Generator[UIPromptRequest, None, bool]:
         json_data = read_json_file(json_path)
 
         with AudioSeparation() as vs:
@@ -135,7 +133,8 @@ class WorkflowManager:
 
         return True
 
-    def translate_lyrics(self, json_path: Path) -> Generator[UIPromptRequest, None, bool]:
+    @staticmethod
+    def translate_lyrics(json_path: Path) -> Generator[UIPromptRequest, None, bool]:
         json_data = read_json_file(json_path)
 
         with Translator() as tl:
@@ -145,7 +144,8 @@ class WorkflowManager:
 
         return True
 
-    def force_align_lyrics(self, json_path: Path) -> Generator[UIPromptRequest, None, bool]:
+    @staticmethod
+    def force_align_lyrics(json_path: Path) -> Generator[UIPromptRequest, None, bool]:
         json_data = read_json_file(json_path)
         vocal_audio_file = Path(json_path.parent / json_data["vocal_separation"]["vocal_file"])
 

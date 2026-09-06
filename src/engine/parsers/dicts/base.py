@@ -1,16 +1,16 @@
+import os
+import time
 from abc import ABC, abstractmethod
-from typing import Any
+from concurrent.futures import ProcessPoolExecutor
 from functools import wraps
 from pathlib import Path
+
 from engine.utils.classes.dataclasses import RawYomitanEntry, DictionaryEntry, RedirectEntry
-from engine.utils.paths import DICTS_DIR
 from engine.utils.classes.exceptions import InvalidDictDefinitionFormatError
 from engine.utils.functions.filesystem import read_json_file
-import time
-from concurrent.futures import ProcessPoolExecutor
-import os
-
 from engine.utils.logger import Logger
+from engine.utils.paths import DICTS_DIR
+
 logger = Logger(__name__)
 
 

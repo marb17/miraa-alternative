@@ -1,23 +1,19 @@
+import re
+import time
+# ! TEMP
+from dataclasses import asdict
+from typing import Any
+from urllib.parse import unquote
+
+from engine.utils.constants import DICTS_DIR
+from engine.utils.helper_funcs import read_json_file, write_json_file
+
 from engine.parsers.dicts.base import BaseDictionaryParser
-from engine.utils.classes.dataclasses import ExampleSentence, RawYomitanEntry, DefinitionSense, DictionaryEntry, \
+from engine.utils.classes.dataclasses import RawYomitanEntry, DefinitionSense, DictionaryEntry, \
     RedirectEntry
 from engine.utils.classes.exceptions import InvalidDictDefinitionFormatError
-
-#! TEMP
-from pathlib import Path
-from dataclasses import asdict
-from engine.utils.helper_funcs import read_json_file, write_json_file
-from engine.utils.constants import DICTS_DIR
-from typing import Any
-from concurrent.futures import ProcessPoolExecutor
-import os
-import re
-from urllib.parse import unquote
-import time
-import json
-import math
-
 from engine.utils.logger import Logger
+
 logger = Logger(__name__)
 
 # region single parsers

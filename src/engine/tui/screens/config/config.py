@@ -1,23 +1,20 @@
 import os
 from typing import Any
 
-from PIL import ContainerIO
 from dotenv import set_key, load_dotenv
 from textual import events, on
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical, Container, VerticalGroup, HorizontalGroup, VerticalScroll
+from textual.containers import Horizontal, Container, VerticalGroup, HorizontalGroup, VerticalScroll
 from textual.message import Message
 from textual.screen import Screen
-from textual.widget import Widget
-from textual.widgets import Label, Button, Switch, Checkbox, Input, Header, Footer, TabbedContent, TabPane
+from textual.widgets import Label, Button, Switch, Input, Header, Footer, TabbedContent, TabPane
 
 from engine.tui.modalscreens.full import SpotifyAuthenticateScreen
 from engine.tui.modalscreens.interactive import UnsavedConfirmationModalScreen
 from engine.tui.widgets.interactive import ConfigOption
-from engine.utils.paths import ENV_FILE
-from engine.utils.default.default_var import DEFAULT_CONFIG
 from engine.utils.functions.filesystem import read_config, write_config
+from engine.utils.paths import ENV_FILE
 
 
 class DownloadMenu(Horizontal):
@@ -89,7 +86,7 @@ class DownloadMenu(Horizontal):
     anything_changed = False
 
     class ReAuthSpotify(Message):
-        def __init__(self, *args, **kwargs):
+        def __init__(self):
             super().__init__()
 
     def compose(self) -> ComposeResult:

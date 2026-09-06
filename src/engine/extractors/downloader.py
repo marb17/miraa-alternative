@@ -1,35 +1,29 @@
 # STANDARD LIBRARY
 import functools
+import json
 import queue
 import threading
 import types
-from pathlib import Path
-from time import sleep, time
-import json
-from typing import Any
 from collections.abc import Generator
-
-import requests.exceptions
+from pathlib import Path
+from time import sleep
+from typing import Any
 from typing import Literal
-from spotipy import cache_handler, CacheFileHandler, SpotifyException
-
-# HELPER LIBRARIES
-from engine.utils.functions.filesystem import read_json_file, load_env_file, read_config
 
 # PYPI LIBRARIES
 import spotipy
-from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
-
-import questionary as q
-
 import yt_dlp
-from yt_dlp.utils import DownloadError, ExtractorError
+from spotipy import CacheFileHandler, SpotifyException
+from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
+from yt_dlp.utils import DownloadError
 
-# CONSTANTS
-from engine.utils.paths import TEMP_DIR, CONFIG_FILE, CACHE_DIR
 from engine.utils.classes.dataclasses import UIPromptRequest
-
+# HELPER LIBRARIES
+from engine.utils.functions.filesystem import load_env_file, read_config
 from engine.utils.logger import Logger
+# CONSTANTS
+from engine.utils.paths import TEMP_DIR, CACHE_DIR
+
 logger = Logger(__name__)
 
 def handle_spotify_no_token_error(func):
@@ -277,7 +271,6 @@ class Downloader:
 
 
     def download_song(self, youtube_id: str,
-                      limit: int = 10,
                       retry_count: int = 3,
                       retry_sleep: float = 5,
                       download_type: Literal['audio', 'video'] = "audio") -> Generator[Any, dict[str, Any], bool | str]:
@@ -359,7 +352,8 @@ class Downloader:
             raise DownloadError(f"Could not download {youtube_id}")
 
 
-    def query_and_download_song(self, limit: int = 10,
+    def query_and_download_song(self,
+                      limit: int = 10,
                       retry_count: int = 3,
                       retry_sleep: float = 5) -> Generator[Any, dict[str, Any], bool | str]:
         # SPOTIFY SECTION

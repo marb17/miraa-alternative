@@ -1,19 +1,17 @@
 import os
+import socket
 import sys
 from typing import Iterable, Any
-import socket
 
 from textual import work, on
 from textual.app import App, SystemCommand
 from textual.screen import Screen
 
+from engine.tui.screens.config.config import ConfigMenu, DownloadMenu
 from engine.tui.screens.home import HomeScreen
 from engine.tui.screens.menu.new_download import DownloadScreen
-from engine.tui.screens.config.config import ConfigMenu, DownloadMenu
 from engine.tui.screens.menu.process_song import ProcessSong
-
 from engine.utils.functions.filesystem import read_config
-from engine.utils.paths import CONFIG_FILE
 
 
 class MiraaInterface(App):
@@ -102,7 +100,7 @@ class MiraaInterface(App):
             home_screen = self.get_screen("home")
             home_screen.post_message(event)
         except Exception as e:
-            raise Exception()
+            raise Exception(e)
 
 
 

@@ -1,6 +1,5 @@
 import sqlite3
 from pathlib import Path
-from rapidfuzz import fuzz
 
 from engine.utils.classes.dataclasses import DatabaseEntry
 from engine.utils.classes.exceptions import DatabaseError

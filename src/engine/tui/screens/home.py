@@ -2,19 +2,16 @@ from typing import Any
 
 from textual import work, on
 from textual.app import ComposeResult
+from textual.containers import Container, HorizontalGroup
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Button
-from textual.containers import Container, HorizontalGroup
 
-from engine.extractors.downloader import Downloader
 from engine.tui.modalscreens.full import SpotifyAuthenticateScreen
 from engine.tui.modalscreens.info import RestartAppModalScreen
-
+from engine.tui.screens.config.config import ConfigMenu, DownloadMenu
 from engine.tui.screens.init.first_init import FirstTimeInit
 from engine.tui.screens.menu.new_download import DownloadScreen
-from engine.tui.screens.config.config import ConfigMenu, DownloadMenu
 from engine.tui.screens.menu.process_song import ProcessSong
-
 from engine.tui.widgets.static import SpotifyCurrentlyPlayingWidget
 from engine.utils.functions.filesystem import read_config, all_available_temp_json_files
 

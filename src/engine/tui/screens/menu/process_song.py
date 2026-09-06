@@ -1,15 +1,14 @@
+import logging
 from pathlib import Path
 from typing import Any
-import logging
 
 from textual import events, work, on
 from textual._context import NoActiveAppError
 from textual.app import ComposeResult
-from textual.screen import Screen, ModalScreen
-from textual.containers import Vertical, Horizontal, Container
-from textual.widgets import Header, Footer, Label, Button, ContentSwitcher, Select, Static, RichLog, TabbedContent, \
-    Tabs, Tab
 from textual.binding import Binding
+from textual.containers import Vertical, Horizontal, Container
+from textual.screen import Screen, ModalScreen
+from textual.widgets import Header, Footer, Label, Button, ContentSwitcher, Select, Static, RichLog, Tabs, Tab
 
 from engine.core.workflow import WorkflowManager
 from engine.tui.screens.config.config import ProcessesMenu

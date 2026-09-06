@@ -1,4 +1,4 @@
-from engine.utils.constants import DICTS_DIR
+from engine.utils.paths import DICTS_DIR
 import shutil
 
 from engine.utils.logger import Logger

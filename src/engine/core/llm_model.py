@@ -1,18 +1,17 @@
 import gc
 import os
 import time
-from collections.abc import Generator
 from itertools import batched
 from math import ceil
 from pathlib import Path
 from typing import Any, Generator
 
-from engine.utils.classes.dataclasses import UIPromptRequest
-from engine.utils.functions.filesystem import read_json_file
-
 from lmdeploy import GenerationConfig
 
+from engine.utils.classes.dataclasses import UIPromptRequest
+from engine.utils.functions.filesystem import read_json_file
 from engine.utils.logger import Logger
+
 logger = Logger(__name__)
 
 

@@ -1,8 +1,6 @@
-from textual import events, work, on
+from textual import events, work
 from textual.app import ComposeResult
 from textual.containers import HorizontalGroup, Container
-from textual.events import ScreenSuspend, ScreenResume
-from textual.screen import Screen
 from textual.widget import Widget
 from textual.widgets import Static, ProgressBar
 

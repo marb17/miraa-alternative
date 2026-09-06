@@ -1,18 +1,16 @@
 # STANDARD LIBRARY
-from pathlib import Path
 from typing import Any, Generator
 
+from lyricsgenius import Genius
 # HELPER LIBRARIES
 from lyricsgenius.types import Song
-from lyricsgenius import Genius
-
-# PYPI PACKAGE
-from questionary import Choice
 
 from engine.utils.classes.dataclasses import UIPromptRequest
 from engine.utils.functions.filesystem import load_env_file
 from engine.utils.functions.other import fuzzy_partial_match
 from engine.utils.logger import Logger
+
+# PYPI PACKAGE
 logger = Logger(__name__)
 
 class GeniusExtractor:

@@ -1,15 +1,14 @@
-import time
 import threading
-from typing import Any, Generator
+from typing import Any
 
 from spotipy import SpotifyException
 from textual import events, work, on
-from textual.app import App, ComposeResult
-from textual.screen import Screen
+from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Vertical, CenterMiddle, Container, HorizontalGroup, HorizontalScroll
+from textual.screen import Screen
 from textual.widgets import Header, Footer, DataTable, Label, Button, ContentSwitcher, Static, LoadingIndicator, \
     RichLog
-from textual.binding import Binding
 from yt_dlp.utils import DownloadError
 
 from engine.core.workflow import WorkflowManager
