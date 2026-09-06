@@ -209,6 +209,7 @@ class ForcedAlignment:
 
     def force_align_lyrics(self, audio_file: Path, json_data_file: Path) -> Any:
         os.environ["PYTHONUTF8"] = "1"
+        os.environ["HF_HOME"] = str(MODEL_DIR / "faster_whisper")
 
         lyrics = read_json_file(json_data_file).get("lyrics_main", "").split("\n")
 
@@ -234,7 +235,14 @@ class ForcedAlignment:
                                    encoding="utf-8")
 
         subprocess.run(
-            ["lyric-align", str(audio_file), str(temp_lyric_path), "-o", str(temp_lyric_path)]
+            ["lyric-align", str(audio_file), str(temp_lyric_path), "-o", str(temp_lyric_path),
+             "--model", "large-v3",
+             "--device", "cuda",
+             "--no-vad",
+             "--pairing", "auto",
+             "--interpolate",
+             "--window", "4",
+             ]
         )
 
 
