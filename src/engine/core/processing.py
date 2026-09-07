@@ -124,7 +124,7 @@ class AudioSeparation:
         elif AUDIO_MODEL_PRESETS[self._model_name].type == "single":
             self._selected_model.load_model(model_filename=AUDIO_MODEL_PRESETS[self._model_name].name)
 
-    def separate_audio(self, audio_path: str | Path) -> Generator[UIPromptRequest, None, bool]:
+    def separate_audio(self, audio_path: str | Path) -> bool:
         """
         Separates vocals into respective stems determined by model used
         :param audio_path: Path to the file
@@ -132,36 +132,26 @@ class AudioSeparation:
         :return: None
         :rtype: None
         """
-        yield UIPromptRequest(
-            type="log",
-            message=f"Initializing '{self._model_name}'"
-        )
+        logger.debug(f"Initializing '{self._model_name}'")
         self._init_model()
-        yield UIPromptRequest(
-            type="log",
-            message="Finished loading model"
-        )
+        logger.debug("Finished loading model")
 
         if isinstance(audio_path, str):
             win_audio_path = Path(audio_path)
         elif isinstance(audio_path, Path):
             win_audio_path = audio_path
+        else:
+            raise NotImplementedError
 
         # ALWAYS CONVERTS A PARENTLESS PATH TO BASE DIR AT .TEMP
         if len(win_audio_path.parts) == 1:
             win_audio_path = TEMP_DIR / win_audio_path
 
-        yield UIPromptRequest(
-            type="log",
-            message="Starting to separate into stems"
-        )
+        logger.debug("Starting to separate into stems")
         now = time.time()
         output_files = self._selected_model.separate([win_audio_path])
 
-        yield UIPromptRequest(
-            type="log",
-            message=f"Took {(time.time() - now):.2f} seconds to separate stems"
-        )
+        logger.debug(f"Took {(time.time() - now):.2f} seconds to separate stems")
 
         output_files = [Path(f) for f in output_files]
 
@@ -188,10 +178,7 @@ class AudioSeparation:
             audio = audio + AUDIO_MODEL_PRESETS[self._model_name].gain
             audio.export(file, format="wav")
 
-        yield UIPromptRequest(
-            type="log",
-            message=f"Finished separating"
-        )
+        logger.debug(f"Finished separating")
 
         return True
 # endregion

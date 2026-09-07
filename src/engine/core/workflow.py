@@ -10,7 +10,7 @@ import torch
 from engine.core.processing import AudioSeparation, ForcedAlignment
 from engine.core.translation_analysis import Translator
 from engine.extractors.geniusextractor import GeniusExtractor
-from engine.utils.classes.dataclasses import SongContext, UIPromptRequest
+from engine.utils.classes.dataclasses import SongContext, UIPromptRequest, UILogRequest
 from engine.utils.classes.exceptions import DataMismatchError
 from engine.utils.functions.filesystem import read_json_file, write_json_file, read_config, load_env_file
 # HELPER LIBRARIES
@@ -61,13 +61,12 @@ class WorkflowManager:
         return True
 
     @staticmethod
-    def extract_genius_metadata(json_file: Path) -> Generator[UIPromptRequest, bool, bool]:
+    def extract_genius_metadata(json_file: Path) -> Generator[UIPromptRequest | UILogRequest, bool, bool]:
         json_data = read_json_file(json_file)
 
         title, artist = json_data["pre_processing"]["raw_metadata"]["name"], json_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
 
-        yield UIPromptRequest(
-            type="log",
+        yield UILogRequest(
             message=f"Extracting genius metadata for {title} | {artist}"
         )
 
@@ -92,11 +91,7 @@ class WorkflowManager:
             logger.warning("Lyrics are romanized, using LLM to convert to Japanese script")
 
             with Translator() as translator:
-                script_lyrics = yield from translator.romaji_to_script(genius_data["lyrics"])
-
-            logger.warning(
-                "before writes"
-            )
+                script_lyrics = translator.romaji_to_script(genius_data["lyrics"])
 
             write_json_file(json_file, genius_data, ["genius_data"])
 
@@ -108,19 +103,18 @@ class WorkflowManager:
             write_json_file(json_file, genius_data["lyrics"], ["lyrics_main"])
             write_json_file(json_file, "", ["lyrics_sub"])
 
-        yield UIPromptRequest(
-            type="log",
+        yield UILogRequest(
             message="Finished extracting genius metadata"
         )
 
         return True
 
     @staticmethod
-    def separate_vocals(json_path: Path) -> Generator[UIPromptRequest, None, bool]:
+    def separate_vocals(json_path: Path) -> bool:
         json_data = read_json_file(json_path)
 
         with AudioSeparation() as vs:
-            yield from vs.separate_audio(TEMP_DIR/json_data["pre_processing"]["audio_file"])
+            vs.separate_audio(TEMP_DIR/json_data["pre_processing"]["audio_file"])
 
             write_json_file(json_path, {
                 "stems": {
@@ -134,25 +128,20 @@ class WorkflowManager:
         return True
 
     @staticmethod
-    def translate_lyrics(json_path: Path) -> Generator[UIPromptRequest, None, bool]:
+    def translate_lyrics(json_path: Path) -> bool:
         json_data = read_json_file(json_path)
 
         with Translator() as tl:
-            translated_lyrics = yield from tl.translate_lyrics(json_data["lyrics_main"])
+            translated_lyrics = tl.translate_lyrics(json_data["lyrics_main"])
 
         write_json_file(json_path, translated_lyrics, ["translated_lyrics"])
 
         return True
 
     @staticmethod
-    def force_align_lyrics(json_path: Path) -> Generator[UIPromptRequest, None, bool]:
+    def force_align_lyrics(json_path: Path) -> bool:
         json_data = read_json_file(json_path)
         vocal_audio_file = Path(json_path.parent / json_data["vocal_separation"]["vocal_file"])
-
-        yield UIPromptRequest(
-            type="log",
-            message=f"Force aligning the lyrics"
-        )
 
         with ForcedAlignment() as fa:
             segments = fa.force_align_lyrics(

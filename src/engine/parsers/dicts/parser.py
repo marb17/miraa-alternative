@@ -8,7 +8,7 @@ from urllib.parse import unquote
 from engine.utils.constants import DICTS_DIR
 from engine.utils.helper_funcs import read_json_file, write_json_file
 
-from engine.parsers.dicts.base import BaseDictionaryParser
+from engine.utils.classes.abc import BaseDictionaryParser
 from engine.utils.classes.dataclasses import RawYomitanEntry, DefinitionSense, DictionaryEntry, \
     RedirectEntry
 from engine.utils.classes.exceptions import InvalidDictDefinitionFormatError

@@ -39,7 +39,7 @@ class SongContext:
 
 @dataclass
 class UIPromptRequest:
-    type: Literal["select", "input", "confirm", "info", "log", "hidden_request"]
+    type: Literal["select", "input", "confirm", "info", "hidden_request"]
     message: Any
     sub_type: Any = None
     choices: list[Any] | None = None
@@ -48,6 +48,10 @@ class UIPromptRequest:
     password: bool = False
     placeholder: str = ""
     extra_info: dict[str, Any] = field(default_factory=dict)
+
+@dataclass
+class UILogRequest:
+    message: str
 
 
 @dataclass

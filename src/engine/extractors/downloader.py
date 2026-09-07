@@ -7,7 +7,7 @@ import types
 from collections.abc import Generator
 from pathlib import Path
 from time import sleep
-from typing import Any
+from typing import Any, Generator
 from typing import Literal
 
 # PYPI LIBRARIES
@@ -90,7 +90,6 @@ def handle_spotify_no_connection_error(func):
             raise e
 
     return wrapper
-
 
 
 class Downloader:
@@ -218,7 +217,7 @@ class Downloader:
         self._sp = spotipy.Spotify(auth_manager=auth_manager_no_token)
 
     @handle_spotify_no_token_error
-    def get_current_playing_song(self) -> Generator[UIPromptRequest, Any, dict[str, Any]]:
+    def get_current_playing_song(self) -> Generator[UIPromptRequest, bool, dict[str, Any]]:
         """
         Gets the current playing song from user's spotify (using the tokens)
         :return: A dict of the song metadata (spotify)
@@ -227,7 +226,7 @@ class Downloader:
         return self._sp_token.current_user_playing_track()
 
     @handle_spotify_no_token_error
-    def get_user_spotify_queue(self) -> Generator[UIPromptRequest, Any, dict[str, Any]]:
+    def get_user_spotify_queue(self) -> Generator[UIPromptRequest, bool, dict[str, Any]]:
         """
         Gets the current users queue from user's spotify
         :return:
@@ -273,7 +272,7 @@ class Downloader:
     def download_song(self, youtube_id: str,
                       retry_count: int = 3,
                       retry_sleep: float = 5,
-                      download_type: Literal['audio', 'video'] = "audio") -> Generator[Any, dict[str, Any], bool | str]:
+                      download_type: Literal['audio', 'video'] = "audio") -> Generator[UIPromptRequest, dict[str, Any], None]:
         class YTInfoLogger:
             def __init__(self, input_queue: queue.Queue):
                 self.log_queue = input_queue
@@ -342,7 +341,6 @@ class Downloader:
                 if msg_type == "__done__":
                     break
 
-                # Yield the message smoothly straight back up to your Textual screen UI!
                 yield UIPromptRequest(type=msg_type, message=msg_text)
 
             except queue.Empty:
@@ -355,20 +353,27 @@ class Downloader:
     def query_and_download_song(self,
                       limit: int = 10,
                       retry_count: int = 3,
-                      retry_sleep: float = 5) -> Generator[Any, dict[str, Any], bool | str]:
+                      retry_sleep: float = 5) -> Generator[UIPromptRequest, dict[str, Any], bool | str]:
         # SPOTIFY SECTION
         offset: int = 0
         youtube_query: str = ""
         song_list = None
 
-        query = yield UIPromptRequest(
+        response: dict[str, str] = yield UIPromptRequest(
             type="input",
             message="Please input song to query: ",
             sub_type="query",
             placeholder="Query to search",
         )
-        first_yt = query["first_yt"]
-        query = query["value"]
+        """
+        Expects a dictionary return:
+        {
+            "value": str | "__current_song__",
+            "first_yt: bool
+        }
+        """
+        first_yt = response["first_yt"]
+        query = response["value"]
 
         if query == "__current_song__":
             pipeline = self.get_current_playing_song()
@@ -426,6 +431,13 @@ class Downloader:
                     sub_type="spotify",
                     extra_info={"page": (offset // limit) + 1}
                 )
+                """
+                Expects dictionary return:
+                {
+                    "value": int | "__next__", "__prev__", "__new__"
+                }
+                The number is index of the possible songs, starting from 0
+                """
 
                 match user_choice["value"]:
                     case "__next__":
@@ -503,6 +515,13 @@ class Downloader:
                     choices=formatted_choices,
                     sub_type="youtube"
                 )
+                """
+                Expects dictionary return:
+                {
+                    "value": int
+                }
+                The number is index of the possible songs, starting from 0
+                """
 
 
             user_choice = formatted_choices[user_choice["value"]]

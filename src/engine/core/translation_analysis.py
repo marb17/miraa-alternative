@@ -55,7 +55,7 @@ class Translator:
 
         return input_string
 
-    def translate_lyrics(self, texts: list[str] | str, use_context: bool = False) -> Generator[UIPromptRequest, None, list[Any]]:
+    def translate_lyrics(self, texts: list[str] | str, use_context: bool = False) -> list[Any]:
         """
         Translates lyrics
         :param texts: Pure string or list of strings (pure string splits by newlines)
@@ -160,8 +160,9 @@ class Translator:
         if not prompts:
             raise ValueError("No prompts found to be generated, please re-check lyrics to ensure they are in Japanese Scripts")
 
+        # TODO add macos support
         with WindowsLLMModel() as llm:
-            inference_response = yield from llm.batch_inference(prompts, estimated_output_cost=50, gen_config=gen_config)
+            inference_response = llm.batch_inference(prompts, estimated_output_cost=50, gen_config=gen_config)
             responses = dict(zip([idx for idx, exp in mapping_index if exp == "do"], inference_response))
 
         results = []
@@ -188,7 +189,7 @@ class Translator:
 
         return results
 
-    def romaji_to_script(self, lyrics: str) -> Generator[UIPromptRequest, None, str]:
+    def romaji_to_script(self, lyrics: str) -> str:
         prompt = f"""
         You are an expert Japanese Language Processor specializing in Orthographic Reconstruction. 
 
@@ -212,7 +213,7 @@ class Translator:
         """
 
         with WindowsLLMModel() as llm:
-            data = yield from llm.batch_inference([prompt])
+            data = llm.batch_inference([prompt])
             data = data[0].strip()
 
         data = self._clean_translation_header_and_unicode(data)

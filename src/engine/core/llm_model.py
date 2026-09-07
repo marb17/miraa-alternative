@@ -8,6 +8,7 @@ from typing import Any, Generator
 
 from lmdeploy import GenerationConfig
 
+from engine.utils.classes.abc import BaseLLMModel
 from engine.utils.classes.dataclasses import UIPromptRequest
 from engine.utils.functions.filesystem import read_json_file
 from engine.utils.logger import Logger
@@ -15,7 +16,7 @@ from engine.utils.logger import Logger
 logger = Logger(__name__)
 
 
-class WindowsLLMModel:
+class WindowsLLMModel(BaseLLMModel):
     def __init__(self) -> None:
         self._pipe = None
 
@@ -118,7 +119,6 @@ class WindowsLLMModel:
 
         return context_cost + total_generation_cost
 
-    # TODO trying out batched, maybe add a feature where it monitors GPU usage and changes batch size
     def init_model(self) -> None:
         """
         Starts the model up, ready to be used
@@ -160,7 +160,10 @@ class WindowsLLMModel:
         else:
             logger.debug("Model already initialized, skipping")
 
-    def batch_inference(self, prompts: list[str], batch_size: int = -1, estimated_output_cost: int = 2048, gen_config: GenerationConfig | None = None) -> Generator[UIPromptRequest, None, list[Any]]:
+    def batch_inference(self, prompts: list[str],
+                        batch_size: int = -1,
+                        estimated_output_cost: int = 2048,
+                        gen_config: GenerationConfig | None = None) -> list[Any]:
         """
         Performs inference on a batch of prompts.
         :param gen_config: A generation config object to change how the LLM generates
@@ -188,16 +191,13 @@ class WindowsLLMModel:
         if self._pipe is None:
             self.init_model()
 
-        yield UIPromptRequest(type="log",
-                              message=f"How many prompts to process: {len(prompts)}")
+        logger.debug(f"How many prompts to process: {len(prompts)}")
         # region batch sizing
         if batch_size > 1:
-            yield UIPromptRequest(type="log",
-                                  message=f"Manual Batch size of {batch_size}")
+            logger.debug(message=f"Manual Batch size of {batch_size}")
             pass
         if batch_size == 0:
-            yield UIPromptRequest(type="log",
-                                  message="No batching")
+            logger.debug(message="No batching")
             batch_size = len(prompts)
         if batch_size == -1:
             # automatic sizing
@@ -209,16 +209,11 @@ class WindowsLLMModel:
 
             batch_size = ceil(num_prompts / num_batches)
 
-            yield UIPromptRequest(type="log",
-                                  message="Automatic Batch Sizing")
-            yield UIPromptRequest(type="log",
-                                  message=f"Estimated Prompt Cost: {total_prompt_cost}")
-            yield UIPromptRequest(type="log",
-                                  message=f"Model Weight: {self._model_weight}")
-            yield UIPromptRequest(type="log",
-                                  message=f"Number of batches: {num_batches}")
-            yield UIPromptRequest(type="log",
-                                  message=f"Batch size: ~{batch_size}")
+            logger.debug(message="Automatic Batch Sizing")
+            logger.debug(message=f"Estimated Prompt Cost: {total_prompt_cost}")
+            logger.debug(message=f"Model Weight: {self._model_weight}")
+            logger.debug(message=f"Number of batches: {num_batches}")
+            logger.debug(message=f"Batch size: ~{batch_size}")
 
         batched_prompts = list(batched(prompts, batch_size))
         # endregion
@@ -230,9 +225,7 @@ class WindowsLLMModel:
             results.extend([response.text for response in self._pipe(list(batch), gen_config)])
             gc.collect()
             torch.cuda.empty_cache()
-            yield UIPromptRequest(type="log",
-                                  message=f"Completed Batch {idx} in {(time.time() - batch_now):.2f} seconds")
+            logger.debug(message=f"Completed Batch {idx} in {(time.time() - batch_now):.2f} seconds")
 
-        yield UIPromptRequest(type="log",
-                              message=f"Completed Batch Inference in {(time.time() - now):.2f} seconds")
+        logger.debug(message=f"Completed Batch Inference in {(time.time() - now):.2f} seconds")
         return results
