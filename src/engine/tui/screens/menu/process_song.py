@@ -13,7 +13,7 @@ from textual.widgets import Header, Footer, Label, Button, ContentSwitcher, Sele
 from engine.core.workflow import WorkflowManager
 from engine.tui.screens.config.config import ProcessesMenu
 from engine.tui.widgets.interactive import FinishedAnyKeyContinue, TableSelect
-from engine.utils.classes.dataclasses import UIPromptRequest
+from engine.utils.classes.dataclasses import UIPromptRequest, UILogRequest
 from engine.utils.functions.filesystem import all_available_temp_json_files, read_config, read_json_file
 
 
@@ -218,33 +218,19 @@ class ProcessSong(Screen):
         self.app.call_from_thread(self.update_ui_tabs, self.current_process_display)
 
         if song_data.get("vocal_separation", {}).get("stems", {}).get("vocal"):
-            self.app.call_from_thread(self.update_ui_for_prompt, UIPromptRequest(
-                type="log",
+            self.app.call_from_thread(self.update_ui_for_prompt, UILogRequest(
                 message="Song has already been separated, skipping"
             ))
         else:
             if not config["vocal_separation"]:
                 with WorkflowManager() as manager:
-                    pipeline = manager.separate_vocals(self.selected_json_file)
-
-                    try:
-                        prompt_request = next(pipeline)
-
-                        while True:
-                            user_answer = self.app.call_from_thread(self.update_ui_for_prompt, prompt_request)
-                            prompt_request = pipeline.send(user_answer)
-                    except StopIteration as e:
-                        if e.value is True:
-                            ...
-                        else:
-                            ...
+                    manager.separate_vocals(self.selected_json_file)
 
         self.current_process_display = "translate_lyrics"
         self.app.call_from_thread(self.update_ui_tabs, self.current_process_display)
 
         if song_data.get("translated_lyrics"):
-            self.app.call_from_thread(self.update_ui_for_prompt, UIPromptRequest(
-                type="log",
+            self.app.call_from_thread(self.update_ui_for_prompt, UILogRequest(
                 message="Song has already been translated, skipping"
             ))
         else:
@@ -321,21 +307,24 @@ class ProcessSong(Screen):
             self.dismiss(event.value)
 
 
-    def update_ui_for_prompt(self, prompt_request: UIPromptRequest) -> Any:
+    def update_ui_for_prompt(self, prompt_request: UIPromptRequest | UILogRequest) -> Any:
         switcher = self.query_one("#main_content_switcher", ContentSwitcher)
 
-        if prompt_request.type == "log":
+        if isinstance(prompt_request, UILogRequest):
             self.query_one("#process_log", RichLog).write(prompt_request.message)
             return True
-        elif prompt_request.type == "hidden_request":
-            if prompt_request.sub_type == "__finished__":
-                switcher.current = "finished"
+        elif isinstance(prompt_request, UIPromptRequest):
+            if prompt_request.type == "hidden_request":
+                if prompt_request.sub_type == "__finished__":
+                    switcher.current = "finished"
+                    return True
+            elif prompt_request.type == "confirm":
                 return True
-        elif prompt_request.type == "confirm":
-            return True
-        elif prompt_request.type == "select":
-            return self.app.push_screen_wait(self.GeniusSelectSong(prompt_request.choices, prompt_request.extra_info.get("song_reference")))
-        return False
+            elif prompt_request.type == "select":
+                return self.app.push_screen_wait(self.GeniusSelectSong(prompt_request.choices, prompt_request.extra_info.get("song_reference")))
+            return False
+        else:
+            raise NotImplementedError
 
 
     def update_ui_tabs(self, value: str):

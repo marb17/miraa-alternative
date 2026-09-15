@@ -53,6 +53,7 @@ class SpotifyAuthenticateScreen(ModalScreen):
     spotify_client = None
     pipeline = None
     url = ""
+    space_taps=0
 
     def compose(self) -> ComposeResult:
         with Container(id="fullscreen"):
@@ -73,6 +74,7 @@ class SpotifyAuthenticateScreen(ModalScreen):
                     extra_buttons=[Button(label="Open Link", variant="primary", id="btn_open_link"),
                                    Button(label="Skip", variant="warning", id="btn_skip")],
                 )
+                yield Static(disabled=True, id="fallback_link")
 
     def _on_mount(self, event: events.Mount) -> None:
         self.query_one("#main_box", CenterMiddle).border_title = "Spotify Authentication"
@@ -103,12 +105,18 @@ class SpotifyAuthenticateScreen(ModalScreen):
             # import pyperclip
             try:
                 # pyperclip.copy(self.url)
+                self.space_taps += 1
                 self.app.copy_to_clipboard(self.url)
+
+                if self.space_taps > 1:
+                    self.query_one("#fallback_link", Static).update(content="\n" + self.url)
+                    self.query_one("#fallback_link", Static).display=True
+
             except Exception as e:
                 self.notify(f"Failed to copy {self.url}, error: {e}")
                 return
 
-            self.notify(f"Successfully copied URL!")
+            self.notify(f"Successfully copied URL!{'(press again to display the link)' if self.space_taps < 2 else ''}")
 
     def _update_url(self, url: str):
         self.url = url
