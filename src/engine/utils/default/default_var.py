@@ -34,7 +34,8 @@ DEFAULT_CONFIG = {
         "genius_metadata": False,
         "vocal_separation": False,
         "split_and_tag": False,
-        "translate_lyrics": False
+        "translate_lyrics": False,
+        "timestamps": False,
     }
 }
 DEFAULT_ENV_VARS = [

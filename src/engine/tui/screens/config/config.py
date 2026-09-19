@@ -313,6 +313,14 @@ class ProcessesMenu(Horizontal):
                         enable_config_write=True
                     )
 
+                    yield ConfigOption(
+                        "checkbox",
+                        "Align Lyrics",
+                        "timestamps_checkbox",
+                        json_keys=["skip_processes", "timestamps"],
+                        enable_config_write=True
+                    )
+
 
     def _on_mount(self, event: events.Mount) -> None:
         skip_processes = self.query_one("#skip_processes", Container)

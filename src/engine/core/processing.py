@@ -205,13 +205,17 @@ class ForcedAlignment:
         os.environ["PYTHONUTF8"] = "1"
         os.environ["HF_HOME"] = str(MODEL_DIR / "faster_whisper")
 
+        silence_time = 100
+
         # silence added audio file
         temp_audio_file = Path(audio_file.parent / f"{audio_file.stem}_temp.wav")
+        temp_audio_file_2 = Path(audio_file.parent / f"{audio_file.stem}_temp_2.wav")
         audio = AudioSegment.from_wav(audio_file)
-        silence = AudioSegment.silent(duration=1000)
+        silence = AudioSegment.silent(duration=silence_time)
         combined = silence + audio
         combined.export(str(temp_audio_file), format="wav")
-
+        combined_2 = silence + silence + audio
+        combined_2.export(str(temp_audio_file_2), format="wav")
 
         lyrics = read_json_file(json_data_file).get("lyrics_main", "").split("\n")
 
@@ -252,26 +256,47 @@ class ForcedAlignment:
              "--interpolate",
              "--window", "3",
              ],
+            ["lyric-align", str(temp_audio_file_2), str(temp_lyric_path), "-o", str(temp_holding_file),
+             "--model", "large-v3",
+             "--device", "cuda",
+             "--no-vad",
+             "--pairing", "auto",
+             "--interpolate",
+             "--window", "3",
+             ],
         ]
 
         for arg in args_to_run:
-            subprocess.run(
-                arg, check=True
+            process = subprocess.Popen(
+                arg,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace"
             )
+
+            with process.stdout:
+                for line in iter(process.stdout.readline, ""):
+                    logger.debug(line.strip())
+
+            return_code = process.wait()
+
             data.append(read_json_file(temp_holding_file))
 
         # for silence compensation
-        for item in data[1]:
-            item["start"] = max(0.0, item["start"] - 1.0)
-            item["end"] = max(0.0, item["end"] - 1.0)
+        for idx, file in enumerate(data[1:], start = 1):
+            for item in file:
+                item["start"] = max(0.0, item["start"] - (silence_time / 1000) * idx) if item["start"] else None
+                item["end"] = max(0.0, item["end"] - (silence_time / 1000) * idx) if item["end"] else None
 
         final_aligned = list()
         for passes in zip(*data):
-            score_sum = max(0.01, sum(p["score"] for p in passes))
-            weighted_start = sum(p["start"] * p["score"] for p in passes)
+            score_sum = max(0.0000001, sum(p["score"] for p in passes))
+            weighted_start = sum((p["start"] if p["start"] else 0) * p["score"] for p in passes)
             start = round(weighted_start / score_sum, 2)
 
-            weighted_end = sum(p["end"] * p["score"] for p in passes)
+            weighted_end = sum((p["end"] if p["end"] else 0) * p["score"] for p in passes)
             end = round(weighted_end / score_sum, 2)
 
             score = round(score_sum / len(list(passes)), 2)
@@ -289,6 +314,7 @@ class ForcedAlignment:
         temp_holding_file.unlink()
         temp_lyric_path.unlink()
         temp_audio_file.unlink()
+        temp_audio_file_2.unlink()
 
         return final_aligned
 

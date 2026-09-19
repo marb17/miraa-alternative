@@ -194,10 +194,10 @@ class WindowsLLMModel(BaseLLMModel):
         logger.debug(f"How many prompts to process: {len(prompts)}")
         # region batch sizing
         if batch_size > 1:
-            logger.debug(message=f"Manual Batch size of {batch_size}")
+            logger.debug(f"Manual Batch size of {batch_size}")
             pass
         if batch_size == 0:
-            logger.debug(message="No batching")
+            logger.debug("No batching")
             batch_size = len(prompts)
         if batch_size == -1:
             # automatic sizing
@@ -209,11 +209,11 @@ class WindowsLLMModel(BaseLLMModel):
 
             batch_size = ceil(num_prompts / num_batches)
 
-            logger.debug(message="Automatic Batch Sizing")
-            logger.debug(message=f"Estimated Prompt Cost: {total_prompt_cost}")
-            logger.debug(message=f"Model Weight: {self._model_weight}")
-            logger.debug(message=f"Number of batches: {num_batches}")
-            logger.debug(message=f"Batch size: ~{batch_size}")
+            logger.debug("Automatic Batch Sizing")
+            logger.debug(f"Estimated Prompt Cost: {total_prompt_cost}")
+            logger.debug(f"Model Weight: {self._model_weight}")
+            logger.debug(f"Number of batches: {num_batches}")
+            logger.debug(f"Batch size: ~{batch_size}")
 
         batched_prompts = list(batched(prompts, batch_size))
         # endregion
@@ -225,7 +225,7 @@ class WindowsLLMModel(BaseLLMModel):
             results.extend([response.text for response in self._pipe(list(batch), gen_config)])
             gc.collect()
             torch.cuda.empty_cache()
-            logger.debug(message=f"Completed Batch {idx} in {(time.time() - batch_now):.2f} seconds")
+            logger.debug(f"Completed Batch {idx} in {(time.time() - batch_now):.2f} seconds")
 
-        logger.debug(message=f"Completed Batch Inference in {(time.time() - now):.2f} seconds")
+        logger.debug(f"Completed Batch Inference in {(time.time() - now):.2f} seconds")
         return results

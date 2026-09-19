@@ -148,6 +148,7 @@ class ProcessSong(Screen):
                         Tab("Audio Stems", id="audio_separation"),
                         Tab("Translate", id="translate_lyrics"),
                         Tab("Analysis", id="split_and_tag"),
+                        Tab("Force Alignment", id="timestamps"),
                         id="process_tabs"
                     )
 
@@ -236,19 +237,20 @@ class ProcessSong(Screen):
         else:
             if not config["translate_lyrics"]:
                 with WorkflowManager() as manager:
-                    pipeline = manager.translate_lyrics(self.selected_json_file)
+                    manager.translate_lyrics(self.selected_json_file)
 
-                    try:
-                        prompt_request = next(pipeline)
+        self.current_process_display = "timestamps"
+        self.app.call_from_thread(self.update_ui_tabs, self.current_process_display)
 
-                        while True:
-                            user_answer = self.app.call_from_thread(self.update_ui_for_prompt, prompt_request)
-                            prompt_request = pipeline.send(user_answer)
-                    except StopIteration as e:
-                        if e.value is True:
-                            ...
-                        else:
-                            ...
+        if song_data.get("timestamps"):
+            self.app.call_from_thread(self.update_ui_for_prompt, UILogRequest(
+                message="Song has already been aligned, skipping"
+            ))
+        else:
+            if not config["timestamps"]:
+                with WorkflowManager() as manager:
+                    manager.force_align_lyrics(self.selected_json_file)
+
 
 
         self.app.call_from_thread(self.update_ui_for_prompt, UIPromptRequest(
