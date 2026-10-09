@@ -177,7 +177,7 @@ class AudioSeparation:
         for file, rename in zip([new_file_name(suffix, as_path=True) for suffix in rename_order], rename_order):
             audio = AudioSegment.from_file(file)
             audio = audio + AUDIO_MODEL_PRESETS[self._model_name].gain
-            if rename in audio_to_save or audio_to_save is None:
+            if audio_to_save is None or rename in audio_to_save:
                 audio.export(file, format="wav")
             else:
                 file.unlink()
@@ -211,38 +211,7 @@ class ForcedAlignment:
 
         lyrics = read_json_file(json_data_file).get("lyrics_main", "").split("\n")
 
-        def run_single_pass(added_silence: int = 0,
-                            deverb: bool = True,
-                            compress: bool = True):
-            target_dbfs = 18
-
-            temp_audio_file = Path(audio_file.parent / f"{audio_file.stem}_temp.wav")
-            dry_audio_file = Path(audio_file.parent / f"{audio_file.stem}_dry.wav")
-
-            if deverb:
-                with AudioSeparation(model_name="dereverb") as sep:
-                    sep.separate_audio(audio_file, audio_to_save=["dry"])
-
-                audio = AudioSegment.from_wav(dry_audio_file)
-            else:
-                audio = AudioSegment.from_wav(audio_file)
-            audio = audio.set_channels(1)
-
-            silence = AudioSegment.silent(duration=added_silence)
-            combined = silence + audio
-
-            if compress:
-                combined = compress_dynamic_range(
-                    combined,
-                    threshold=26.0,
-                    ratio=5.0
-                )
-
-            change_in_dbfs = target_dbfs - combined.dBFS
-            final_audio = combined.apply_gain(change_in_dbfs)
-
-            final_audio.export(str(temp_audio_file), format="wav")
-
+        def run_alignment(audio: Path, added_silence: int = 0):
             mapping_index = list()
 
             for lyric in lyrics:
@@ -257,12 +226,17 @@ class ForcedAlignment:
             process_lyrics = "\n".join(process_lyrics)
 
             temp_lyric_path = Path(json_data_file.parent / f"{json_data_file.stem}_lyrics.txt")
+            temp_audio_run_path = Path(audio_file.parent / f"{audio_file.stem}_run.wav")
             temp_holding_file = Path(json_data_file.parent / f"{json_data_file.stem}_holding.json")
             temp_lyric_path.write_text(process_lyrics,
                                        encoding="utf-8")
 
+            silence = AudioSegment.silent(duration=added_silence)
+            combined = silence + AudioSegment.from_wav(audio_file)
+            combined.export(str(temp_audio_run_path), format="wav")
+
             args_to_run = [
-                ["lyric-align", str(temp_audio_file), str(temp_lyric_path), "-o", str(temp_holding_file),
+                ["lyric-align", str(temp_audio_run_path), str(temp_lyric_path), "-o", str(temp_holding_file),
                  "--model", "large-v3",
                  "--device", "cuda",
                  "--no-vad",
@@ -299,45 +273,99 @@ class ForcedAlignment:
             finally:
                 temp_holding_file.unlink()
                 temp_lyric_path.unlink()
+                temp_audio_run_path.unlink()
+
+
+        def run_test_pass():
+            target_dbfs = -18
+
+            temp_audio_file = Path(audio_file.parent / f"{audio_file.stem}_temp.wav")
+            temp_dry_audio_file = Path(audio_file.parent / f"{audio_file.stem}_dry.wav")
+
+            with AudioSeparation(model_name="dereverb") as sep:
+                sep.separate_audio(audio_file, audio_to_save=["dry"])
+
+            dry_audio = AudioSegment.from_wav(temp_dry_audio_file)
+
+            temp_dry_audio_file.unlink()
+            audio = AudioSegment.from_wav(audio_file)
+
+            dry_audio = dry_audio.set_channels(1)
+            audio = audio.set_channels(1)
+
+            audios = [audio, dry_audio]
+
+            scores = list()
+
+            for audio_data in audios:
+                change_in_dbfs = target_dbfs - audio_data.dBFS
+                final_audio = audio_data.apply_gain(change_in_dbfs)
+
+                final_audio.export(str(temp_audio_file), format="wav")
+
+                pass_data = run_alignment(temp_audio_file)
+                scores.append(sum([seg["score"] for seg in pass_data]) / len(pass_data))
+
                 temp_audio_file.unlink()
-                dry_audio_file.unlink(missing_ok=True)
 
-        print(run_single_pass(0))
-        print(run_single_pass(20, deverb=False))
-        print(run_single_pass(40, compress=False))
+            best_score = max(scores)
+            return audios[scores.index(best_score)]
 
-        # final_aligned = list()
-        # for passes in zip(*data):
-        #     score_sum = max(0.0000001, sum(p["score"] for p in passes))
-        #     weighted_start = sum((p["start"] if p["start"] else 0) * p["score"] for p in passes)
-        #     start = round(weighted_start / score_sum, 2)
-        #
-        #     weighted_end = sum((p["end"] if p["end"] else 0) * p["score"] for p in passes)
-        #     end = round(weighted_end / score_sum, 2)
-        #
-        #     score = round(score_sum / len(list(passes)), 2)
-        #
-        #     final_aligned.append(
-        #         LyricSegment(
-        #             passes[0]["line"],
-        #             start,
-        #             end,
-        #             score,
-        #             all(p["matched"] for p in passes)
-        #         )
-        #     )
-        #
-        # return final_aligned
+        def run_full_pass(audio_segment_data, tries: int = 3):
+            cur_tries = 0
+
+            temp_audio_path = Path(json_data_file.parent / f"{json_data_file.stem}_run.wav")
+            audio_segment_data.export(str(temp_audio_path), format="wav")
+
+            pass_data = list()
+
+            while cur_tries < tries:
+                add_silence_by = 150
+
+                pass_data.append(run_alignment(temp_audio_path, (add_silence_by * cur_tries)))
+                print(pass_data[-1])
+
+                cur_tries += 1
+
+            temp_audio_path.unlink()
+
+            final_aligned = list()
+
+            for passes in zip(*pass_data):
+                score_sum = max(0.0000001, sum(p["score"] for p in passes))
+                weighted_start = sum((p["start"] if p["start"] else 0) * p["score"] for p in passes)
+                start = round(weighted_start / score_sum, 2)
+
+                weighted_end = sum((p["end"] if p["end"] else 0) * p["score"] for p in passes)
+                end = round(weighted_end / score_sum, 2)
+
+                score = round(score_sum / len(list(passes)), 2)
+
+                final_aligned.append(
+                    LyricSegment(
+                        passes[0]["line"],
+                        start,
+                        end,
+                        score,
+                        all(p["matched"] for p in passes)
+                    )
+                )
+
+            return final_aligned
+
+        best_audio = run_test_pass()
+        return run_full_pass(best_audio)
+
 
 
 if __name__ == "__main__":
     fa = ForcedAlignment()
     # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\aRDURmIYBZ4_vocal.wav"),
     #                       Path(r"D:\python\miraa-alternative\src\.temp\Mela! - Ryokuoushoku Shakai.json"))
-    # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\d6i4AtCxrDo_vocal.wav"),
-    #                       Path(r"D:\python\miraa-alternative\src\.temp\Haikei Shounenyo - Hump Back.json"))
-    data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\v-WcMQbXbKY_vocal.wav"),
-                          Path(r"D:\python\miraa-alternative\src\.temp\花になって - Be a flower - Ryokuoushoku Shakai.json"))
+    data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\d6i4AtCxrDo_vocal.wav"),
+                          Path(r"D:\python\miraa-alternative\src\.temp\Haikei Shounenyo - Hump Back.json"))
+    # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\v-WcMQbXbKY_vocal.wav"),
+    #                       Path(r"D:\python\miraa-alternative\src\.temp\花になって - Be a flower - Ryokuoushoku Shakai.json"))
     # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\qs4Q4cQxyU4_vocal.wav"),
     #                       Path(r"D:\python\miraa-alternative\src\.temp\Wherever you are - ONE OK ROCK.json"))
     # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\1zwaZkOXXqw_vocal.wav"),
@@ -353,9 +381,9 @@ if __name__ == "__main__":
     # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\vOLncha7MqM_vocal.wav"),
     #                       Path(r"D:\python\miraa-alternative\src\.temp\君のせい - the peggies.json"))
 
-    # parsed = [d.to_dict() for d in data]
-    # temp = Path(r"D:\python\miraa-alternative\src\.temp\temp.json")
-    # temp.write_text(json.dumps(parsed, ensure_ascii=False), encoding="utf-8")
+    parsed = [d.to_dict() for d in data]
+    temp = Path(r"D:\python\miraa-alternative\src\.temp\temp.json")
+    temp.write_text(json.dumps(parsed, ensure_ascii=False), encoding="utf-8")
 
 
 # region japanese morphological analyzer

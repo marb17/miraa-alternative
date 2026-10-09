@@ -6,7 +6,7 @@ from engine.utils.paths import TEMP_DIR
 import playsound3
 import time
 
-file_path = Path(r"D:\python\miraa-alternative\src\.temp\花になって - Be a flower - Ryokuoushoku Shakai.json")
+file_path = Path(r"D:\python\miraa-alternative\src\.temp\Haikei Shounenyo - Hump Back.json")
 
 pygame.mixer.init()
 data = read_json_file(file_path)
