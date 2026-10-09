@@ -205,90 +205,74 @@ class ForcedAlignment:
         os.environ["PYTHONUTF8"] = "1"
         os.environ["HF_HOME"] = str(MODEL_DIR / "faster_whisper")
 
-        silence_time = 100
-
-        # silence added audio file
-        temp_audio_file = Path(audio_file.parent / f"{audio_file.stem}_temp.wav")
-        temp_audio_file_2 = Path(audio_file.parent / f"{audio_file.stem}_temp_2.wav")
-        audio = AudioSegment.from_wav(audio_file)
-        silence = AudioSegment.silent(duration=silence_time)
-        combined = silence + audio
-        combined.export(str(temp_audio_file), format="wav")
-        combined_2 = silence + silence + audio
-        combined_2.export(str(temp_audio_file_2), format="wav")
-
         lyrics = read_json_file(json_data_file).get("lyrics_main", "").split("\n")
 
-        mapping_index = list()
+        def run_single_pass(added_silence: int = 0):
+            temp_audio_file = Path(audio_file.parent / f"{audio_file.stem}_temp.wav")
+            audio = AudioSegment.from_wav(audio_file)
+            silence = AudioSegment.silent(duration=silence_time)
+            combined = silence + audio
+            combined.export(str(temp_audio_file), format="wav")
 
-        for lyric in lyrics:
-            if lyric.startswith("[") and lyric.endswith("]"):
-                mapping_index.append((lyric, False))
-            elif not lyric:
-                mapping_index.append((lyric, False))
-            else:
-                mapping_index.append((lyric, True))
+            mapping_index = list()
 
-        process_lyrics = [lyric[0] for lyric in mapping_index if lyric[1]]
-        process_lyrics = "\n".join(process_lyrics)
+            for lyric in lyrics:
+                if lyric.startswith("[") and lyric.endswith("]"):
+                    mapping_index.append((lyric, False))
+                elif not lyric:
+                    mapping_index.append((lyric, False))
+                else:
+                    mapping_index.append((lyric, True))
 
-        temp_lyric_path = Path(json_data_file.parent / f"{json_data_file.stem}_lyrics.txt")
-        temp_holding_file = Path(json_data_file.parent / f"{json_data_file.stem}_holding.json")
-        temp_lyric_path.write_text(process_lyrics,
-                                   encoding="utf-8")
+            process_lyrics = [lyric[0] for lyric in mapping_index if lyric[1]]
+            process_lyrics = "\n".join(process_lyrics)
 
-        data = list()
+            temp_lyric_path = Path(json_data_file.parent / f"{json_data_file.stem}_lyrics.txt")
+            temp_holding_file = Path(json_data_file.parent / f"{json_data_file.stem}_holding.json")
+            temp_lyric_path.write_text(process_lyrics,
+                                       encoding="utf-8")
 
-        args_to_run = [
-            ["lyric-align", str(audio_file), str(temp_lyric_path), "-o", str(temp_holding_file),
-             "--model", "large-v3",
-             "--device", "cuda",
-             "--no-vad",
-             "--pairing", "auto",
-             "--interpolate",
-             "--window", "3",
-             ],
-            ["lyric-align", str(temp_audio_file), str(temp_lyric_path), "-o", str(temp_holding_file),
-             "--model", "large-v3",
-             "--device", "cuda",
-             "--no-vad",
-             "--pairing", "auto",
-             "--interpolate",
-             "--window", "3",
-             ],
-            ["lyric-align", str(temp_audio_file_2), str(temp_lyric_path), "-o", str(temp_holding_file),
-             "--model", "large-v3",
-             "--device", "cuda",
-             "--no-vad",
-             "--pairing", "auto",
-             "--interpolate",
-             "--window", "3",
-             ],
-        ]
+            data = list()
 
-        for arg in args_to_run:
-            process = subprocess.Popen(
-                arg,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",
-                errors="replace"
-            )
+            args_to_run = [
+                ["lyric-align", str(audio_file), str(temp_lyric_path), "-o", str(temp_holding_file),
+                 "--model", "large-v3",
+                 "--device", "cuda",
+                 "--no-vad",
+                 "--pairing", "auto",
+                 "--interpolate",
+                 "--window", "3",
+                 ],
+            ]
 
-            with process.stdout:
-                for line in iter(process.stdout.readline, ""):
-                    logger.debug(line.strip())
+            for arg in args_to_run:
+                process = subprocess.Popen(
+                    arg,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace"
+                )
 
-            return_code = process.wait()
+                with process.stdout:
+                    for line in iter(process.stdout.readline, ""):
+                        logger.debug(line.strip())
 
-            data.append(read_json_file(temp_holding_file))
+                return_code = process.wait()
 
-        # for silence compensation
-        for idx, file in enumerate(data[1:], start = 1):
-            for item in file:
-                item["start"] = max(0.0, item["start"] - (silence_time / 1000) * idx) if item["start"] else None
-                item["end"] = max(0.0, item["end"] - (silence_time / 1000) * idx) if item["end"] else None
+            data = read_json_file(temp_holding_file)
+
+            for section in data:
+                section["start"] = max(0.0, section["start"] - added_silence) if section["start"] else None
+                section["end"] = max(0.0, section["end"] - added_silence) if section["end"] else None
+
+            try:
+                return data
+            finally:
+                temp_holding_file.unlink()
+                temp_lyric_path.unlink()
+                temp_audio_file.unlink()
 
         final_aligned = list()
         for passes in zip(*data):
@@ -310,11 +294,6 @@ class ForcedAlignment:
                     all(p["matched"] for p in passes)
                 )
             )
-
-        temp_holding_file.unlink()
-        temp_lyric_path.unlink()
-        temp_audio_file.unlink()
-        temp_audio_file_2.unlink()
 
         return final_aligned
 
