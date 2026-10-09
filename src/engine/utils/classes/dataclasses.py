@@ -20,6 +20,11 @@ class LyricSegment:
             "matched": self.matched
         }
 
+    def __post_init__(self):
+        self.start = round(self.start, 2)
+        self.end = round(self.end, 2)
+        self.score = round(self.score, 2)
+
 
 @dataclass
 class DatabaseEntry:

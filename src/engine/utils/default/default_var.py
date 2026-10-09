@@ -153,7 +153,7 @@ AUDIO_MODEL_PRESETS: dict[str, AudioSeparatorModel] = {
     "dereverb": AudioSeparatorModel(
         name="dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt",
         type="single",
-        rename_order=["dry", "wet"],
+        rename_order=["wet", "dry"],
     ),
     "crowd_iso": AudioSeparatorModel(
         name="mel_band_roformer_crowd_aufr33_viperx_sdr_8.7144.ckpt",
