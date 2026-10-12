@@ -146,7 +146,7 @@ class WorkflowManager:
         with ForcedAlignment() as fa:
             segments = fa.force_align_lyrics(
                 vocal_audio_file,
-                json_path
+                read_json_file(json_path).get("lyrics_main", "")
             )
 
         python_segments = [seg.to_dict() for seg in segments]

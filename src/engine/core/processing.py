@@ -205,13 +205,18 @@ class ForcedAlignment:
 
         return False
 
-    def force_align_lyrics(self, audio_file: Path, json_data_file: Path) -> list[LyricSegment]:
+    def force_align_lyrics(self, audio_file: Path, lyrics: str | list[str]) -> list[LyricSegment]:
         os.environ["PYTHONUTF8"] = "1"
         os.environ["HF_HOME"] = str(MODEL_DIR / "faster_whisper")
 
-        lyrics = read_json_file(json_data_file).get("lyrics_main", "").split("\n")
+        if isinstance(lyrics, str):
+            lyrics = lyrics.split("\n")
+        elif isinstance(lyrics, list):
+            pass
 
         def run_alignment(audio: Path, added_silence: int = 0):
+            now = time.time()
+
             mapping_index = list()
 
             for lyric in lyrics:
@@ -225,14 +230,14 @@ class ForcedAlignment:
             process_lyrics = [lyric[0] for lyric in mapping_index if lyric[1]]
             process_lyrics = "\n".join(process_lyrics)
 
-            temp_lyric_path = Path(json_data_file.parent / f"{json_data_file.stem}_lyrics.txt")
+            temp_lyric_path = Path(audio_file.parent / f"{audio_file.stem}_lyrics.txt")
             temp_audio_run_path = Path(audio_file.parent / f"{audio_file.stem}_run.wav")
-            temp_holding_file = Path(json_data_file.parent / f"{json_data_file.stem}_holding.json")
+            temp_holding_file = Path(audio_file.parent / f"{audio_file.stem}_holding.json")
             temp_lyric_path.write_text(process_lyrics,
                                        encoding="utf-8")
 
             silence = AudioSegment.silent(duration=added_silence)
-            combined = silence + AudioSegment.from_wav(audio_file)
+            combined = silence + AudioSegment.from_wav(audio)
             combined.export(str(temp_audio_run_path), format="wav")
 
             args_to_run = [
@@ -274,6 +279,7 @@ class ForcedAlignment:
                 temp_holding_file.unlink()
                 temp_lyric_path.unlink()
                 temp_audio_run_path.unlink()
+                logger.debug(f"Finished Alignment in: {round(time.time() - now, 2)}")
 
 
         def run_test_pass():
@@ -296,6 +302,7 @@ class ForcedAlignment:
             audios = [audio, dry_audio]
 
             scores = list()
+            pass_data = list()
 
             for audio_data in audios:
                 change_in_dbfs = target_dbfs - audio_data.dBFS
@@ -303,29 +310,47 @@ class ForcedAlignment:
 
                 final_audio.export(str(temp_audio_file), format="wav")
 
-                pass_data = run_alignment(temp_audio_file)
-                scores.append(sum([seg["score"] for seg in pass_data]) / len(pass_data))
+                s_data = run_alignment(temp_audio_file)
+                scores.append(sum([seg["score"] for seg in s_data]) / len(s_data))
+                logger.debug(f"Average Score: {scores[-1]}")
+                pass_data.append(s_data)
 
                 temp_audio_file.unlink()
 
-            best_score = max(scores)
-            return audios[scores.index(best_score)]
+            best_index = scores.index(max(scores))
+            logger.debug(f"Chose pass number: {best_index + 1}")
+            logger.debug(f"Best Score: {scores[best_index]}")
+            return best_index, audios, pass_data
 
-        def run_full_pass(audio_segment_data, tries: int = 3):
-            cur_tries = 0
-
-            temp_audio_path = Path(json_data_file.parent / f"{json_data_file.stem}_run.wav")
+        def run_full_pass(audio_segment_data, extra_pass_data: list[list[dict]] | None = None, tries_per_pass: int = 3):
+            temp_audio_path = Path(audio_file.parent / f"{audio_file.stem}_align_run.wav")
             audio_segment_data.export(str(temp_audio_path), format="wav")
 
             pass_data = list()
+            if extra_pass_data: pass_data.extend(extra_pass_data)
 
-            while cur_tries < tries:
-                add_silence_by = 150
+            times = [230, 590, 1130]
 
-                pass_data.append(run_alignment(temp_audio_path, (add_silence_by * cur_tries)))
+            for idx, t in enumerate(times):
+                best_pass: list[dict] = list()
+                best_score: float = 0
+
+                for x in range(tries_per_pass):
+                    logger.debug(f"Pass: {idx}, Try: {x}")
+                    d = run_alignment(temp_audio_path, (t + (x*75)))
+                    avg_score = sum([seg["score"] for seg in d]) / len(d)
+                    logger.debug(f"Average Score: {avg_score}")
+
+                    if avg_score > best_score:
+                        best_pass = d
+                        best_score = avg_score
+
+                    if best_score > 0.6:
+                        logger.debug(f"Finished pass: {idx}")
+                        break
+
+                pass_data.append(best_pass)
                 print(pass_data[-1])
-
-                cur_tries += 1
 
             temp_audio_path.unlink()
 
@@ -353,8 +378,8 @@ class ForcedAlignment:
 
             return final_aligned
 
-        best_audio = run_test_pass()
-        return run_full_pass(best_audio)
+        best_idx, audios, data = run_test_pass()
+        return run_full_pass(audios[best_idx], extra_pass_data=[data[best_idx]])
 
 
 
@@ -363,7 +388,7 @@ if __name__ == "__main__":
     # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\aRDURmIYBZ4_vocal.wav"),
     #                       Path(r"D:\python\miraa-alternative\src\.temp\Mela! - Ryokuoushoku Shakai.json"))
     data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\d6i4AtCxrDo_vocal.wav"),
-                          Path(r"D:\python\miraa-alternative\src\.temp\Haikei Shounenyo - Hump Back.json"))
+                          read_json_file(Path(r"D:\python\miraa-alternative\src\.temp\Haikei Shounenyo - Hump Back.json")).get("lyrics_main"))
     # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\v-WcMQbXbKY_vocal.wav"),
     #                       Path(r"D:\python\miraa-alternative\src\.temp\花になって - Be a flower - Ryokuoushoku Shakai.json"))
     # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\qs4Q4cQxyU4_vocal.wav"),
