@@ -157,7 +157,7 @@ class WorkflowManager:
         return True
 
     @staticmethod
-    def move_to_final_database(json_path: Path) -> bool:
+    def move_to_final_database(json_path: Path) -> None:
         json_data = read_json_file(json_path)
         audio_file = Path(json_path.parent / f"{json_data["pre_processing"]["youtube_id"]}.wav")
         v_audio_file = Path(json_path.parent / f"{json_data["pre_processing"]["youtube_id"]}_vocal.wav")

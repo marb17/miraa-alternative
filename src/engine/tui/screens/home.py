@@ -12,6 +12,7 @@ from engine.tui.screens.config.config import ConfigMenu, DownloadMenu
 from engine.tui.screens.init.first_init import FirstTimeInit
 from engine.tui.screens.menu.new_download import DownloadScreen
 from engine.tui.screens.menu.process_song import ProcessSong
+from engine.tui.screens.menu.song_list_view import SongListView
 from engine.tui.widgets.static import SpotifyCurrentlyPlayingWidget
 from engine.utils.functions.filesystem import read_config, all_available_temp_json_files
 
@@ -89,6 +90,9 @@ class HomeScreen(Screen):
     def action_open_process(self) -> None:
         self.app.push_screen(ProcessSong(), callback=self.handle_resume_widget_poll)
 
+    def action_open_song_view(self) -> None:
+        self.app.push_screen(SongListView(), callback=self.handle_resume_widget_poll)
+
 
 
     def handle_resume_widget_poll(self, result: Any) -> None:
@@ -109,6 +113,7 @@ class HomeScreen(Screen):
             with HorizontalGroup(id="quick_menu"):
                 yield Button("Download New", id="download", variant="success")
                 yield Button("Process Song", id="process", variant="primary")
+                yield Button("Song List", id="song_list", variant="default")
 
 
 
@@ -188,3 +193,6 @@ class HomeScreen(Screen):
         elif event.button.id == "process":
             self.query_one("#spotify_currently_playing", SpotifyCurrentlyPlayingWidget).handle_stop_updating()
             self.action_open_process()
+        elif event.button.id == "song_list":
+            self.query_one("#spotify_currently_playing", SpotifyCurrentlyPlayingWidget).handle_stop_updating()
+            self.action_open_song_view()

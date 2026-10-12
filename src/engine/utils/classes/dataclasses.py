@@ -1,5 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Literal, Any
 
@@ -33,12 +34,14 @@ class DatabaseEntry:
     id: int = None
     title: str = None
     artist: str = None
+    album_name: str = None
+    album_release_date: date = None
     youtube_id: str = None
     image_thumbnail: str = None
 
-    audio: Path = None
-    audio_inst: Path = None
-    audio_vocal: Path = None
+    audios: dict[str, Path] = None
+
+    metadata: dict[str, Any] = None
 
 
 @dataclass

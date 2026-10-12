@@ -117,7 +117,7 @@ class ProcessSong(Screen):
     """
 
     BINDINGS = [
-        Binding("ctrl+x", "app.pop_screen", "Exit Processing", priority=True)
+        Binding("ctrl+x", "exit_processing", "Exit Processing", priority=True)
     ]
 
     json_options: list[tuple[str, Path]] = list()
@@ -251,11 +251,8 @@ class ProcessSong(Screen):
                 with WorkflowManager() as manager:
                     manager.force_align_lyrics(self.selected_json_file)
 
-
         with WorkflowManager() as manager:
             manager.move_to_final_database(self.selected_json_file)
-
-
 
         self.app.call_from_thread(self.update_ui_for_prompt, UIPromptRequest(
             type="hidden_request",
@@ -364,6 +361,7 @@ class ProcessSong(Screen):
     def close_menu(self) -> None:
         self.action_self_dismiss(True)
 
-
-
+    def action_exit_processing(self) -> None:
+        self.workers.cancel_node(self)
+        self.app.pop_screen()
         

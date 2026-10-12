@@ -1,10 +1,19 @@
+from pygments.formatters import img
 from textual import events, work
 from textual.app import ComposeResult
-from textual.containers import HorizontalGroup, Container
+from textual.containers import HorizontalGroup, Container, VerticalGroup
 from textual.widget import Widget
 from textual.widgets import Static, ProgressBar
 
 from engine.extractors.downloader import Downloader
+from engine.utils.classes.dataclasses import DatabaseEntry
+
+# from textual_image.widget import Image
+from textual_image.widget import Image as Image
+
+import io
+import requests
+from PIL import Image as PILImage
 
 
 class SpotifyCurrentlyPlayingWidget(Widget):
@@ -323,3 +332,117 @@ class SpotifyCurrentlyPlayingWidget(Widget):
             total=self.song_length_ms,
             progress=self.current_progress_ms
         )
+
+
+class SongEntry(Widget):
+    def __init__(self, data: DatabaseEntry):
+        super().__init__()
+        self.data = data
+
+    @work(thread=True)
+    def fetch_image(self) -> None:
+        image_url = self.data.image_thumbnail
+        response = requests.get(image_url)
+        img = PILImage.open(io.BytesIO(response.content))
+        self.app.call_from_thread(self.update_image, img)
+
+    def update_image(self, image: PILImage.Image) -> None:
+        image_widget = self.query_one(".song-image", Image)
+        image_widget.image = image
+        image_widget.refresh()
+
+    def _on_mount(self, event: events.Mount) -> None:
+        self.fetch_image()
+
+    DEFAULT_CSS = """
+    SongEntry {
+        width: 100%;
+        height: auto;
+    }
+
+    .song-row {
+        border: solid $secondary;
+        border-title-color: $primary;
+        border-title-align: center;
+        border-title-style: bold;
+
+        width: 100%;
+        height: auto;
+        hatch: none;
+    }
+
+    .song-image {
+        height: 5;
+        width: 10;
+    }
+
+    .image_container {
+        height: auto;
+        width: auto;
+        padding: 0 1;
+    }
+
+    .song-title {
+        background: $secondary;
+        text-style: bold;
+        width: auto;
+        max-width: 100%;
+        text-overflow: ellipsis;
+        text-wrap: nowrap;
+    }
+
+    .song-artist {
+        color: $text-muted;
+        content-align: left middle;
+        width: auto;
+        max-width: 100%;
+        text-overflow: ellipsis;
+        text-wrap: nowrap;
+    }
+
+    .song_info {
+        width: 1fr;
+        height: auto;
+    }
+    
+    .song_extra_info {
+        width: 1fr;
+        height: auto;
+        align: right middle;
+    }
+
+    .album_name {
+        color: 30%;
+        background: 10%;
+        text-overflow: ellipsis;
+        text-wrap: nowrap;
+        width: auto;
+        content-align: right middle;
+    }
+
+    .album_release_date {
+        color: 30%;
+        width: 100%;
+        content-align: right middle;
+    }
+    
+    .extra_info_container {
+        width: 100%;
+        height: auto;
+        align: right middle;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        with HorizontalGroup(classes="song-row"):
+            with Container(classes="image_container"):
+                yield Image(classes="song-image")
+
+            with VerticalGroup(classes="song_info"):
+                yield Static(self.data.title, classes="song-title")
+                yield Static(self.data.artist, classes="song-artist")
+
+            with VerticalGroup(classes="song_extra_info"):
+                with Container(classes="extra_info_container"):
+                    yield Static(f"Album: {self.data.album_name}", classes="album_name")
+                yield Static(str(self.data.album_release_date), classes="album_release_date")
