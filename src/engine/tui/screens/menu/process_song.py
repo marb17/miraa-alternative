@@ -252,6 +252,10 @@ class ProcessSong(Screen):
                     manager.force_align_lyrics(self.selected_json_file)
 
 
+        with WorkflowManager() as manager:
+            manager.move_to_final_database(self.selected_json_file)
+
+
 
         self.app.call_from_thread(self.update_ui_for_prompt, UIPromptRequest(
             type="hidden_request",

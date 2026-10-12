@@ -30,10 +30,15 @@ class LyricSegment:
 class DatabaseEntry:
     json_path: Path
 
-    id: int
-    title: str
-    artist: str
-    youtube_id: str
+    id: int = None
+    title: str = None
+    artist: str = None
+    youtube_id: str = None
+    image_thumbnail: str = None
+
+    audio: Path = None
+    audio_inst: Path = None
+    audio_vocal: Path = None
 
 
 @dataclass

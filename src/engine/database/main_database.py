@@ -9,11 +9,18 @@ from engine.utils.paths import DATABASE_DIR
 
 class MainDatabase:
     def __init__(self) -> None:
-        self.database = sqlite3.connect("database.db")
+        self.database = sqlite3.connect(Path(DATABASE_DIR / "database.db"))
         self.cursor = self.database.cursor()
 
         Path(DATABASE_DIR / "songs").mkdir(parents=False, exist_ok=True)
         Path(DATABASE_DIR / "raw_metadata").mkdir(parents=False, exist_ok=True)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.database.close()
+        return False
 
     def raw_execute(self, query: str, params: tuple = (), commit: bool = True, safe_exit: bool = True) -> None:
         try:
@@ -35,9 +42,13 @@ class MainDatabase:
                              "title TEXT NOT NULL,"
                              "artist TEXT NOT NULL,"
                              "json_path TEXT NOT NULL,"
-                             "youtube_id TEXT NOT NULL) "
+                             "youtube_id TEXT NOT NULL,"
+                             "image_thumbnail TEXT NOT NULL,"
+                             "audio TEXT NOT NULL,"
+                             "inst_audio TEXT NOT NULL,"
+                             "vocal_audio TEXT NOT NULL"
                              
-                             ";")
+                             ");")
         except DatabaseError:
             raise DatabaseError("Table already exists")
 
@@ -47,9 +58,11 @@ class MainDatabase:
         json_data = read_json_file(entry.json_path)
         title, artist = json_data["pre_processing"]["raw_metadata"]["name"], json_data["pre_processing"]["raw_metadata"]["artists"][0]["name"]
         youtube_id = json_data["pre_processing"]["youtube_id"]
+        image_thumbnail = json_data["genius_data"]["header_image_url"]
+        audio, v_audio, i_audio = f"{youtube_id}.wav", f"{youtube_id}_vocal.wav", f"{youtube_id}_inst.wav"
 
-        query = "INSERT INTO songs (title, artist, json_path, youtube_id) VALUES (?, ?, ?, ?);"
-        params = (title, artist, json_path, youtube_id)
+        query = "INSERT INTO songs (title, artist, json_path, youtube_id, image_thumbnail, audio, inst_audio, vocal_audio) VALUES (?, ?, ?, ?, ?, ?, ?, ?);"
+        params = (title, artist, json_path, youtube_id, image_thumbnail, audio, i_audio, v_audio)
 
         self.raw_execute(query, params=params)
 
@@ -63,7 +76,11 @@ class MainDatabase:
                 title=entry[1],
                 artist=entry[2],
                 json_path=Path(DATABASE_DIR / "raw_metadata" / entry[3]),
-                youtube_id=entry[4]
+                youtube_id=entry[4],
+                image_thumbnail=entry[5],
+                audio=Path(DATABASE_DIR / "songs" / entry[6]),
+                audio_inst=Path(DATABASE_DIR / "songs" / entry[7]),
+                audio_vocal=Path(DATABASE_DIR / "songs" / entry[8]),
             )
             for entry in entries
         ]
@@ -76,9 +93,9 @@ class MainDatabase:
 if __name__ == '__main__':
     db = MainDatabase()
 
-    # db.create_table()
+    db.create_table()
 
     # db.add_entry(DatabaseEntry(Path(r"D:\python\miraa-alternative\src\.temp\想い人 - Ryokuoushoku Shakai.json")))
     # db.add_entry(DatabaseEntry(Path(r"D:\python\miraa-alternative\src\.temp\ライラック - 美波.json")))
 
-    print(db.get_all_entries())
+    # print(db.get_all_entries())

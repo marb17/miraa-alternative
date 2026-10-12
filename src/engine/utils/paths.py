@@ -19,7 +19,7 @@ CONFIG_DIR = BASE_DIR / "config"
 DATA_DIR = BASE_DIR / "data"
 MODEL_DIR = BASE_DIR / "models"
 
-DATABASE_DIR = BACKEND_DIR / "database"
+DATABASE_DIR = DATA_DIR / "database"
 
 # FILES
 ENV_FILE = CONFIG_DIR / ".env"

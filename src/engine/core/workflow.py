@@ -3,21 +3,23 @@ from collections.abc import Generator
 from concurrent.futures.thread import ThreadPoolExecutor
 # PYPI LIBRARIES
 from pathlib import Path
+import shutil
 from typing import Any
 
 import torch
 
 from engine.core.processing import AudioSeparation, ForcedAlignment
 from engine.core.translation_analysis import Translator
+from engine.database.main_database import MainDatabase
 from engine.extractors.geniusextractor import GeniusExtractor
-from engine.utils.classes.dataclasses import SongContext, UIPromptRequest, UILogRequest
+from engine.utils.classes.dataclasses import SongContext, UIPromptRequest, UILogRequest, DatabaseEntry
 from engine.utils.classes.exceptions import DataMismatchError
 from engine.utils.functions.filesystem import read_json_file, write_json_file, read_config, load_env_file
 # HELPER LIBRARIES
 # from engine.utils.helper_funcs import questionary_select
 from engine.utils.functions.other import contains_japanese
 from engine.utils.logger import Logger
-from engine.utils.paths import TEMP_DIR
+from engine.utils.paths import TEMP_DIR, DATABASE_DIR
 
 logger = Logger(__name__)
 
@@ -153,6 +155,24 @@ class WorkflowManager:
         write_json_file(json_path, python_segments, ["timestamps"])
 
         return True
+
+    @staticmethod
+    def move_to_final_database(json_path: Path) -> bool:
+        json_data = read_json_file(json_path)
+        audio_file = Path(json_path.parent / f"{json_data["pre_processing"]["youtube_id"]}.wav")
+        v_audio_file = Path(json_path.parent / f"{json_data["pre_processing"]["youtube_id"]}_vocal.wav")
+        i_audio_file = Path(json_path.parent / f"{json_data["pre_processing"]["youtube_id"]}_inst.wav")
+
+        audio_target_path = Path(DATABASE_DIR / "songs")
+
+        shutil.move(audio_file, audio_target_path)
+        shutil.move(v_audio_file, audio_target_path)
+        shutil.move(i_audio_file, audio_target_path)
+
+        with MainDatabase() as db:
+            db.add_entry(DatabaseEntry(json_path))
+
+        shutil.move(json_path, Path(DATABASE_DIR / "raw_metadata"))
 
 
 class OldWorkflowManager:
