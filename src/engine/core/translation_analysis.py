@@ -3,14 +3,20 @@ import re
 import gc
 import time
 from typing import Any, Generator
+import platform
 
-from engine.core.llm_model import WindowsLLMModel
+from engine.core.llm_model import LLMModel
 from engine.utils.classes.dataclasses import UIPromptRequest
 # HELPER LIBRARIES
 from engine.utils.functions.other import contains_japanese
 
 # PYPI LIBRARIES
-from lmdeploy import GenerationConfig
+
+if platform.system() == "Windows":
+    from lmdeploy import GenerationConfig
+elif platform.system() == "Darwin":
+    pass
+    # raise NotImplementedError
 
 from engine.utils.logger import Logger
 logger = Logger(__name__)
@@ -161,7 +167,7 @@ class Translator:
             raise ValueError("No prompts found to be generated, please re-check lyrics to ensure they are in Japanese Scripts")
 
         # TODO add macos support
-        with WindowsLLMModel() as llm:
+        with LLMModel() as llm:
             inference_response = llm.batch_inference(prompts, estimated_output_cost=50, gen_config=gen_config)
             responses = dict(zip([idx for idx, exp in mapping_index if exp == "do"], inference_response))
 

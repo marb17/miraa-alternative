@@ -12,11 +12,13 @@ from engine.utils.paths import DATABASE_DIR, TEMP_DIR
 
 class MainDatabase:
     def __init__(self) -> None:
+        Path(DATABASE_DIR).mkdir(parents=True, exist_ok=True)
+        Path(DATABASE_DIR / "songs").mkdir(parents=False, exist_ok=True)
+        Path(DATABASE_DIR / "raw_metadata").mkdir(parents=False, exist_ok=True)
+
         self.database = sqlite3.connect(Path(DATABASE_DIR / "database.db"))
         self.cursor = self.database.cursor()
 
-        Path(DATABASE_DIR / "songs").mkdir(parents=False, exist_ok=True)
-        Path(DATABASE_DIR / "raw_metadata").mkdir(parents=False, exist_ok=True)
 
     def __enter__(self):
         return self
@@ -68,7 +70,9 @@ class MainDatabase:
         }
         album_name, album_release_date = json_data["pre_processing"]["raw_metadata"]["album"]["name"], datetime.strptime(json_data["pre_processing"]["raw_metadata"]["album"]["release_date"], "%Y-%m-%d").date()
 
-        metadata = {}
+        metadata = {
+            "duration": json_data["pre_processing"]["youtube_metadata"]["duration"],
+        }
 
         query = "INSERT INTO songs (title, artist, album_name, album_release_date, youtube_id, image_thumbnail, audios, json_path, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"
         params = (
@@ -106,7 +110,7 @@ class MainDatabase:
         return final_output
 
     def move_entry_to_temp(self, entry_id: int) -> None:
-        self.raw_execute("SELECT json_path, audio, audio_inst, audio_vocal FROM songs WHERE entry_id = ?;",
+        self.raw_execute("SELECT json_path, audios FROM songs WHERE entry_id = ?;",
                          (entry_id,),
                          commit=False)
         row = self.cursor.fetchone()
@@ -114,10 +118,12 @@ class MainDatabase:
         if not row:
             return
 
+        audios = json.loads(row[1])
+
         json_path = Path(DATABASE_DIR / "raw_metadata" / row[0])
-        audio_path = Path(DATABASE_DIR / "songs" / row[1])
-        audio_inst_path = Path(DATABASE_DIR / "songs" / row[2])
-        audio_vocal_path = Path(DATABASE_DIR / "songs" / row[3])
+        audio_path = Path(DATABASE_DIR / "songs" / audios["audio"])
+        audio_inst_path = Path(DATABASE_DIR / "songs" / audios["inst_audio"])
+        audio_vocal_path = Path(DATABASE_DIR / "songs" / audios["vocal_audio"])
 
         shutil.move(json_path, Path(TEMP_DIR))
         shutil.move(audio_path, Path(TEMP_DIR))
@@ -135,4 +141,6 @@ if __name__ == '__main__':
     # db.add_entry(DatabaseEntry(Path(r"D:\python\miraa-alternative\src\.temp\想い人 - Ryokuoushoku Shakai.json")))
     # db.add_entry(DatabaseEntry(Path(r"D:\python\miraa-alternative\src\.temp\ライラック - 美波.json")))
 
-    print(db.get_all_entries())
+    # print(db.get_all_entries())
+
+    db.move_entry_to_temp(5)

@@ -9,7 +9,7 @@ dependencies = [
     "nagisa",
     "lmdeploy",
     "audio-separator",
-    "textual", "opencv-python", "mmengine",
+    "textual", "textual-image", "opencv-python", "mmengine",
     "torch", "torchvision",
     "gdown",
     "pyperclip",

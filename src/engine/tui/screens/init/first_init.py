@@ -6,7 +6,7 @@ from textual.containers import Container, CenterMiddle, Center, HorizontalGroup
 from textual.screen import Screen, ModalScreen
 from textual.widgets import Header, Label, ProgressBar, RichLog, Static, Button, Input, Footer
 
-from engine.main import Analyzer
+from engine.utils.setup import Analyzer
 from engine.tui.modalscreens.info import InfoModalScreen, RestartAppModalScreen
 from engine.utils.paths import ENV_FILE
 from engine.utils.default.default_var import DEFAULT_DICTS
@@ -69,7 +69,7 @@ class InitProgress(Screen):
             with CenterMiddle(id="progress"):
                 with Center():
                     yield Label("Completion:")
-                    yield ProgressBar(total=3, show_eta=False)
+                    yield ProgressBar(total=4, show_eta=False)
 
                 yield RichLog(id="logs", highlight=True, markup=True)
 

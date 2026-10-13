@@ -6,7 +6,9 @@ from engine.utils.paths import TEMP_DIR
 import playsound3
 import time
 
-file_path = Path(r"D:\python\miraa-alternative\src\.temp\Backlight - Ado.json")
+# file_path = Path(r"D:\python\miraa-alternative\src\.temp\Backlight - Ado.json")
+# file_path = Path(r"/Users/marb/PycharmProjects/miraa-alternative/src/.ssh_copy_over/花になって - Be a flower - Ryokuoushoku Shakai.json")
+file_path = Path(r"/Users/marb/PycharmProjects/miraa-alternative/src/.temp/sabotage - Ryokuoushoku Shakai.json")
 
 pygame.mixer.init()
 data = read_json_file(file_path)
@@ -14,7 +16,7 @@ sound = pygame.mixer.Sound(Path(TEMP_DIR / f"{data.get("pre_processing").get("au
 data = data.get("timestamps")
 # file_path.write_text(json.dumps(data, indent=4))
 
-sound.set_volume(0.05)
+sound.set_volume(0.35)
 sound.play()
 
 # playsound3.playsound(Path(r"D:\python\miraa-alternative\src\.temp\Ww8oxgqDQSs.wav"), block=False)

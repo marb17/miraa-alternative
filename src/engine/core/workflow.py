@@ -32,8 +32,8 @@ class WorkflowManager:
         self._config = read_config()
 
         # temporary gpu check
-        if not torch.cuda.is_available():
-            raise Exception("CUDA not available")
+        # if not torch.cuda.is_available():
+        #     raise Exception("CUDA not available")
 
     def __enter__(self):
         return self

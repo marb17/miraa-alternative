@@ -1,3 +1,6 @@
+import hashlib
+from math import floor
+
 from pygments.formatters import img
 from textual import events, work
 from textual.app import ComposeResult
@@ -14,6 +17,8 @@ from textual_image.widget import Image as Image
 import io
 import requests
 from PIL import Image as PILImage
+
+from engine.utils.paths import CACHE_DIR
 
 
 class SpotifyCurrentlyPlayingWidget(Widget):
@@ -341,10 +346,30 @@ class SongEntry(Widget):
 
     @work(thread=True)
     def fetch_image(self) -> None:
+        image_cache_dir = CACHE_DIR / "thumbnail-images"
+        image_cache_dir.mkdir(parents=True, exist_ok=True)
+
         image_url = self.data.image_thumbnail
-        response = requests.get(image_url)
-        img = PILImage.open(io.BytesIO(response.content))
-        self.app.call_from_thread(self.update_image, img)
+        url_hash = hashlib.md5(image_url.encode("utf-8")).hexdigest()
+        cache_path = image_cache_dir / f"{url_hash}.jpg"
+
+        try:
+            if cache_path.exists():
+                img = PILImage.open(cache_path)
+                img.load()
+            else:
+                response = requests.get(image_url, timeout=10)
+                response.raise_for_status()
+
+                cache_path.write_bytes(response.content)
+
+                img = PILImage.open(io.BytesIO(response.content))
+                img.load()
+
+            self.app.call_from_thread(self.update_image, img)
+
+        except Exception as e:
+            pass
 
     def update_image(self, image: PILImage.Image) -> None:
         image_widget = self.query_one(".song-image", Image)
@@ -373,7 +398,7 @@ class SongEntry(Widget):
 
     .song-image {
         height: 5;
-        width: 10;
+        width: 12;
     }
 
     .image_container {
@@ -431,7 +456,21 @@ class SongEntry(Widget):
         height: auto;
         align: right middle;
     }
+    
+    .right_spacing {
+        width: 1;
+        height: auto;
+    }
     """
+
+    @staticmethod
+    def second_to_pretty_time(seconds: float | int | None) -> str:
+        if not seconds:
+            return "--:--"
+
+        s = seconds % 60
+        minutes = floor(seconds / 60)
+        return f"{minutes:02d}:{s:02d}"
 
     def compose(self) -> ComposeResult:
         with HorizontalGroup(classes="song-row"):
@@ -441,8 +480,18 @@ class SongEntry(Widget):
             with VerticalGroup(classes="song_info"):
                 yield Static(self.data.title, classes="song-title")
                 yield Static(self.data.artist, classes="song-artist")
+                yield Static()
+                yield Static(self.second_to_pretty_time(self.data.metadata.get("duration")), classes="album_name")
 
             with VerticalGroup(classes="song_extra_info"):
                 with Container(classes="extra_info_container"):
                     yield Static(f"Album: {self.data.album_name}", classes="album_name")
-                yield Static(str(self.data.album_release_date), classes="album_release_date")
+                yield Static(f"Album Release Date: {str(self.data.album_release_date)}", classes="album_release_date")
+                yield Static()
+                yield Static(
+                    f"BPM: {self.data.metadata.get("bpm", "-")} | Key: {self.data.metadata.get('key', '-')}",
+                    classes="album_release_date"
+                )
+
+
+            yield Container(classes="right_spacing")
