@@ -17,6 +17,7 @@ document.addEventListener( "keydown", (keypress) => {
 document.addEventListener( "keydown", (keypress) => {
     if (keypress.key === "3") {
         CurrentPage = 3;
+        goToPage3();
     }
 }) //// temporary way to go to third page
 
@@ -24,7 +25,7 @@ document.addEventListener( "keydown", (keypress) => {
 
 
 if (window.location.pathname.includes("page3.html")) {
-    EnterPage3();
+    CombineLyrics();
 }
 
 

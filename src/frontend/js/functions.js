@@ -52,64 +52,20 @@ function goToPage3() {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // Below are all the functions that will be used
 
 function delay(ms){
     return new Promise(resolve => setTimeout(resolve, ms));
 } // function to create delay in milliseconds
 
-
-// this function starts the transition for the first to second page
-// async function StartMenuTransition() {
-//    if (StartUp === true) return;
-//    console.log("StartMenu");
-//    StartUp = true;
-//    circlec.style.transform = "translate(-100%, -50%)";
-//    appbackground.style.backgroundColor = "#887aab";
-//    circleout.style.backgroundColor = "#887aab";
-//    circleout.style.border = "#887aab";
- //   clickanywhere.style.color= "#887aab";
- //   titletextcontainer.style.opacity = 0;
- //   await delay(400);
-//    window.location.href= "page2.html";
-
-
-async function EnterPage3(){
+async function CombineLyrics(){
     try {
         response = await fetch('../../../test_data/output/Haikei Shounenyo - Hump Back.json');
         data = await response.json();
         lyricArray = data.translated_lyrics;
 
         console.log(lyricArray);
-        formattedLyrics = lyricArray.join('<br>')+ '<br><br>&nbsp;';
+        formattedLyrics = lyricArray.join('<br>')+ '&nbsp;';
     } catch (error) {
 
         console.error("Failed to load lyrics:", error);
@@ -119,3 +75,4 @@ async function EnterPage3(){
 // then it combined all of the items in the array, and adds a <br> between each single item (in this case on line of lyrics)
 // then the .innerHTML is used to treat the entire line of every item and <br> as a line of html code, thus causing
 // all of the lines to be neatly formatted and separated.
+

@@ -84,10 +84,12 @@
         gap:1vh;
 
     outline: 2px solid #151515;
+
+    container-type: size;
 }
 
 .titletext{
-    font-size: 13vh;
+    font-size: 10cqw;
     color: #151515;
     font-family: "Readex Pro", sans-serif;
     font-optical-sizing: auto;
@@ -99,8 +101,8 @@
 }
 
 #titletext1{
-    grid-column: 1/span 2;
-    grid-row:1/span 3;
+    grid-column: 1/span 3;
+    grid-row:2/span 3;
 
     align-self : center;
     justify-self : center;
@@ -116,7 +118,7 @@
     font-style: normal;
     margin : 0;
     line-height: 1;
-    font-size: 5vh;
+    font-size: 3cqw;
 
     justify-self: center;
 
@@ -131,7 +133,7 @@
     font-style: normal;
     margin : 0;
     line-height: 1;
-    font-size: 3vh;
+    font-size: 2.5cqw;
     justify-self: center;
 
     grid-column: 4/ span1;
@@ -148,10 +150,12 @@
     width: 100vw;
     height: 100vw;
     background-color: #acacac;
-    position: absolute;
-    top: 20%;
-    left: 50%;
+    position: fixed;
+    bottom: -95%;
+    right: -45%;
 }
+
+
 
 #aboutparagraph{
 
@@ -159,14 +163,61 @@
     font-optical-sizing: auto;
     font-weight: lighter;
     line-height: 1;
-    font-size: 2.5vh;
+    font-size: 2cqw;
 
     grid-column: 1/span 2;
-    grid-row: 7/span 2;
+    grid-row: 6/span 3;
 
-    align-self : start;
+    align-self : center;
     justify-self : center;
 }
+
+@media (orientation: portrait){
+    #titletext2{
+        grid-column:1/span 8;
+        grid-row: 5/span 2;
+        font-size: 5cqw;
+        align-self: start;
+        justify-self: center;
+    }
+
+    #titletext1{
+        grid-column:1/span 8;
+        grid-row: 3/span 2;
+        align-self: end;
+        justify-self: center;
+    }
+
+    #clickanywheretostart{
+        grid-column:1/span 8;
+        grid-row: 5/span 1;
+        align-self: center;
+        justify-self: center;
+
+        font-size: 3.5cqw;
+    }
+
+    #aboutparagraph{
+        grid-column: 1/ span1;
+        grid-row: 8/span 1;
+        font-size: 3.5cqw;
+        justify-self: start;
+        align-self: end;
+        padding: 20px;
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 #bodypage2{
     margin:0;
@@ -188,8 +239,8 @@
     margin: auto;
 
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    grid-template-rows: repeat(3, 1fr) auto auto repeat(3,1fr);
+    grid-template-rows: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 0;
 
     outline: 2px solid #151515;
@@ -236,6 +287,62 @@
     animation: scalein 0.6s ease-in forwards;
 
 }
+
+
+
+
+
+
+
+body{
+    margin:0;
+    padding:0;
+    background-color: #e4e4e4;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#apppage3{
+    width: 100vw;
+    height: 100vh;
+
+    display: grid;
+    grid-template-columns: repeat(16, 1fr);
+    grid-template-rows: repeat(10, 1fr);
+}
+
+
+#lyrics-container{
+    background-color: #e4e4e4;
+    width: 30vw;
+    height: 90vh;
+
+    outline: 1.5px solid #151515;
+    overflow: scroll;
+
+    grid-column: 3;
+    grid-row: 5;
+
+}
+
+#lyrics-container::-webkit-scrollbar {
+    display: none;
+}
+
+
+#lyrics{
+    font-family: "Noto Sans JP", sans-serif;
+    text-align: center;
+    font-size:2vh;
+    padding-bottom: 2vh;
+    color: #151515;
+}
+
 
 /* old stuff. dont delete, i use this for future references since i still have no clue on how stuff works
 body{
