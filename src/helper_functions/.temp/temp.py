@@ -23,18 +23,23 @@ sound.play()
 start_time = time.time()
 
 last_seg_start = 0
+try:
+    while True:
+        if time.time() - start_time > data[0].get("end"):
+            data.pop(0)
 
-while True:
-    if time.time() - start_time > data[0].get("end"):
-        data.pop(0)
+        if time.time() - start_time > data[0].get("start") and last_seg_start != data[0].get("start"):
+            last_seg_start = data[0].get("start")
+            print(data[0]["line"])
 
-    if time.time() - start_time > data[0].get("start") and last_seg_start != data[0].get("start"):
-        last_seg_start = data[0].get("start")
-        print(data[0]["line"])
+        # print(time.time() - start_time)
+        time.sleep(0.05)
+        # print(time.time() - start_time)
+except IndexError:
+    while True:
+        time.sleep(1)
 
-    # print(time.time() - start_time)
-    time.sleep(0.05)
-    # print(time.time() - start_time)
+
 
 # import torch
 #

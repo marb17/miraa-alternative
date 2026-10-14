@@ -380,9 +380,13 @@ class ForcedAlignment:
             best_index = scores.index(max(scores))
             logger.debug(f"Chose pass number: {best_index + 1}")
             logger.debug(f"Best Score: {scores[best_index]}")
-            return best_index, audios, pass_data, vad_setting
+            return best_index, audios, pass_data, vad_setting, scores
 
-        def run_full_pass(audio_segment_data, extra_pass_data: list[list[dict]] | None = None, tries_per_pass: int = 3, use_vad: bool = False):
+        def run_full_pass(audio_segment_data, 
+                          extra_pass_data: list[list[dict]] | None = None, 
+                          tries_per_pass: int = 3, 
+                          use_vad: bool = False,
+                          fail_pass_score: tuple[float, float] = (0.4, 0.75)):
             temp_audio_path = Path(audio_file.parent / f"{audio_file.stem}_align_run.wav")
             audio_segment_data.export(str(temp_audio_path), format="wav")
 
@@ -391,9 +395,34 @@ class ForcedAlignment:
 
             times = [200, 600, 1350]
 
+            # for idx, t in enumerate(times):
+            #     best_pass: list[dict] = list()
+            #     best_score: float = 0
+            #
+            #     for x in range(tries_per_pass):
+            #         logger.debug(f"Pass: {idx}, Try: {x}")
+            #         d = run_alignment(temp_audio_path, added_silence=(t + (x*125)), vad=use_vad)
+            #         avg_score = sum([seg["score"] for seg in d]) / len(d)
+            #         logger.debug(f"Average Score: {avg_score}")
+            #
+            #         if avg_score > best_score:
+            #             best_pass = d
+            #             best_score = avg_score
+            #
+            #         if best_score > 0.75:
+            #             logger.debug(f"Finished pass: {idx}")
+            #             break
+            #
+            #     if best_score < 0.4:
+            #         logger.debug(f"Failed pass: {idx}")
+            #         print(pass_data[-1])
+            #         continue
+            #     else:
+            #         pass_data.append(best_pass)
+
             for idx, t in enumerate(times):
-                best_pass: list[dict] = list()
-                best_score: float = 0
+                any_chosen = False
+                best_data, best_score = None, 0
 
                 for x in range(tries_per_pass):
                     logger.debug(f"Pass: {idx}, Try: {x}")
@@ -402,19 +431,21 @@ class ForcedAlignment:
                     logger.debug(f"Average Score: {avg_score}")
 
                     if avg_score > best_score:
-                        best_pass = d
-                        best_score = avg_score
+                        best_data, best_score = d, avg_score
 
-                    if best_score > 0.75:
-                        logger.debug(f"Finished pass: {idx}")
+                    if avg_score > fail_pass_score[0]:
+                        logger.debug(f"Finished pass: {idx} | {x}")
+                        pass_data.append(d)
+                        any_chosen = True
+                    else:
+                        logger.debug(f"Failed pass: {idx} | {x}")
+
+                    if avg_score > fail_pass_score[1]:
                         break
 
-                if best_score < 0.4:
-                    logger.debug(f"Failed pass: {idx}")
-                    print(pass_data[-1])
-                    continue
-                else:
-                    pass_data.append(best_pass)
+                if not any_chosen:
+                    pass_data.append(best_data)
+
 
             temp_audio_path.unlink()
 
@@ -467,8 +498,14 @@ class ForcedAlignment:
 
             return final_aligned
 
-        best_idx, audios, data, vad_settings = run_test_pass()
-        return run_full_pass(audios[best_idx], extra_pass_data=[data[best_idx]], use_vad=vad_settings[best_idx])
+        best_idx, audios, data, vad_settings, scores = run_test_pass()
+        return run_full_pass(audios[best_idx],
+                             extra_pass_data=[data[best_idx]],
+                             use_vad=vad_settings[best_idx],
+                             fail_pass_score=(
+                                 max(scores[best_idx], 0.65),
+                                 0.8)
+                             )
 
 
 
