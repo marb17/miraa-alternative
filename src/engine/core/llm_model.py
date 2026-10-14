@@ -83,18 +83,31 @@ if platform.system() == "Windows":
             return False
 
         def _close(self) -> None:
-            self._pipe.close()
-            self._pipe = None
+            if self._pipe is not None:
+                logger.debug("Closing LMDeploy pipeline...")
 
+                self._pipe.close()
+
+                if hasattr(self._pipe, 'engine') and self._pipe.engine is not None:
+                    try:
+                        self._pipe.engine.close()
+                        del self._pipe.engine
+                    except Exception as e:
+                        logger.warning(f"Error while closing internal engine: {e}")
+
+                del self._pipe
+                self._pipe = None
+
+            import gc
             import torch
+
             gc.collect()
             gc.collect()
+
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
                 torch.cuda.ipc_collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                torch.cuda.ipc_collect()
+                torch.cuda.reset_peak_memory_stats()
 
         # region batched inference
         def _calculate_prompt_cost(self, prompt: list[str], estimated_output_token_cost: int) -> float:
@@ -243,3 +256,18 @@ class LLMModel:
         elif self.platform == "Darwin":
             pass
             raise NotImplementedError
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.platform == "Windows":
+            import torch
+            gc.collect()
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.ipc_collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.ipc_collect()
+        elif self.platform == "Darwin":
+            raise NotImplementedError
+        return False

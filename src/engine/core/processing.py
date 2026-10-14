@@ -252,7 +252,7 @@ class ForcedAlignment:
                  "--device", "cuda",
                  *([] if vad else ["--no-vad"]),
                  "--pairing", "auto",
-                 "--interpolate",
+                 # "--interpolate",
                  "--window", "1",
             ]
 
@@ -264,7 +264,7 @@ class ForcedAlignment:
                         ["lyric-align", str(temp_audio_run_path), str(temp_lyric_path), "-o", "placeholder_output_file",
                          "--segments", str(temp_segments_file),
                          "--pairing", str(x),
-                         "--interpolate",
+                         # "--interpolate",
                          "--window", str(y),
                         ]
                     )
@@ -274,7 +274,7 @@ class ForcedAlignment:
                         ["lyric-align", str(temp_audio_run_path), str(temp_lyric_path), "-o", "placeholder_output_file",
                          "--segments", str(temp_segments_file),
                          "--pairing", "auto",
-                         "--interpolate",
+                         # "--interpolate",
                          "--window", str(y),
                          ]
                     )
@@ -288,18 +288,12 @@ class ForcedAlignment:
 
                 process = subprocess.Popen(
                     arg_template,
-                    # stdout=subprocess.PIPE,
-                    # stderr=subprocess.STDOUT,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     text=True,
                     encoding="utf-8",
                     errors="replace"
                 )
-
-                # with process.stdout:
-                #     for line in iter(process.stdout.readline, ""):
-                #         logger.debug(line.strip())
 
                 return_code = process.wait()
 
@@ -342,7 +336,7 @@ class ForcedAlignment:
 
 
         def run_test_pass():
-            target_dbfs = -18
+            target_dbfs = -16
 
             temp_audio_file = Path(audio_file.parent / f"{audio_file.stem}_temp.wav")
             temp_dry_audio_file = Path(audio_file.parent / f"{audio_file.stem}_dry.wav")
@@ -394,31 +388,6 @@ class ForcedAlignment:
             if extra_pass_data: pass_data.extend(extra_pass_data)
 
             times = [200, 600, 1350]
-
-            # for idx, t in enumerate(times):
-            #     best_pass: list[dict] = list()
-            #     best_score: float = 0
-            #
-            #     for x in range(tries_per_pass):
-            #         logger.debug(f"Pass: {idx}, Try: {x}")
-            #         d = run_alignment(temp_audio_path, added_silence=(t + (x*125)), vad=use_vad)
-            #         avg_score = sum([seg["score"] for seg in d]) / len(d)
-            #         logger.debug(f"Average Score: {avg_score}")
-            #
-            #         if avg_score > best_score:
-            #             best_pass = d
-            #             best_score = avg_score
-            #
-            #         if best_score > 0.75:
-            #             logger.debug(f"Finished pass: {idx}")
-            #             break
-            #
-            #     if best_score < 0.4:
-            #         logger.debug(f"Failed pass: {idx}")
-            #         print(pass_data[-1])
-            #         continue
-            #     else:
-            #         pass_data.append(best_pass)
 
             for idx, t in enumerate(times):
                 any_chosen = False
@@ -496,14 +465,46 @@ class ForcedAlignment:
                     )
                 )
 
-            return final_aligned
+            for idx, segment in enumerate(final_aligned[:-1]):
+                next_seg = final_aligned[idx + 1]
+
+                if segment.end is not None and next_seg.start is not None:
+                    if segment.end >= next_seg.start:
+                        final_aligned[idx].end = final_aligned[idx + 1].start - 0.02
+                    else:
+                        pass
+
+            for idx in range(1, len(final_aligned) - 1):
+                last_seg = final_aligned[idx - 1]
+                cur_seg = final_aligned[idx]
+                next_seg = final_aligned[idx + 1]
+
+                if (cur_seg.start is None and
+                        cur_seg.end is None and
+                        last_seg.end is not None and
+                        next_seg.start is not None and
+                        next_seg.start - last_seg.end < 15):
+                    cur_seg.start = last_seg.end + 0.05
+                    cur_seg.end = next_seg.start - 0.05
+
+            rounded_aligned = [
+                LyricSegment(
+                    seg.line,
+                    round(seg.start, 2) if seg.start else None,
+                    round(seg.end, 2) if seg.end else None,
+                    seg.score,
+                    seg.matched
+                )
+                for seg in final_aligned]
+
+            return rounded_aligned
 
         best_idx, audios, data, vad_settings, scores = run_test_pass()
         return run_full_pass(audios[best_idx],
                              extra_pass_data=[data[best_idx]],
                              use_vad=vad_settings[best_idx],
                              fail_pass_score=(
-                                 max(scores[best_idx], 0.65),
+                                 max(scores[best_idx] - 0.05, 0.65),
                                  0.8)
                              )
 
