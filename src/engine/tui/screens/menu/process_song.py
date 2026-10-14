@@ -241,7 +241,6 @@ class ProcessSong(Screen):
 
         self.current_process_display = "timestamps"
         self.app.call_from_thread(self.update_ui_tabs, self.current_process_display)
-
         if song_data.get("timestamps"):
             self.app.call_from_thread(self.update_ui_for_prompt, UILogRequest(
                 message="Song has already been aligned, skipping"
@@ -251,8 +250,8 @@ class ProcessSong(Screen):
                 with WorkflowManager() as manager:
                     manager.force_align_lyrics(self.selected_json_file)
 
-        with WorkflowManager() as manager:
-            manager.move_to_final_database(self.selected_json_file)
+        # with WorkflowManager() as manager:
+        #     manager.move_to_final_database(self.selected_json_file)
 
         self.app.call_from_thread(self.update_ui_for_prompt, UIPromptRequest(
             type="hidden_request",

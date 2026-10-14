@@ -6,13 +6,13 @@ import os
 import subprocess
 import sys
 import time
-import uuid
+import uuid, hashlib
 from collections.abc import Generator
 from pathlib import Path
 from typing import Literal
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from pydub import AudioSegment
-from pydub.effects import compress_dynamic_range
 
 from engine.utils.classes.dataclasses import UIPromptRequest, LyricSegment
 from engine.utils.default.default_var import AUDIO_MODEL_PRESETS
@@ -219,7 +219,7 @@ class ForcedAlignment:
 
         # run_id = uuid.uuid4().hex[:8]
 
-        def run_alignment(audio: Path, added_silence: int = 0, vad: bool = False, window: int = 3):
+        def run_alignment(audio: Path, added_silence: int = 0, vad: bool = False):
             now = time.time()
 
             mapping_index = list()
@@ -237,7 +237,7 @@ class ForcedAlignment:
 
             temp_lyric_path = Path(audio_file.parent / f"{audio_file.stem}_lyrics.txt")
             temp_audio_run_path = Path(audio_file.parent / f"{audio_file.stem}_run.wav")
-            temp_holding_file = Path(audio_file.parent / f"{audio_file.stem}_holding.json")
+            temp_segments_file = Path(audio_file.parent / f"{audio_file.stem}_segments.json")
             temp_lyric_path.write_text(process_lyrics,
                                        encoding="utf-8")
 
@@ -245,45 +245,99 @@ class ForcedAlignment:
             combined = silence + AudioSegment.from_wav(audio)
             combined.export(str(temp_audio_run_path), format="wav")
 
-            args_to_run = [
-                ["lyric-align", str(temp_audio_run_path), str(temp_lyric_path), "-o", str(temp_holding_file),
+            first_pass_args = [
+                "lyric-align", str(temp_audio_run_path), str(temp_lyric_path), "-o", "placeholder_output_file",
+                 "--dump-segments", str(temp_segments_file),
                  "--model", "large-v3",
                  "--device", "cuda",
                  *([] if vad else ["--no-vad"]),
                  "--pairing", "auto",
                  "--interpolate",
-                 "--window", str(window),
-                 ],
+                 "--window", "1",
             ]
 
-            for arg in args_to_run:
+            segment_args = []
+
+            for x in range(1, 6):
+                for y in range(1, 5):
+                    segment_args.append(
+                        ["lyric-align", str(temp_audio_run_path), str(temp_lyric_path), "-o", "placeholder_output_file",
+                         "--segments", str(temp_segments_file),
+                         "--pairing", str(x),
+                         "--interpolate",
+                         "--window", str(y),
+                        ]
+                    )
+
+                if x == 1:
+                    segment_args.append(
+                        ["lyric-align", str(temp_audio_run_path), str(temp_lyric_path), "-o", "placeholder_output_file",
+                         "--segments", str(temp_segments_file),
+                         "--pairing", "auto",
+                         "--interpolate",
+                         "--window", str(y),
+                         ]
+                    )
+
+
+            def run_pass(arg_template: list[str]):
+                arg_hash = hashlib.sha256(''.join(arg_template).encode("utf-8")).hexdigest()[:12]
+                temp_holding_file = Path(audio_file.parent / f"{audio_file.stem}_holding_{arg_hash}.json")
+
+                arg_template = [str(temp_holding_file) if arg == "placeholder_output_file" else arg for arg in arg_template]
+
                 process = subprocess.Popen(
-                    arg,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
+                    arg_template,
+                    # stdout=subprocess.PIPE,
+                    # stderr=subprocess.STDOUT,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                     text=True,
                     encoding="utf-8",
                     errors="replace"
                 )
 
-                with process.stdout:
-                    for line in iter(process.stdout.readline, ""):
-                        logger.debug(line.strip())
+                # with process.stdout:
+                #     for line in iter(process.stdout.readline, ""):
+                #         logger.debug(line.strip())
 
                 return_code = process.wait()
 
-            data = read_json_file(temp_holding_file)
+                data = read_json_file(temp_holding_file)
+                temp_holding_file.unlink()
 
-            for section in data:
-                section["start"] = max(0.0, section["start"] - (added_silence / 1000)) if section["start"] else None
-                section["end"] = max(0.0, section["end"] - (added_silence / 1000)) if section["end"] else None
+                for section in data:
+                    section["start"] = max(0.0, section["start"] - (added_silence / 1000)) if section["start"] else None
+                    section["end"] = max(0.0, section["end"] - (added_silence / 1000)) if section["end"] else None
+
+                return data, sum([seg["score"] for seg in data]) / len(data)
+
+
+            first_data, first_score = run_pass(first_pass_args)
+            pass_data = [first_data]
+            scores = [first_score]
+
+            with ThreadPoolExecutor(max_workers=15) as executor:
+                futures = {
+                    executor.submit(run_pass, template) for template in segment_args
+                }
+                
+                for future in as_completed(futures):
+                    p_data, score = future.result()
+                    pass_data.append(p_data)
+                    scores.append(score)
+                    logger.debug("Finished a pass")
+
+            best_index = scores.index(max(scores))
+            best_data = pass_data[best_index]
+            logger.debug(f"Best Raw Pass: {best_index + 1} | Score: {scores[best_index]}")
 
             try:
-                return data
+                return best_data
             finally:
-                temp_holding_file.unlink()
                 temp_lyric_path.unlink()
                 temp_audio_run_path.unlink()
+                temp_segments_file.unlink()
                 logger.debug(f"Finished Alignment in: {round(time.time() - now, 2)}")
 
 
@@ -335,7 +389,7 @@ class ForcedAlignment:
             pass_data = list()
             if extra_pass_data: pass_data.extend(extra_pass_data)
 
-            times = [230, 590, 1130]
+            times = [200, 600, 1350]
 
             for idx, t in enumerate(times):
                 best_pass: list[dict] = list()
@@ -343,7 +397,7 @@ class ForcedAlignment:
 
                 for x in range(tries_per_pass):
                     logger.debug(f"Pass: {idx}, Try: {x}")
-                    d = run_alignment(temp_audio_path, added_silence=(t + (x*75)), vad=use_vad)
+                    d = run_alignment(temp_audio_path, added_silence=(t + (x*125)), vad=use_vad)
                     avg_score = sum([seg["score"] for seg in d]) / len(d)
                     logger.debug(f"Average Score: {avg_score}")
 
@@ -355,7 +409,7 @@ class ForcedAlignment:
                         logger.debug(f"Finished pass: {idx}")
                         break
 
-                if best_score < 0.5:
+                if best_score < 0.4:
                     logger.debug(f"Failed pass: {idx}")
                     print(pass_data[-1])
                     continue
@@ -366,15 +420,40 @@ class ForcedAlignment:
 
             final_aligned = list()
 
+            def weighted_median(values_and_weights):
+                valid = [(v, w) for v, w in values_and_weights if v is not None and w is not None]
+                if not valid:
+                    return None
+
+                valid.sort(key=lambda x: x[0])
+
+                total_weight = sum(w for v, w in valid)
+                if total_weight <= 0:
+                    values = [v for v, w in valid]
+                    return values[len(values) // 2]
+
+                half_weight = total_weight / 2.0
+                cumulative_weight = 0.0
+
+                for v, w in valid:
+                    cumulative_weight += w
+                    if cumulative_weight >= half_weight:
+                        return v
+
+                return valid[-1][0]
+
             for passes in zip(*pass_data):
-                score_sum = max(0.0000001, sum(p["score"] for p in passes))
-                weighted_start = sum((p["start"] if p["start"] else 0) * p["score"] for p in passes)
-                start = round(weighted_start / score_sum, 2)
+                start_pairs = [(p.get("start"), p.get("score", 0)) for p in passes]
+                end_pairs = [(p.get("end"), p.get("score", 0)) for p in passes]
 
-                weighted_end = sum((p["end"] if p["end"] else 0) * p["score"] for p in passes)
-                end = round(weighted_end / score_sum, 2)
+                raw_start = weighted_median(start_pairs)
+                raw_end = weighted_median(end_pairs)
 
-                score = round(score_sum / len(list(passes)), 2)
+                start = round(raw_start, 2) if raw_start is not None else None
+                end = round(raw_end, 2) if raw_end is not None else None
+
+                score_sum = max(0.0000001, sum(p.get("score", 0) for p in passes))
+                score = round(score_sum / len(passes), 2)
 
                 final_aligned.append(
                     LyricSegment(

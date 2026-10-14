@@ -22,9 +22,12 @@ class LyricSegment:
         }
 
     def __post_init__(self):
-        self.start = round(self.start, 2)
-        self.end = round(self.end, 2)
-        self.score = round(self.score, 2)
+        if self.start is not None:
+            self.start = round(self.start, 2)
+        if self.end is not None:
+            self.end = round(self.end, 2)
+        if self.score is not None:
+            self.score = round(self.score, 2)
 
 
 @dataclass
