@@ -52,6 +52,8 @@ class Translator:
         return input_string
 
     def _clean_translation_response(self, input_string: str) -> str:
+        return input_string
+
         input_string = input_string.strip()
 
         m = re.search(r"^\W*Translation:\W*\s*(.+)$", input_string, re.IGNORECASE | re.MULTILINE)
@@ -79,63 +81,98 @@ class Translator:
 
         # allows pure string and list of string & context creation
         if type(texts) is str:
-            data = texts.split("\n")
+            lyrics = texts.split("\n")
             context = texts
         elif type(texts) is list:
-            data = texts
+            lyrics = texts
             context = '\n'.join(texts)
 
         # setup prompts to be sent
-        def get_context(data: list[str], idx: int, radius: int = 4) -> str:
-            start = max(0, idx - radius)
-            end = min(len(data), idx + radius + 1)
+        SYSTEM_TRANSLATION_PROMPT = """You are an expert Japanese-to-English lyric translator. Your priority is full semantic fidelity and natural, complete English: nothing in the Japanese may be dropped, softened, or generalized, and nothing may be added.
 
-            return "\n".join(
-                line.strip()
-                for i, line in enumerate(data[start:end], start=start)
-                if i != idx and line.strip()
-            )
-
-        SYSTEM_TRANSLATION_PROMPT = """You are an expert Japanese-to-English lyric translator. Your priority is full semantic fidelity: nothing in the Japanese may be dropped, softened, or generalized, and nothing may be added.
-
-        ### COMPLETENESS
-        English may be, and often must be, longer than the Japanese. Never shorten a line to make it sound cleaner or more poetic. If a choice is between a smooth phrase that loses an element and a slightly longer phrase that keeps it, choose the longer one.
+        ### COMPLETENESS AND LENGTH
+        English is usually longer than Japanese, because Japanese omits subjects, objects, and auxiliaries. Translate each line as a full, natural English expression, not a compressed fragment.
+        - Every clause in the Japanese must appear as a clause in the English. A line with two or three clauses (て-form chains, 〜が/〜けど contrasts, 〜ほど degree clauses) must produce two or three clauses. Never keep only the first or last one.
+        - Supply the subject, object, and auxiliary verbs that English needs, using the context. Do not leave a noun phrase hanging when the Japanese is a full predicate.
+        - Prefer the longer phrasing that keeps an element over the shorter one that loses it. Do not shorten a line for style or rhythm.
+        - Do not add "..." unless the source line itself ends with one or clearly trails off.
 
         Reflect every one of these if present in the line:
         - Adverbs and degree, time, and frequency words (今でも, 何度も, 限りなく, もう, まだ, ずっと, 少しも)
-        - Degree clauses (〜ほど, 〜くらい, 〜だけ, 〜ばかり)
+        - Degree clauses (〜ほど, 〜くらい, 〜だけ, 〜ばかり). Keep the "to the point that..." structure instead of reducing it to "so much" or "so deeply".
         - Subordinate and conditional clauses (〜なら, 〜たら, 〜のに, 〜ても, 〜まま) and て-form chains
-        - Passive, causative, and "affected by" verbs (〜られる, 気を取られる, 彩られる, 纏う)
-        - Sentence-final particles and endings (さ, よ, ね, な, だろ, や, のさ), which carry tone and assertion
+        - Passive, causative, and "affected by" verbs (〜られる, 気を取られる, 彩られる, 纏う). Keep the noun the verb acts on.
+        - Sentence-final particles and endings (see below)
         - Specific nouns (未練, 孤独, 罰). Do not swap them for generic ones.
 
+        ### SENTENCE-FINAL ENDINGS
+        Render the tone of these consistently, and sparingly (a short tag such as "you know", "I guess", or "huh", or a change in phrasing, not a new clause):
+        - さ: assertive, "you see / you know"
+        - や: casual realization or resignation, "I realize / I guess"
+        - な: musing or soft confirmation, "huh / I guess"
+        - よ: calling out or emphasis; after a noun it is a vocative ("Anger!", "Sky, ..."), not the word "you"
+        - だろ / じゃない: tag question, "right? / don't you?"
+        Identical endings must get identical treatment across the song. Different endings on otherwise identical lines should result in slightly different English.
+
         ### ACCURACY
-        - Resolve omitted subjects and objects from context, and keep the pronoun the context best supports.
-        - Translate idioms by their real meaning, never word by word, and make sure the result does not reverse the meaning.
+        - Resolve omitted subjects and objects from context, and keep the pronoun the context best supports. Only use "you" if the line contains a second-person word (あなた, 君, あんた, お前, etc.). Note plurals like あんたら/お前ら ("you guys").
+        - Translate idioms by their real meaning, never word by word, and make sure the result does not reverse the meaning. If a phrase looks like an idiom (e.g. 箍を外す), use the idiomatic meaning.
         - Check negation carefully. Adjective negation like 眠くはない means "not sleepy", not "won't sleep".
         - Keep particle relationships distinct: 愛ある罰 ("a punishment that has love in it") is not 愛への罰 ("a punishment for/toward love").
-        - Treat colloquial contractions (ちゃ, ってる, ぶっ/ふっ prefixes) as their full forms, but keep their force.
+        - Treat colloquial contractions (ちゃ, ってる, ぶっ/ふっ prefixes) as their full forms, but keep their force. Distinguish similar verbs: 蹴り飛ばす (kick away), ぶっ飛ばす (blast away).
+        - Watch commonly confused words: 散々 (as an adjective) means awful/terrible, not "countless"; 恨み is a grudge/resentment, not regret; もつれる is tangled, ほつれる is frayed/unraveled; 穿つ is to pierce/bore through; 逆光 is backlight/backlit; 悪党 is a villain/scoundrel/crook.
+        - Keep register: harsh or rough wording stays rough, and tender wording stays tender.
         - Prefer the specific verb or noun over a generic one.
+
+        ### ECHO FRAGMENTS (strict)
+        Treat a line as an echo ONLY if all of these are true: it is very short (roughly 6 characters or fewer), it consists only of a verb or adjective ending (〜ないや, 〜ないさ, 〜ないな and the like), and it repeats the end of the previous line. In that case, repeat the specific predicate of the previous line in short form (for example "Not sleepy, not sleepy." or "Not sad anymore."). Never use a generic "Not anymore." when the previous line gives a specific predicate, and never invent a new emotion, action, or statement.
+        If the line does not meet all three conditions, it is NOT an echo. Translate it fully with the rules above.
 
         ### BOUNDARIES
         - Translate only the target line. Context may resolve ambiguity but must never add content from other lines.
-        - Do not explain, gloss, or interpret. No parenthetical notes, symbolism, or emotional conclusions the line does not state.
+        - Do not explain, gloss, or interpret. No parenthetical notes, symbolism, or emotional conclusions the line does not state. Do not add intensifiers or interjections that are not in the source.
         - If the line trails off on a conjunction or conditional, end the English the same way. Do not finish the thought.
         - Keep deliberate repetition, and translate identical Japanese lines identically.
         - Keep non-Japanese text (English words, vocal syllables) exactly as written.
+        - Never invent content to fill a gap. If a phrase is hard, translate its words literally and plainly. An awkward but faithful line is better than a fluent invented one. Never add guilt, regret, pain, realization, or backstory the line does not state.
+        - A line that starts or ends mid-sentence is a piece of a longer sentence. Translate only its own words, and do not restate what the previous line already says.
+        - Do not assign gender or number: no "she/he/they/girl/boy". あいつ = "that person" (or "that guy" if the tone is rough). 私/僕/俺 = "I".
+        - Text in parentheses in the source is a backing-vocal echo of the previous line's ending. Translate it as a short parenthetical echo, and never romanize it.
+        - A question mark on a short line like 分かってる? means the speaker is asking the listener.
 
         ### EXAMPLES (style and completeness only; the lines are unrelated to the target)
-        Japanese: 今でも君の声が耳から離れない
-        Translation: Even now, your voice won't leave my ears.
-
-        Japanese: 何度も諦めようとしたのに
-        Translation: Even though I tried to give up so many times
-
-        Japanese: もう泣かないさ
-        Translation: I'm not going to cry anymore, you know.
-
-        Japanese: 雨に打たれた街を歩いていた
-        Translation: I was walking through the city, beaten by the rain.
+        Japanese: 窓が割れるほど慌てていた
+        Translation: I was so flustered that the window broke.
+        
+        Japanese: 切符を失くしたわけじゃないんだ
+        Translation: It's not that I lost my ticket.
+        
+        Japanese: 誰に頼まずとも自分で払う
+        Translation: I'll pay for it myself, even without asking anyone.
+        
+        Japanese: 手を振れば良かった
+        Translation: I should have waved.
+        
+        Japanese: 皿を洗うのが嫌で、つい放っておいてしまう
+        Translation: I hate washing dishes, so before I know it I've left them sitting.
+        
+        Japanese: 錆びた鍵を何度も回しては、扉を見つめた
+        Translation: I turned the rusty key again and again, and each time I stared at the door.
+        
+        Japanese: 雨音に気を取られていた
+        Translation: I was distracted by the sound of the rain.
+        
+        Previous line: 返事はいつもすぐに先延ばしに
+        Japanese: してしまうような僕だから
+        Translation: Because I'm the kind of person who ends up doing that,
+        
+        Previous line: 鍵はここに置いておいてね
+        Japanese: (おいてね)
+        Translation: (leave it there, okay?)
+        
+        Previous line: もうお腹は空いてないや
+        Japanese: ないや ないや
+        Translation: Not hungry, not hungry.
 
         ### OUTPUT
         Output exactly one line and nothing else:
@@ -155,8 +192,12 @@ class Translator:
             prompt_parts.append(
                 "TARGET LYRIC (translate this line only):\n"
                 f"<<<\n{text.strip()}\n>>>\n\n"
-                "Keep every adverb, clause, particle, and sentence-final nuance. "
-                "Do not add anything from neighboring lines or your own interpretation.\n"
+                "Translate every clause, adverb, particle, and sentence-final nuance as natural, complete English. "
+                "If the target begins or ends mid-sentence, translate only its own words and do not repeat "
+                "the previous line's content. "
+                "If a phrase is unclear, translate it literally rather than inventing meaning. "
+                "Do not add pronouns, gender, similes, or feelings the line does not contain. "
+                "Do not add '...' unless the source has it.\n"
                 "Output exactly one line:\n"
                 "Translation: <English translation>"
             )
@@ -166,7 +207,7 @@ class Translator:
         prompts = []
         mapping_index = []
         processed_lyrics = {}
-        for idx, text in enumerate(data):
+        for idx, text in enumerate(lyrics):
             # skips certain conditions
             if text == '':
                 continue
@@ -212,9 +253,29 @@ class Translator:
             inference_response = llm.batch_inference(prompts, estimated_output_cost=50, gen_config=gen_config)
             responses = dict(zip([idx for idx, exp in mapping_index if exp == "do"], inference_response))
 
+            cleanup_prompts = []
+            for idx, response in responses.items():
+                cleanup_prompts.append(f"""You are checking a Japanese-to-English lyric translation.
+                    Japanese line: {lyrics[idx]}
+                    Previous line (reference only): {lyrics[idx - 1] if idx != 0 else "None"}
+                    Next line (reference only): {lyrics[idx + 1] if idx != len(lyrics) - 1 else "None"}
+                    Draft: {response}
+                    
+                    Check only these:
+                    1. Anything in the draft with no word behind it in the Japanese line (invented feelings, gender, similes, or content copied from the previous or next line).
+                    2. Any word or clause of the Japanese line that the draft dropped or mistranslated.
+                    3. A vocative よ after a noun translated as "you".
+                    If none apply, output the draft unchanged. Otherwise output a corrected version.
+                    
+                    Reply with exactly one line, with no explanation, no bold, and no quotation marks:
+                    Translation: <final translation>""")
+
+            inference_response = llm.batch_inference(cleanup_prompts, estimated_output_cost=50, gen_config=gen_config)
+            responses = dict(zip([idx for idx, exp in mapping_index if exp == "do"], inference_response))
+
         results = []
 
-        for idx, d in enumerate(data):
+        for idx, d in enumerate(lyrics):
             if (idx, "do") in mapping_index:
                 response = responses[idx]
 
