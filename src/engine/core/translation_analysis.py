@@ -51,13 +51,17 @@ class Translator:
 
         return input_string
 
-    def _clean_translation_header_and_unicode(self, input_string: str) -> str:
-        """Also cleans Unicode"""
+    def _clean_translation_response(self, input_string: str) -> str:
         input_string = input_string.strip()
-        input_string = re.sub(
-            r"^\*?\*?Translation:\*?\*?\s*", "", input_string, flags=re.IGNORECASE
-        )
+
+        m = re.search(r"^\W*Translation:\W*\s*(.+)$", input_string, re.IGNORECASE | re.MULTILINE)
+        if m:
+            input_string = m.group(1)
+        else:
+            input_string = input_string.split("\n")[0]
+
         input_string = self._clean_unicode(input_string)
+        input_string = input_string.strip().strip('*"').strip()
 
         return input_string
 
@@ -79,57 +83,82 @@ class Translator:
             context = texts
         elif type(texts) is list:
             data = texts
-            context = "\n".join(texts)
+            context = '\n'.join(texts)
 
         # setup prompts to be sent
-        SYSTEM_TRANSLATION_PROMPT = """You are an expert song lyricist and multilingual translator.
-        Translate song lyrics into natural, emotionally faithful English that preserves the original meaning, tone, imagery, and lyrical flow.
+        def get_context(data: list[str], idx: int, radius: int = 4) -> str:
+            start = max(0, idx - radius)
+            end = min(len(data), idx + radius + 1)
 
-        ### TRANSLATION RULES
+            return "\n".join(
+                line.strip()
+                for i, line in enumerate(data[start:end], start=start)
+                if i != idx and line.strip()
+            )
 
-        1. CONTEXT & GRAMMAR
-           - Read the surrounding lyrics to understand sentence structure, omitted subjects, pronouns, and clauses spanning multiple lines.
-           - Use context to resolve ambiguity, but never invent details unsupported by the original.
-           - Treat the original lyrics as authoritative, not any existing translation.
+        SYSTEM_TRANSLATION_PROMPT = """You are an expert Japanese-to-English lyric translator. Your priority is full semantic fidelity: nothing in the Japanese may be dropped, softened, or generalized, and nothing may be added.
 
-        2. MEANING & ARTISTIC INTENT
-           - Preserve the original meaning, emotional intensity, metaphors, idioms, wordplay, and speaker's personality.
-           - Prefer natural English equivalents over literal translations when they preserve the intended meaning.
-           - Preserve ambiguity when the original is ambiguous.
-           - Do not add, omit, exaggerate, or reinterpret meaning just to make a line sound poetic.
+        ### COMPLETENESS
+        English may be, and often must be, longer than the Japanese. Never shorten a line to make it sound cleaner or more poetic. If a choice is between a smooth phrase that loses an element and a slightly longer phrase that keeps it, choose the longer one.
 
-        3. NATURALNESS & SINGABILITY
-           - Write concise, fluent English that sounds natural when spoken or sung.
-           - Preserve meaningful repetition, emphasis, and distinctive phrasing.
-           - Favor rhythm and concise wording when accuracy is maintained.
-           - Do not force rhymes, syllable counts, or poetic imagery absent from the original.
+        Reflect every one of these if present in the line:
+        - Adverbs and degree, time, and frequency words (今でも, 何度も, 限りなく, もう, まだ, ずっと, 少しも)
+        - Degree clauses (〜ほど, 〜くらい, 〜だけ, 〜ばかり)
+        - Subordinate and conditional clauses (〜なら, 〜たら, 〜のに, 〜ても, 〜まま) and て-form chains
+        - Passive, causative, and "affected by" verbs (〜られる, 気を取られる, 彩られる, 纏う)
+        - Sentence-final particles and endings (さ, よ, ね, な, だろ, や, のさ), which carry tone and assertion
+        - Specific nouns (未練, 孤独, 罰). Do not swap them for generic ones.
 
-        4. CONSISTENCY & QUALITY
-           - Maintain consistent terminology, imagery, and tone across the song.
-           - Distinguish literal meaning from implication and figurative language.
-           - Before responding, silently check grammatical accuracy, meaning, naturalness, and contextual consistency. Revise any unsupported interpretations or awkward phrasing.
+        ### ACCURACY
+        - Resolve omitted subjects and objects from context, and keep the pronoun the context best supports.
+        - Translate idioms by their real meaning, never word by word, and make sure the result does not reverse the meaning.
+        - Check negation carefully. Adjective negation like 眠くはない means "not sleepy", not "won't sleep".
+        - Keep particle relationships distinct: 愛ある罰 ("a punishment that has love in it") is not 愛への罰 ("a punishment for/toward love").
+        - Treat colloquial contractions (ちゃ, ってる, ぶっ/ふっ prefixes) as their full forms, but keep their force.
+        - Prefer the specific verb or noun over a generic one.
 
-        ### STRICT OUTPUT RULES
-        - Translate ONLY the single target line provided under "Target Line".
-        - Use the full song context only to understand meaning and grammar.
-        - Output EXACTLY: Translation: <your translation>
-        - Do not include quotation marks, original-language text, explanations, alternatives, or extra formatting.
-        - Stop immediately after the translation.
-        """
+        ### BOUNDARIES
+        - Translate only the target line. Context may resolve ambiguity but must never add content from other lines.
+        - Do not explain, gloss, or interpret. No parenthetical notes, symbolism, or emotional conclusions the line does not state.
+        - If the line trails off on a conjunction or conditional, end the English the same way. Do not finish the thought.
+        - Keep deliberate repetition, and translate identical Japanese lines identically.
+        - Keep non-Japanese text (English words, vocal syllables) exactly as written.
+
+        ### EXAMPLES (style and completeness only; the lines are unrelated to the target)
+        Japanese: 今でも君の声が耳から離れない
+        Translation: Even now, your voice won't leave my ears.
+
+        Japanese: 何度も諦めようとしたのに
+        Translation: Even though I tried to give up so many times
+
+        Japanese: もう泣かないさ
+        Translation: I'm not going to cry anymore, you know.
+
+        Japanese: 雨に打たれた街を歩いていた
+        Translation: I was walking through the city, beaten by the rain.
+
+        ### OUTPUT
+        Output exactly one line and nothing else:
+        Translation: <English translation>"""
 
         def build_prompt(text: str, context: str = None, use_context: bool = False) -> str:
-            prompt_parts = [SYSTEM_TRANSLATION_PROMPT]
+            prompt_parts = [SYSTEM_TRANSLATION_PROMPT.strip()]
 
-            if use_context and context:
+            if context and context.strip():
                 prompt_parts.append(
-                    "### SONG CONTEXT (Reference only — do not translate this section)\n"
-                    f"{context.strip()}"
+                    "FULL SONG IN THE ORIGINAL LANGUAGE (reference only):\n"
+                    "Use it only to determine the speaker, addressee, omitted subjects/objects, "
+                    "and emotional situation. Do not translate it or take content from it.\n"
+                    f"<<<\n{context.strip()}\n>>>"
                 )
 
             prompt_parts.append(
-                "### TARGET LYRIC TO TRANSLATE\n"
-                f"Target Lyric: {text.strip()}\n\n"
-                "**Translation:**"
+                "TARGET LYRIC (translate this line only):\n"
+                f"<<<\n{text.strip()}\n>>>\n\n"
+                "Keep every adverb, clause, particle, and sentence-final nuance. "
+                "Do not add anything from neighboring lines or your own interpretation.\n"
+                "Output exactly one line:\n"
+                "Translation: <English translation>"
             )
 
             return "\n\n".join(prompt_parts)
@@ -151,13 +180,30 @@ class Translator:
                 continue
 
             # region prompts
-            prompts.append(build_prompt(text, context, use_context))
+            prompts.append(build_prompt(text,
+                                        context,
+                                        use_context))
             # endregion
             mapping_index.append((idx, "do"))
             processed_lyrics[text] = idx
 
-        gen_config = GenerationConfig(max_new_tokens=50,
-                                      stop_words=["\n\n", "(Note:", "*(Note:", "*("])
+        #todo json schema kwargs? thanks pycharm go to implementation
+
+        # gen_config = GenerationConfig(
+        #     max_new_tokens=96,
+        #     do_sample=True,
+        #     temperature=0.3,
+        #     top_p=0.9,
+        #     top_k=40,
+        #     min_p=0.0,
+        #     repetition_penalty=1.0,
+        #     random_seed=42,
+        # )
+        gen_config = GenerationConfig(
+            max_new_tokens=96,
+            do_sample=False,
+            repetition_penalty=1.0,
+        )
 
         if not prompts:
             raise ValueError("No prompts found to be generated, please re-check lyrics to ensure they are in Japanese Scripts")
@@ -173,14 +219,14 @@ class Translator:
                 response = responses[idx]
 
                 # remove translation header
-                formatted_response = self._clean_translation_header_and_unicode(response)
+                formatted_response = self._clean_translation_response(response)
                 results.append(formatted_response)
             elif (idx, "dup") in mapping_index:
                 prev_processed_idx = processed_lyrics[d]
                 response = responses[prev_processed_idx]
 
                 # remove translation header
-                formatted_response = self._clean_translation_header_and_unicode(response)
+                formatted_response = self._clean_translation_response(response)
                 results.append(formatted_response)
             else:
                 formatted_response = self._clean_unicode(d)
@@ -217,6 +263,6 @@ class Translator:
             data = llm.batch_inference([prompt])
             data = data[0].strip()
 
-        data = self._clean_translation_header_and_unicode(data)
+        data = self._clean_translation_response(data)
 
         return data

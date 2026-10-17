@@ -29,7 +29,8 @@ if platform.system() == "Windows":
             # TODO ask use to choose what model
             # TODO automatically download model and quantize when not downloaded yet
             self._model_id = str(self._model_dir / "shisa-v2.1-llama3.2-3b-int4")
-            # self._model_id = str(self._model_dir / "shisa-v2.1-llama3.2-3b-int8")
+            # self._model_id = str(self._model_dir / "shisa-v2.1-llama3.2-3b-fp8")
+            # self._model_id = str(self._model_dir / "shisa-v2.1-llama3.2-3b")
             # self._model_id = str(self._model_dir / "shisa-v2.1-qwen3-8b-int4")
             os.environ["HF_HOME"] = str(self._model_dir)
 
@@ -188,7 +189,6 @@ if platform.system() == "Windows":
                 now = time.time()
 
                 backend_config = TurbomindEngineConfig(
-                    # model_format='awq',
                     #todo seems to affect stability, need to test more cuz i keep getting 0xC0000409 exit codes
                     cache_max_entry_count=cache_ratio,
                     tp=1,
