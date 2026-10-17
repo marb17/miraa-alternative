@@ -82,6 +82,58 @@ class Translator:
             context = "\n".join(texts)
 
         # setup prompts to be sent
+        SYSTEM_TRANSLATION_PROMPT = """You are an expert song lyricist and multilingual translator.
+        Translate song lyrics into natural, emotionally faithful English that preserves the original meaning, tone, imagery, and lyrical flow.
+
+        ### TRANSLATION RULES
+
+        1. CONTEXT & GRAMMAR
+           - Read the surrounding lyrics to understand sentence structure, omitted subjects, pronouns, and clauses spanning multiple lines.
+           - Use context to resolve ambiguity, but never invent details unsupported by the original.
+           - Treat the original lyrics as authoritative, not any existing translation.
+
+        2. MEANING & ARTISTIC INTENT
+           - Preserve the original meaning, emotional intensity, metaphors, idioms, wordplay, and speaker's personality.
+           - Prefer natural English equivalents over literal translations when they preserve the intended meaning.
+           - Preserve ambiguity when the original is ambiguous.
+           - Do not add, omit, exaggerate, or reinterpret meaning just to make a line sound poetic.
+
+        3. NATURALNESS & SINGABILITY
+           - Write concise, fluent English that sounds natural when spoken or sung.
+           - Preserve meaningful repetition, emphasis, and distinctive phrasing.
+           - Favor rhythm and concise wording when accuracy is maintained.
+           - Do not force rhymes, syllable counts, or poetic imagery absent from the original.
+
+        4. CONSISTENCY & QUALITY
+           - Maintain consistent terminology, imagery, and tone across the song.
+           - Distinguish literal meaning from implication and figurative language.
+           - Before responding, silently check grammatical accuracy, meaning, naturalness, and contextual consistency. Revise any unsupported interpretations or awkward phrasing.
+
+        ### STRICT OUTPUT RULES
+        - Translate ONLY the single target line provided under "Target Line".
+        - Use the full song context only to understand meaning and grammar.
+        - Output EXACTLY: Translation: <your translation>
+        - Do not include quotation marks, original-language text, explanations, alternatives, or extra formatting.
+        - Stop immediately after the translation.
+        """
+
+        def build_prompt(text: str, context: str = None, use_context: bool = False) -> str:
+            prompt_parts = [SYSTEM_TRANSLATION_PROMPT]
+
+            if use_context and context:
+                prompt_parts.append(
+                    "### SONG CONTEXT (Reference only — do not translate this section)\n"
+                    f"{context.strip()}"
+                )
+
+            prompt_parts.append(
+                "### TARGET LYRIC TO TRANSLATE\n"
+                f"Target Lyric: {text.strip()}\n\n"
+                "**Translation:**"
+            )
+
+            return "\n\n".join(prompt_parts)
+
         prompts = []
         mapping_index = []
         processed_lyrics = {}
@@ -93,80 +145,23 @@ class Translator:
                 continue
             if not contains_japanese(text):
                 continue
+
             if text in processed_lyrics:
                 mapping_index.append((idx, "dup"))
                 continue
 
             # region prompts
-            if use_context:
-                prompts.append(f"""
-            You are a **professional Japanese translator** who captures emotional depth, poetic nuance, and cultural context. 
-            Your goal is to translate naturally and beautifully — as if the text were written in English — while respecting the original emotion and imagery.
-
-            ### TRANSLATION PRINCIPLES ###
-            - Prioritize FEELING and resonance over literal wording.
-            - Preserve metaphors, imagery, and poetic tone.
-
-            ### RULES ###
-            1. Translate **only** the given line in "Lyric:" below.
-            2. Output exactly one line: `**Translation:** <your translation>`
-            3. Do not add explanations, alternatives, or commentary. Ever.
-            4. Stop immediately after the translation line.
-
-            ### EXAMPLES ###
-            Text: 君がいない夜は長すぎる  
-            **Translation:** The nights without you stretch on forever  
-
-            Text: 心の奥で泣いている  
-            **Translation:** I'm crying deep inside my soul  
-
-            ### USE THIS AS CONTEXT TO HOW THE LYRIC INTERACTS WITH THE SONG ###
-            Context: {context}
-
-            Now translate the following line with emotional depth and natural phrasing:
-            Lyric: {text}
-
-            **Output exactly:**
-            **Translation:** <your translation>
-            """)
-            else:
-                prompts.append(f"""
-            You are a **professional Japanese translator** who captures emotional depth, poetic nuance, and cultural context. 
-            Your goal is to translate naturally and beautifully — as if the text were written in English — while respecting the original emotion and imagery.
-            
-            ### TRANSLATION PRINCIPLES ###
-            - Prioritize FEELING and resonance over literal wording.
-            - Preserve metaphors, imagery, and poetic tone.
-        
-            ### RULES ###
-            1. Translate **only** the given line in "Lyric:" below.
-            2. Output exactly one line: `**Translation:** <your translation>`
-            3. Do not add explanations, alternatives, or commentary. Ever.
-            4. Stop immediately after the translation line.
-            
-            ### EXAMPLES ###
-            Text: 君がいない夜は長すぎる  
-            **Translation:** The nights without you stretch on forever  
-    
-            Text: 心の奥で泣いている  
-            **Translation:** I'm crying deep inside my soul  
-
-            Now translate the following line with emotional depth and natural phrasing:
-            Lyric: {text}
-    
-            **Output exactly:**
-            **Translation:** <your translation>
-            """)
+            prompts.append(build_prompt(text, context, use_context))
             # endregion
             mapping_index.append((idx, "do"))
             processed_lyrics[text] = idx
 
-        gen_config = GenerationConfig(max_new_tokens=50)
+        gen_config = GenerationConfig(max_new_tokens=50,
+                                      stop_words=["\n\n", "(Note:", "*(Note:", "*("])
 
         if not prompts:
             raise ValueError("No prompts found to be generated, please re-check lyrics to ensure they are in Japanese Scripts")
 
-        # TODO add macos support
         with LLMModel() as llm:
             inference_response = llm.batch_inference(prompts, estimated_output_cost=50, gen_config=gen_config)
             responses = dict(zip([idx for idx, exp in mapping_index if exp == "do"], inference_response))
@@ -218,7 +213,7 @@ class Translator:
         <your reconstructed Japanese text here>
         """
 
-        with WindowsLLMModel() as llm:
+        with LLMModel() as llm:
             data = llm.batch_inference([prompt])
             data = data[0].strip()
 

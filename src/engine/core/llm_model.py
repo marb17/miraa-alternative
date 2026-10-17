@@ -8,7 +8,6 @@ from typing import Any, Generator
 import platform
 
 from engine.utils.classes.abc import BaseLLMModel
-from engine.utils.classes.dataclasses import UIPromptRequest
 from engine.utils.functions.filesystem import read_json_file
 from engine.utils.logger import Logger
 
@@ -29,7 +28,9 @@ if platform.system() == "Windows":
             self._model_dir = Path(self._base_dir / "models/hugging_face")
             # TODO ask use to choose what model
             # TODO automatically download model and quantize when not downloaded yet
-            self._model_id = str(self._model_dir / "shisa-v2.1-qwen3-8b-awq")
+            self._model_id = str(self._model_dir / "shisa-v2.1-llama3.2-3b-int4")
+            # self._model_id = str(self._model_dir / "shisa-v2.1-llama3.2-3b-int8")
+            # self._model_id = str(self._model_dir / "shisa-v2.1-qwen3-8b-int4")
             os.environ["HF_HOME"] = str(self._model_dir)
 
             self._free_vram: float = 0
@@ -46,11 +47,32 @@ if platform.system() == "Windows":
             Model_Weights_Bytes = Total_Parameters * (Quantization_Bits / 8) * 1.2
             Model_Weights_GB    = Model_Weights_Bytes / (1024 ^ 3)
             """
-            model_data = read_json_file(self._model_dir / "shisa-v2.1-qwen3-8b-awq/config.json")
-            parameter_count = ((model_data["vocab_size"] * model_data["hidden_size"] * 2) +
-                               (4 * model_data["num_hidden_layers"] * (model_data["hidden_size"] ** 2)) +
-                               (3 * model_data["hidden_size"] * model_data["intermediate_size"] * model_data["num_hidden_layers"]))
-            self._model_weight = 1.2 * (parameter_count * model_data["quantization_config"]["bits"] / 8) / (1024 ** 3)
+            model_data = read_json_file(
+                Path(self._model_id) / "config.json"
+            )
+
+            vocab_size = model_data["vocab_size"]
+            hidden_size = model_data["hidden_size"]
+            num_hidden_layers = model_data["num_hidden_layers"]
+            intermediate_size = model_data["intermediate_size"]
+            num_kv_heads = model_data.get(
+                "num_key_value_heads", model_data.get("num_attention_heads", 32)
+            )
+            head_dim = model_data.get(
+                "head_dim", hidden_size // model_data.get("num_attention_heads", 32)
+            )
+            bits = model_data.get("quantization_config", {}).get("bits", 4)
+
+            embeddings = vocab_size * hidden_size * 2
+            attention = num_hidden_layers * (4 * (hidden_size ** 2))
+            mlp_swiglu = num_hidden_layers * (
+                    3 * (hidden_size * intermediate_size)
+            )
+            parameter_count = embeddings + attention + mlp_swiglu
+
+            self._model_weight = (
+                    1.2 * (parameter_count * bits / 8) / (1024 ** 3)
+            )
             """
             KV_Cache_Bytes = 2 * Num_Hidden_Layers * Num_KV_Heads * Head_Dim * Batch_Size * Output_Tokens * Precision_Bytes
     
@@ -61,8 +83,9 @@ if platform.system() == "Windows":
             
             KV_Cache_GB = KV_Cache_Bytes / (1024 ^ 3)
             """
-            self._kv_cache_base = (2 * model_data["num_hidden_layers"] * model_data["num_key_value_heads"] * model_data["head_dim"] * 2)
-
+            self._kv_cache_base = (
+                    2 * num_hidden_layers * num_kv_heads * head_dim * 2
+            )
             """
             Where Precision_Bytes is:
             - 2 (for FP16 / BF16)
@@ -71,7 +94,9 @@ if platform.system() == "Windows":
             
             Bytes Per Token per Batch = Hidden * Layers * Precision Bytes = Bytes
             """
-            self._gb_per_token = (model_data["hidden_size"] * model_data["num_hidden_layers"] * 2) / (1024 ** 3)
+            self._gb_per_token = (
+                                         hidden_size * num_hidden_layers * 2
+                                 ) / (1024 ** 3)
 
         def __enter__(self):
             if self._pipe is None:
@@ -81,6 +106,19 @@ if platform.system() == "Windows":
         def __exit__(self, exc_type, exc_val, exc_tb):
             self._close()
             return False
+
+        @staticmethod
+        def _clean_memory():
+            import gc
+            import torch
+
+            gc.collect()
+            gc.collect()
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.ipc_collect()
+                torch.cuda.reset_peak_memory_stats()
 
         def _close(self) -> None:
             if self._pipe is not None:
@@ -98,21 +136,13 @@ if platform.system() == "Windows":
                 del self._pipe
                 self._pipe = None
 
-            import gc
-            import torch
-
-            gc.collect()
-            gc.collect()
-
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                torch.cuda.ipc_collect()
-                torch.cuda.reset_peak_memory_stats()
+            self._clean_memory()
 
         # region batched inference
         def _calculate_prompt_cost(self, prompt: list[str], estimated_output_token_cost: int) -> float:
             """
             LMDEPLOY uses Chunked Pre-Fill so each prompt is processed in smaller batches 512 tokens?
+            yeah i still havent read the documentation so idk if this is right
 
             Context_Activation_GB = Batch_Size * Input_Tokens * (GB per Token)
             """
@@ -136,6 +166,20 @@ if platform.system() == "Windows":
             """
             Starts the model up, ready to be used
             """
+            # get available VRAM
+            import torch
+            if not torch.cuda.is_available():
+                raise RuntimeError("CUDA is not available on this system.")
+
+            device = torch.cuda.current_device()
+
+            free_bytes, total_bytes = torch.cuda.mem_get_info(device)
+            self._free_vram = free_bytes / (1024 ** 3)
+            logger.debug(f"Available VRAM: {self._free_vram}")
+
+            cache_ratio = 0.5 if self._free_vram > (self._model_weight * 1.4) else 0.1
+            logger.debug(f"Cache Ratio: {cache_ratio}")
+
             if self._pipe is None:
                 from lmdeploy import pipeline, TurbomindEngineConfig
 
@@ -144,32 +188,17 @@ if platform.system() == "Windows":
                 now = time.time()
 
                 backend_config = TurbomindEngineConfig(
-                    model_format='awq',
-                    cache_max_entry_count=0.8,
-                    tp=1
+                    # model_format='awq',
+                    #todo seems to affect stability, need to test more cuz i keep getting 0xC0000409 exit codes
+                    cache_max_entry_count=cache_ratio,
+                    tp=1,
+                    session_len=8192
                 )
 
                 self._pipe = pipeline(self._model_id,
                                       backend_config=backend_config,
-                                      log_level="WARNING")
+                                      log_level="WARNING",)
                 logger.debug(f"Loaded model in {(time.time() - now):.2f} seconds")
-
-                # get available VRAM
-                import torch
-                if not torch.cuda.is_available():
-                    raise RuntimeError("CUDA is not available on this system.")
-
-                device = torch.cuda.current_device()
-
-                total_mem = torch.cuda.get_device_properties(device).total_memory
-
-                allocated_mem = torch.cuda.memory_allocated(device)
-                reserved_mem = torch.cuda.memory_reserved(device)
-
-                free_mem_bytes = total_mem - (allocated_mem + reserved_mem)
-                self._free_vram = free_mem_bytes / (1024 ** 3)
-                logger.debug(f"Available VRAM: {self._free_vram}")
-
             else:
                 logger.debug("Model already initialized, skipping")
 
@@ -236,12 +265,14 @@ if platform.system() == "Windows":
             for idx, batch in enumerate(batched_prompts, start=1):
                 batch_now = time.time()
                 results.extend([response.text for response in self._pipe(list(batch), gen_config)])
-                gc.collect()
-                torch.cuda.empty_cache()
+                self._clean_memory()
                 logger.debug(f"Completed Batch {idx} in {(time.time() - batch_now):.2f} seconds")
 
             logger.debug(f"Completed Batch Inference in {(time.time() - now):.2f} seconds")
+
             return results
+
+
 elif platform.system() == "Darwin":
     pass
     # raise NotImplementedError
@@ -256,6 +287,7 @@ class LLMModel:
         elif self.platform == "Darwin":
             pass
             raise NotImplementedError
+        raise NotImplementedError
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.platform == "Windows":

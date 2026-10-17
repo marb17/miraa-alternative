@@ -134,7 +134,7 @@ class WorkflowManager:
         json_data = read_json_file(json_path)
 
         with Translator() as tl:
-            translated_lyrics = tl.translate_lyrics(json_data["lyrics_main"])
+            translated_lyrics = tl.translate_lyrics(json_data["lyrics_main"], use_context=True)
 
         write_json_file(json_path, translated_lyrics, ["translated_lyrics"])
 
