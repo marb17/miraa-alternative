@@ -190,7 +190,7 @@
 
     #clickanywheretostart{
         grid-column:1/span 8;
-        grid-row: 5/span 1;
+        grid-row: 6/span 1;
         align-self: center;
         justify-self: center;
 
