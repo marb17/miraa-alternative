@@ -1,9 +1,12 @@
 # STANDARD LIBRARY
+import json
 import re
 import gc
 import time
 from typing import Any, Generator
 import platform
+
+from pydantic_core.core_schema import json_schema
 
 from engine.core.llm_model import LLMModel
 from engine.utils.classes.dataclasses import UIPromptRequest
@@ -52,18 +55,18 @@ class Translator:
         return input_string
 
     def _clean_translation_response(self, input_string: str) -> str:
-        return input_string
+        # return input_string
 
         input_string = input_string.strip()
 
-        m = re.search(r"^\W*Translation:\W*\s*(.+)$", input_string, re.IGNORECASE | re.MULTILINE)
-        if m:
-            input_string = m.group(1)
-        else:
-            input_string = input_string.split("\n")[0]
+        # m = re.search(r"^\W*Translation:\W*\s*(.+)$", input_string, re.IGNORECASE | re.MULTILINE)
+        # if m:
+        #     input_string = m.group(1)
+        # else:
+        #     input_string = input_string.split("\n")[0]
 
         input_string = self._clean_unicode(input_string)
-        input_string = input_string.strip().strip('*"').strip()
+        input_string = json.loads(input_string).get("translation", "")
 
         return input_string
 
@@ -140,40 +143,6 @@ class Translator:
         - Text in parentheses in the source is a backing-vocal echo of the previous line's ending. Translate it as a short parenthetical echo, and never romanize it.
         - A question mark on a short line like 分かってる? means the speaker is asking the listener.
 
-        ### EXAMPLES (style and completeness only; the lines are unrelated to the target)
-        Japanese: 窓が割れるほど慌てていた
-        Translation: I was so flustered that the window broke.
-        
-        Japanese: 切符を失くしたわけじゃないんだ
-        Translation: It's not that I lost my ticket.
-        
-        Japanese: 誰に頼まずとも自分で払う
-        Translation: I'll pay for it myself, even without asking anyone.
-        
-        Japanese: 手を振れば良かった
-        Translation: I should have waved.
-        
-        Japanese: 皿を洗うのが嫌で、つい放っておいてしまう
-        Translation: I hate washing dishes, so before I know it I've left them sitting.
-        
-        Japanese: 錆びた鍵を何度も回しては、扉を見つめた
-        Translation: I turned the rusty key again and again, and each time I stared at the door.
-        
-        Japanese: 雨音に気を取られていた
-        Translation: I was distracted by the sound of the rain.
-        
-        Previous line: 返事はいつもすぐに先延ばしに
-        Japanese: してしまうような僕だから
-        Translation: Because I'm the kind of person who ends up doing that,
-        
-        Previous line: 鍵はここに置いておいてね
-        Japanese: (おいてね)
-        Translation: (leave it there, okay?)
-        
-        Previous line: もうお腹は空いてないや
-        Japanese: ないや ないや
-        Translation: Not hungry, not hungry.
-
         ### OUTPUT
         Output exactly one line and nothing else:
         Translation: <English translation>"""
@@ -240,14 +209,36 @@ class Translator:
         #     repetition_penalty=1.0,
         #     random_seed=42,
         # )
+
+        VERIFY_SCHEMA = {
+            "type": "object",
+            "properties": {
+                "dropped": {"type": "array", "maxItems": 3, "items": {"type": "string", "maxLength": 12}},
+                "wrong": {"type": "array", "maxItems": 3, "items": {"type": "string", "maxLength": 24}},
+                "extra": {"type": "array", "maxItems": 3, "items": {"type": "string", "maxLength": 24}},
+                "translation": {"type": "string", "maxLength": 160},
+            },
+            "required": ["dropped", "wrong", "extra", "translation"],
+            "additionalProperties": False,
+        }
+
         gen_config = GenerationConfig(
             max_new_tokens=96,
             do_sample=False,
             repetition_penalty=1.0,
         )
+        verify_config = GenerationConfig(
+            max_new_tokens=200,
+            do_sample=False,
+            response_format=dict(
+                type="json_schema",
+                json_schema=dict(name="verify", schema=VERIFY_SCHEMA)
+            )
+        )
 
         if not prompts:
             raise ValueError("No prompts found to be generated, please re-check lyrics to ensure they are in Japanese Scripts")
+
 
         with LLMModel() as llm:
             inference_response = llm.batch_inference(prompts, estimated_output_cost=50, gen_config=gen_config)
@@ -261,16 +252,17 @@ class Translator:
                     Next line (reference only): {lyrics[idx + 1] if idx != len(lyrics) - 1 else "None"}
                     Draft: {response}
                     
-                    Check only these:
-                    1. Anything in the draft with no word behind it in the Japanese line (invented feelings, gender, similes, or content copied from the previous or next line).
-                    2. Any word or clause of the Japanese line that the draft dropped or mistranslated.
-                    3. A vocative よ after a noun translated as "you".
-                    If none apply, output the draft unchanged. Otherwise output a corrected version.
+                    Fill in:
+                    - dropped: Japanese words from the line that the draft does not express (copy them from the Japanese).
+                    - wrong: English words from the draft that mean something different from the Japanese, such as a wrong word, reversed negation, an idiom read literally, or a call-out read as "you" (copy them from the draft).
+                    - extra: English words from the draft with no source word behind them, such as invented feelings, gender, similes, or content from the previous line (copy them from the draft).
+                    - translation: if all three lists are empty, write "". Otherwise write the draft corrected so that dropped words are restored, wrong words are fixed, and extra words are removed. Change nothing else, use plain literal wording, and add no notes.
                     
-                    Reply with exactly one line, with no explanation, no bold, and no quotation marks:
-                    Translation: <final translation>""")
+                    Copy words exactly. Do not list anything you cannot point to. Sentence-final particles (さ, や, な, よ, ね) alone are not dropped words. Word notes are authoritative.
+                    """
+                    )
 
-            inference_response = llm.batch_inference(cleanup_prompts, estimated_output_cost=50, gen_config=gen_config)
+            inference_response = llm.batch_inference(cleanup_prompts, estimated_output_cost=50, gen_config=verify_config)
             responses = dict(zip([idx for idx, exp in mapping_index if exp == "do"], inference_response))
 
         results = []

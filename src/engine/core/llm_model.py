@@ -246,7 +246,7 @@ if platform.system() == "Windows":
                 available_vram = self._free_vram - self._model_weight
                 total_prompt_cost = self._calculate_prompt_cost(prompts, estimated_output_cost)
 
-                num_batches = ceil(total_prompt_cost / available_vram * 1.3)
+                num_batches = ceil((total_prompt_cost / available_vram) * 1.2)
                 num_prompts = len(prompts)
 
                 batch_size = ceil(num_prompts / num_batches)
