@@ -23,9 +23,10 @@ from engine.utils.logger import Logger
 from engine.utils.paths import TEMP_DIR, MODEL_DIR
 
 # PYPI LIBRARIES
-# from sudachipy.morpheme import Morpheme
-# from sudachipy import dictionary, tokenizer
-import nagisa
+from sudachipy.morpheme import Morpheme
+from sudachipy import tokenizer, SplitMode, MorphemeList
+from sudachipy import Dictionary as SudachiDictionary
+# import nagisa
 logger = Logger(__name__)
 
 if sys.platform == "darwin":
@@ -512,35 +513,60 @@ class ForcedAlignment:
 
 class MorphologicalAnalyzer:
     def __init__(self):
-        raise NotImplementedError
+        self.tokenizer = SudachiDictionary(dict="full").tokenizer()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.tokenizer = None
+        del self.tokenizer
+        return False
+
+    def split_text(self, text: str) -> MorphemeList:
+        return self.tokenizer.tokenize(text, SplitMode.C)
+
+
 
 if __name__ == "__main__":
-    fa = ForcedAlignment()
-    # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\aRDURmIYBZ4_vocal.wav"),
-    #                       Path(r"D:\python\miraa-alternative\src\.temp\Mela! - Ryokuoushoku Shakai.json"))
-    # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\d6i4AtCxrDo_vocal.wav"),
-    #                       read_json_file(Path(r"D:\python\miraa-alternative\src\.temp\Haikei Shounenyo - Hump Back.json")).get("lyrics_main"))
-    data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\gt-v_YCkaMY_vocal.wav"),
-                          read_json_file(Path(r"D:\python\miraa-alternative\src\.temp\Backlight - Ado.json")).get("lyrics_main"))
-    # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\v-WcMQbXbKY_vocal.wav"),
-    #                       Path(r"D:\python\miraa-alternative\src\.temp\花になって - Be a flower - Ryokuoushoku Shakai.json"))
-    # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\qs4Q4cQxyU4_vocal.wav"),
-    #                       Path(r"D:\python\miraa-alternative\src\.temp\Wherever you are - ONE OK ROCK.json"))
-    # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\1zwaZkOXXqw_vocal.wav"),
-    #                       Path(r"D:\python\miraa-alternative\src\.temp\DADDY ! DADDY ! DO ! - Masayuki Suzuki.json"))
-    # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\phwvj0_XM4k_vocal.wav"),
-    #                       Path(r"D:\python\miraa-alternative\src\.temp\JET - POLKADOT STINGRAY.json"))
+    with MorphologicalAnalyzer() as analyzer:
+        data = list(analyzer.split_text("散々な思い出は悲しみを穿つほど"))
+        for d in data:
+            print(d)
+            print(d.surface())
+            print(d.part_of_speech())
+            print(d.normalized_form())
+            print(d.dictionary_form())
+            print()
 
 
-    # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\GQ3V50XoLOM_vocal.wav"),
-    #                       Path(r"D:\python\miraa-alternative\src\.temp\ライラック - 美波.json"))
-    # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\QLBfxG0cenQ_vocal.wav"),
-    #                       Path(r"D:\python\miraa-alternative\src\.temp\想い人 - Ryokuoushoku Shakai.json"))
-    # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\vOLncha7MqM_vocal.wav"),
-    #                       Path(r"D:\python\miraa-alternative\src\.temp\君のせい - the peggies.json"))
-
-    parsed = [d.to_dict() for d in data]
-    temp = Path(r"D:\python\miraa-alternative\src\.temp\temp.json")
-    temp.write_text(json.dumps(parsed, ensure_ascii=False), encoding="utf-8")
+# if __name__ == "__main__":
+#     fa = ForcedAlignment()
+#     # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\aRDURmIYBZ4_vocal.wav"),
+#     #                       Path(r"D:\python\miraa-alternative\src\.temp\Mela! - Ryokuoushoku Shakai.json"))
+#     # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\d6i4AtCxrDo_vocal.wav"),
+#     #                       read_json_file(Path(r"D:\python\miraa-alternative\src\.temp\Haikei Shounenyo - Hump Back.json")).get("lyrics_main"))
+#     data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\gt-v_YCkaMY_vocal.wav"),
+#                           read_json_file(Path(r"D:\python\miraa-alternative\src\.temp\Backlight - Ado.json")).get("lyrics_main"))
+#     # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\v-WcMQbXbKY_vocal.wav"),
+#     #                       Path(r"D:\python\miraa-alternative\src\.temp\花になって - Be a flower - Ryokuoushoku Shakai.json"))
+#     # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\qs4Q4cQxyU4_vocal.wav"),
+#     #                       Path(r"D:\python\miraa-alternative\src\.temp\Wherever you are - ONE OK ROCK.json"))
+#     # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\1zwaZkOXXqw_vocal.wav"),
+#     #                       Path(r"D:\python\miraa-alternative\src\.temp\DADDY ! DADDY ! DO ! - Masayuki Suzuki.json"))
+#     # data = fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\phwvj0_XM4k_vocal.wav"),
+#     #                       Path(r"D:\python\miraa-alternative\src\.temp\JET - POLKADOT STINGRAY.json"))
+#
+#
+#     # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\GQ3V50XoLOM_vocal.wav"),
+#     #                       Path(r"D:\python\miraa-alternative\src\.temp\ライラック - 美波.json"))
+#     # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\QLBfxG0cenQ_vocal.wav"),
+#     #                       Path(r"D:\python\miraa-alternative\src\.temp\想い人 - Ryokuoushoku Shakai.json"))
+#     # fa.force_align_lyrics(Path(r"D:\python\miraa-alternative\src\.temp\vOLncha7MqM_vocal.wav"),
+#     #                       Path(r"D:\python\miraa-alternative\src\.temp\君のせい - the peggies.json"))
+#
+#     parsed = [d.to_dict() for d in data]
+#     temp = Path(r"D:\python\miraa-alternative\src\.temp\temp.json")
+#     temp.write_text(json.dumps(parsed, ensure_ascii=False), encoding="utf-8")
 
 
