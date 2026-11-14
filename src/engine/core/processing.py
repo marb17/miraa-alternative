@@ -127,7 +127,9 @@ class AudioSeparation:
         elif AUDIO_MODEL_PRESETS[self._model_name].type == "single":
             self._selected_model.load_model(model_filename=AUDIO_MODEL_PRESETS[self._model_name].name)
 
-    def separate_audio(self, audio_path: str | Path, audio_to_save: None | list[str] = None) -> bool:
+    def separate_audio(self, audio_path: str | Path,
+                       audio_to_save: None | list[str] = None,
+                       combine_audios: bool = False) -> bool:
         """
         Separates vocals into respective stems determined by model used
         :param audio_path: Path to the file
@@ -178,13 +180,24 @@ class AudioSeparation:
         for file, rename_to in zip(output_files, rename_order):
             rename_file(file, rename_to)
 
-        for file, rename in zip([new_file_name(suffix, as_path=True) for suffix in rename_order], rename_order):
+        combined_audios = None
+
+        for idx, (file, rename) in enumerate(zip([new_file_name(suffix, as_path=True) for suffix in rename_order], rename_order)):
             audio = AudioSegment.from_file(file)
             audio = audio + AUDIO_MODEL_PRESETS[self._model_name].gain
             if audio_to_save is None or rename in audio_to_save:
-                audio.export(file, format="wav")
+                if combine_audios:
+                    if idx == 0:
+                        combined_audios = audio
+                    else:
+                        combined_audios = combined_audios.overlay(audio)
+                else:
+                    audio.export(file, format="wav")
             else:
                 file.unlink()
+
+        if combined_audios:
+            combined_audios.export(new_file_name("combined"), format="wav")
 
         logger.debug(f"Finished separating")
 
