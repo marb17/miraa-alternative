@@ -16,6 +16,11 @@ from engine.utils.default.default_var import MODEL_INFO, AUDIO_MODEL_PRESETS
 import click
 from click_shell import shell
 
+def parse_csv(ctx, param, value):
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",")]
+
 # @click.group
 @shell(
     prompt="miraa > ",
@@ -49,7 +54,17 @@ def download_audio(url: str, output_type: Literal["audio", "video"]) -> None:
               type=click.Choice([key for key in AUDIO_MODEL_PRESETS]),
               default="vocal_full",
               help=f"Model to use for separation\n\n{MODEL_INFO}")
-def separate_audio(file: str, model: ALLOWED_MODEL_NAMES) -> None:
+@click.option(
+    "--audios_to_save",
+    type=str,
+    callback=parse_csv,
+    help="Comma separated list of audio names to save"
+)
+@click.option("--combine",
+              is_flag=True,
+              default=False,
+              help=f"Combine all saved tracks into one file")
+def separate_audio(file: str, model: ALLOWED_MODEL_NAMES, audios_to_save: list[str], combine: bool) -> None:
     """
     Separates the audio from the file provided
     """
@@ -69,7 +84,7 @@ def separate_audio(file: str, model: ALLOWED_MODEL_NAMES) -> None:
     click.echo(f"Separating {file_path}")
 
     with AudioSeparation(model_name=model) as separation:
-        list(separation.separate_audio(file_path))
+        separation.separate_audio(file_path, audio_to_save=audios_to_save, combine=combine)
 
 
 # miraa-alternative stuff

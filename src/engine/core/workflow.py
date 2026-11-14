@@ -116,7 +116,7 @@ class WorkflowManager:
         json_data = read_json_file(json_path)
 
         with AudioSeparation() as vs:
-            vs.separate_audio(TEMP_DIR/json_data["pre_processing"]["audio_file"])
+            vs.separate_audio(TEMP_DIR / json_data["pre_processing"]["audio_file"])
 
             write_json_file(json_path, {
                 "stems": {

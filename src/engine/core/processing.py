@@ -129,7 +129,7 @@ class AudioSeparation:
 
     def separate_audio(self, audio_path: str | Path,
                        audio_to_save: None | list[str] = None,
-                       combine_audios: bool = False) -> bool:
+                       combine: bool = False) -> bool:
         """
         Separates vocals into respective stems determined by model used
         :param audio_path: Path to the file
@@ -181,13 +181,14 @@ class AudioSeparation:
             rename_file(file, rename_to)
 
         combined_audios = None
+        all_audio_files = [new_file_name(suffix, as_path=True) for suffix in rename_order]
 
-        for idx, (file, rename) in enumerate(zip([new_file_name(suffix, as_path=True) for suffix in rename_order], rename_order)):
-            audio = AudioSegment.from_file(file)
-            audio = audio + AUDIO_MODEL_PRESETS[self._model_name].gain
+        for file, rename in zip(all_audio_files, rename_order):
             if audio_to_save is None or rename in audio_to_save:
-                if combine_audios:
-                    if idx == 0:
+                audio = AudioSegment.from_file(file)
+                audio = audio + AUDIO_MODEL_PRESETS[self._model_name].gain
+                if combine:
+                    if combined_audios is None:
                         combined_audios = audio
                     else:
                         combined_audios = combined_audios.overlay(audio)
@@ -196,8 +197,10 @@ class AudioSeparation:
             else:
                 file.unlink()
 
-        if combined_audios:
+        if combine and combined_audios is not None:
             combined_audios.export(new_file_name("combined"), format="wav")
+            for file in all_audio_files:
+                file.unlink(missing_ok=True)
 
         logger.debug(f"Finished separating")
 

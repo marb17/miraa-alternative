@@ -102,7 +102,7 @@ MODEL_INFO = """\b
 MULTI-STEM SEPARATION (Full Band):
   htdemucs_ft               Elite 4-stem model (Vocals/Drums/Bass/Other). Minimal artifacts.
   htdemucs_6s               6-stem model adds Guitar/Piano. Higher artifact risk.
-  bs-roformer_sw            Elite performance, best overall stems for drums and bass.
+  bs_roformer_sw            Elite performance, best overall stems for drums and bass.
 
 \b
 SPECIALIZED CORE UTILITIES:
